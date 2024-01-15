@@ -15,7 +15,7 @@ use std::hash::{Hash, Hasher};
 use std::io::BufReader;
 use std::mem::size_of;
 use std::os::raw::c_void;
-use std::ptr::copy_nonoverlapping as memcpy;
+use std::ptr::{copy_nonoverlapping as memcpy, slice_from_raw_parts};
 use std::time::Instant;
 
 use anyhow::{anyhow, Result};
@@ -122,7 +122,7 @@ impl App {
         create_render_pass(&instance, &device, &mut data)?;
         create_descriptor_set_layout(&device, &mut data)?;
         create_pipeline(&device, &mut data)?;
-        create_command_pool(&instance, &device, &mut data)?;
+        create_command_pools(&instance, &device, &mut data)?;
         create_color_objects(&instance, &device, &mut data)?;
         create_depth_objects(&instance, &device, &mut data)?;
         create_framebuffers(&device, &mut data)?;
@@ -176,6 +176,7 @@ impl App {
 
         self.data.images_in_flight[image_index] = in_flight_fence;
 
+        self.update_command_buffer(image_index)?;
         self.update_uniform_buffer(image_index)?;
 
         let wait_semaphores = &[self.data.image_available_semaphores[self.frame]];
@@ -214,13 +215,94 @@ impl App {
         Ok(())
     }
 
-    /// Updates the uniform buffer object for our Vulkan app.
-    unsafe fn update_uniform_buffer(&self, image_index: usize) -> Result<()> {
-        // MVP
+    /// Updates a command buffer for our Vulkan app.
+    #[rustfmt::skip]
+    unsafe fn update_command_buffer(&mut self, image_index: usize) -> Result<()> {
+        // Reset
+
+        let command_pool = self.data.command_pools[image_index];
+        self.device.reset_command_pool(command_pool, vk::CommandPoolResetFlags::empty())?;
+
+        let command_buffer = self.data.command_buffers[image_index];
+
+        // Model
 
         let time = self.start.elapsed().as_secs_f32();
 
         let model = Mat4::from_axis_angle(vec3(0.0, 0.0, 1.0), Deg(90.0) * time);
+
+        let model_bytes = &*slice_from_raw_parts(
+            &model as *const Mat4 as *const u8,
+            size_of::<Mat4>()
+        );
+
+        let opacity = 0.25f32;
+        let opacity_bytes = &opacity.to_ne_bytes()[..];
+
+        // Commands
+
+        let info = vk::CommandBufferBeginInfo::builder().flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
+
+        self.device.begin_command_buffer(command_buffer, &info)?;
+
+        let render_area = vk::Rect2D::builder()
+            .offset(vk::Offset2D::default())
+            .extent(self.data.swapchain_extent);
+
+        let color_clear_value = vk::ClearValue {
+            color: vk::ClearColorValue {
+                float32: [0.0, 0.0, 0.0, 1.0],
+            },
+        };
+
+        let depth_clear_value = vk::ClearValue {
+            depth_stencil: vk::ClearDepthStencilValue { depth: 1.0, stencil: 0 },
+        };
+
+        let clear_values = &[color_clear_value, depth_clear_value];
+        let info = vk::RenderPassBeginInfo::builder()
+            .render_pass(self.data.render_pass)
+            .framebuffer(self.data.framebuffers[image_index])
+            .render_area(render_area)
+            .clear_values(clear_values);
+
+        self.device.cmd_begin_render_pass(command_buffer, &info, vk::SubpassContents::INLINE);
+        self.device.cmd_bind_pipeline(command_buffer, vk::PipelineBindPoint::GRAPHICS, self.data.pipeline);
+        self.device.cmd_bind_vertex_buffers(command_buffer, 0, &[self.data.vertex_buffer], &[0]);
+        self.device.cmd_bind_index_buffer(command_buffer, self.data.index_buffer, 0, vk::IndexType::UINT32);
+        self.device.cmd_bind_descriptor_sets(
+            command_buffer,
+            vk::PipelineBindPoint::GRAPHICS,
+            self.data.pipeline_layout,
+            0,
+            &[self.data.descriptor_sets[image_index]],
+            &[],
+        );
+        self.device.cmd_push_constants(
+            command_buffer,
+            self.data.pipeline_layout,
+            vk::ShaderStageFlags::VERTEX,
+            0,
+            model_bytes,
+        );
+        self.device.cmd_push_constants(
+            command_buffer,
+            self.data.pipeline_layout,
+            vk::ShaderStageFlags::FRAGMENT,
+            64,
+            opacity_bytes,
+        );
+        self.device.cmd_draw_indexed(command_buffer, self.data.indices.len() as u32, 1, 0, 0, 0);
+        self.device.cmd_end_render_pass(command_buffer);
+
+        self.device.end_command_buffer(command_buffer)?;
+
+        Ok(())
+    }
+
+    /// Updates the uniform buffer object for our Vulkan app.
+    unsafe fn update_uniform_buffer(&self, image_index: usize) -> Result<()> {
+        // MVP
 
         let view = Mat4::look_at_rh(
             point3::<f32>(2.0, 2.0, 2.0),
@@ -244,7 +326,7 @@ impl App {
                 10.0,
             );
 
-        let ubo = UniformBufferObject { model, view, proj };
+        let ubo = UniformBufferObject { view, proj };
 
         // Copy
 
@@ -292,6 +374,7 @@ impl App {
         self.data.in_flight_fences.iter().for_each(|f| self.device.destroy_fence(*f, None));
         self.data.render_finished_semaphores.iter().for_each(|s| self.device.destroy_semaphore(*s, None));
         self.data.image_available_semaphores.iter().for_each(|s| self.device.destroy_semaphore(*s, None));
+        self.data.command_pools.iter().for_each(|p| self.device.destroy_command_pool(*p, None));
         self.device.free_memory(self.data.index_buffer_memory, None);
         self.device.destroy_buffer(self.data.index_buffer, None);
         self.device.free_memory(self.data.vertex_buffer_memory, None);
@@ -315,7 +398,6 @@ impl App {
     /// Destroys the parts of our Vulkan app related to the swapchain.
     #[rustfmt::skip]
     unsafe fn destroy_swapchain(&mut self) {
-        self.device.free_command_buffers(self.data.command_pool, &self.data.command_buffers);
         self.device.destroy_descriptor_pool(self.data.descriptor_pool, None);
         self.data.uniform_buffers_memory.iter().for_each(|m| self.device.free_memory(*m, None));
         self.data.uniform_buffers.iter().for_each(|b| self.device.destroy_buffer(*b, None));
@@ -389,6 +471,7 @@ struct AppData {
     descriptor_pool: vk::DescriptorPool,
     descriptor_sets: Vec<vk::DescriptorSet>,
     // Command Buffers
+    command_pools: Vec<vk::CommandPool>,
     command_buffers: Vec<vk::CommandBuffer>,
     // Sync Objects
     image_available_semaphores: Vec<vk::Semaphore>,
@@ -934,7 +1017,13 @@ unsafe fn create_pipeline(device: &Device, data: &mut AppData) -> Result<()> {
 
     let attachment = vk::PipelineColorBlendAttachmentState::builder()
         .color_write_mask(vk::ColorComponentFlags::all())
-        .blend_enable(false);
+        .blend_enable(true)
+        .src_color_blend_factor(vk::BlendFactor::SRC_ALPHA)
+        .dst_color_blend_factor(vk::BlendFactor::ONE_MINUS_SRC_ALPHA)
+        .color_blend_op(vk::BlendOp::ADD)
+        .src_alpha_blend_factor(vk::BlendFactor::ONE)
+        .dst_alpha_blend_factor(vk::BlendFactor::ZERO)
+        .alpha_blend_op(vk::BlendOp::ADD);
 
     let attachments = &[attachment];
     let color_blend_state = vk::PipelineColorBlendStateCreateInfo::builder()
@@ -943,10 +1032,25 @@ unsafe fn create_pipeline(device: &Device, data: &mut AppData) -> Result<()> {
         .attachments(attachments)
         .blend_constants([0.0, 0.0, 0.0, 0.0]);
 
+    // Push Constant Ranges
+
+    let vert_push_constant_range = vk::PushConstantRange::builder()
+        .stage_flags(vk::ShaderStageFlags::VERTEX)
+        .offset(0)
+        .size(64);
+
+    let frag_push_constant_range = vk::PushConstantRange::builder()
+        .stage_flags(vk::ShaderStageFlags::FRAGMENT)
+        .offset(64)
+        .size(4);
+
     // Layout
 
     let set_layouts = &[data.descriptor_set_layout];
-    let layout_info = vk::PipelineLayoutCreateInfo::builder().set_layouts(set_layouts);
+    let push_constant_ranges = &[vert_push_constant_range, frag_push_constant_range];
+    let layout_info = vk::PipelineLayoutCreateInfo::builder()
+        .set_layouts(set_layouts)
+        .push_constant_ranges(push_constant_ranges);
 
     data.pipeline_layout = device.create_pipeline_layout(&layout_info, None)?;
 
@@ -1016,14 +1120,30 @@ unsafe fn create_framebuffers(device: &Device, data: &mut AppData) -> Result<()>
 // Command Pool
 //================================================
 
-unsafe fn create_command_pool(instance: &Instance, device: &Device, data: &mut AppData) -> Result<()> {
-    let indices = QueueFamilyIndices::get(instance, data, data.physical_device)?;
+unsafe fn create_command_pools(instance: &Instance, device: &Device, data: &mut AppData) -> Result<()> {
+    // Global
 
-    let info = vk::CommandPoolCreateInfo::builder().queue_family_index(indices.graphics);
+    data.command_pool = create_command_pool(instance, device, data)?;
 
-    data.command_pool = device.create_command_pool(&info, None)?;
+    // Per-framebuffer
+
+    let num_images = data.swapchain_images.len();
+    for _ in 0..num_images {
+        let command_pool = create_command_pool(instance, device, data)?;
+        data.command_pools.push(command_pool);
+    }
 
     Ok(())
+}
+
+unsafe fn create_command_pool(instance: &Instance, device: &Device, data: &mut AppData) -> Result<vk::CommandPool> {
+    let indices = QueueFamilyIndices::get(instance, data, data.physical_device)?;
+
+    let info = vk::CommandPoolCreateInfo::builder()
+        .flags(vk::CommandPoolCreateFlags::TRANSIENT)
+        .queue_family_index(indices.graphics);
+
+    Ok(device.create_command_pool(&info, None)?)
 }
 
 //================================================
@@ -1655,59 +1775,15 @@ unsafe fn create_descriptor_sets(device: &Device, data: &mut AppData) -> Result<
 //================================================
 
 unsafe fn create_command_buffers(device: &Device, data: &mut AppData) -> Result<()> {
-    // Allocate
+    let num_images = data.swapchain_images.len();
+    for image_index in 0..num_images {
+        let allocate_info = vk::CommandBufferAllocateInfo::builder()
+            .command_pool(data.command_pools[image_index])
+            .level(vk::CommandBufferLevel::PRIMARY)
+            .command_buffer_count(1);
 
-    let allocate_info = vk::CommandBufferAllocateInfo::builder()
-        .command_pool(data.command_pool)
-        .level(vk::CommandBufferLevel::PRIMARY)
-        .command_buffer_count(data.framebuffers.len() as u32);
-
-    data.command_buffers = device.allocate_command_buffers(&allocate_info)?;
-
-    // Commands
-
-    for (i, command_buffer) in data.command_buffers.iter().enumerate() {
-        let info = vk::CommandBufferBeginInfo::builder();
-
-        device.begin_command_buffer(*command_buffer, &info)?;
-
-        let render_area = vk::Rect2D::builder()
-            .offset(vk::Offset2D::default())
-            .extent(data.swapchain_extent);
-
-        let color_clear_value = vk::ClearValue {
-            color: vk::ClearColorValue {
-                float32: [0.0, 0.0, 0.0, 1.0],
-            },
-        };
-
-        let depth_clear_value = vk::ClearValue {
-            depth_stencil: vk::ClearDepthStencilValue { depth: 1.0, stencil: 0 },
-        };
-
-        let clear_values = &[color_clear_value, depth_clear_value];
-        let info = vk::RenderPassBeginInfo::builder()
-            .render_pass(data.render_pass)
-            .framebuffer(data.framebuffers[i])
-            .render_area(render_area)
-            .clear_values(clear_values);
-
-        device.cmd_begin_render_pass(*command_buffer, &info, vk::SubpassContents::INLINE);
-        device.cmd_bind_pipeline(*command_buffer, vk::PipelineBindPoint::GRAPHICS, data.pipeline);
-        device.cmd_bind_vertex_buffers(*command_buffer, 0, &[data.vertex_buffer], &[0]);
-        device.cmd_bind_index_buffer(*command_buffer, data.index_buffer, 0, vk::IndexType::UINT32);
-        device.cmd_bind_descriptor_sets(
-            *command_buffer,
-            vk::PipelineBindPoint::GRAPHICS,
-            data.pipeline_layout,
-            0,
-            &[data.descriptor_sets[i]],
-            &[],
-        );
-        device.cmd_draw_indexed(*command_buffer, data.indices.len() as u32, 1, 0, 0, 0);
-        device.cmd_end_render_pass(*command_buffer);
-
-        device.end_command_buffer(*command_buffer)?;
+        let command_buffer = device.allocate_command_buffers(&allocate_info)?[0];
+        data.command_buffers.push(command_buffer);
     }
 
     Ok(())
@@ -1790,7 +1866,6 @@ impl SwapchainSupport {
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
 struct UniformBufferObject {
-    model: Mat4,
     view: Mat4,
     proj: Mat4,
 }
