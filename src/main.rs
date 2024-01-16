@@ -28,7 +28,7 @@ use vulkanalia::prelude::v1_0::*;
 use vulkanalia::window as vk_window;
 use vulkanalia::Version;
 use winit::dpi::LogicalSize;
-use winit::event::{Event, WindowEvent};
+use winit::event::{ElementState, Event, VirtualKeyCode, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
 use winit::window::{Window, WindowBuilder};
 
@@ -90,6 +90,16 @@ fn main() -> Result<()> {
                 *control_flow = ControlFlow::Exit;
                 unsafe { app.destroy(); }
             }
+            // Handle keyboard events.
+            Event::WindowEvent { event: WindowEvent::KeyboardInput { input, .. }, .. } => {
+                if input.state == ElementState::Pressed {
+                    match input.virtual_keycode {
+                        Some(VirtualKeyCode::Left) if app.models > 1 => app.models -= 1,
+                        Some(VirtualKeyCode::Right) if app.models < 9 => app.models += 1,
+                        _ => { }
+                    }
+                }
+            }
             _ => {}
         }
     });
@@ -105,6 +115,7 @@ struct App {
     frame: usize,
     resized: bool,
     start: Instant,
+    models: usize,
 }
 
 impl App {
@@ -145,6 +156,7 @@ impl App {
             frame: 0,
             resized: false,
             start: Instant::now(),
+            models: 1,
         })
     }
 
@@ -225,20 +237,6 @@ impl App {
 
         let command_buffer = self.data.command_buffers[image_index];
 
-        // Model
-
-        let time = self.start.elapsed().as_secs_f32();
-
-        let model = Mat4::from_axis_angle(vec3(0.0, 0.0, 1.0), Deg(90.0) * time);
-
-        let model_bytes = &*slice_from_raw_parts(
-            &model as *const Mat4 as *const u8,
-            size_of::<Mat4>()
-        );
-
-        let opacity = 0.25f32;
-        let opacity_bytes = &opacity.to_ne_bytes()[..];
-
         // Commands
 
         let info = vk::CommandBufferBeginInfo::builder().flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
@@ -266,7 +264,75 @@ impl App {
             .render_area(render_area)
             .clear_values(clear_values);
 
-        self.device.cmd_begin_render_pass(command_buffer, &info, vk::SubpassContents::INLINE);
+        self.device.cmd_begin_render_pass(command_buffer, &info, vk::SubpassContents::SECONDARY_COMMAND_BUFFERS);
+
+        let secondary_command_buffers = (0..self.models)
+            .map(|i| self.update_secondary_command_buffer(image_index, i))
+            .collect::<Result<Vec<_>, _>>()?;
+        self.device.cmd_execute_commands(command_buffer, &secondary_command_buffers[..]);
+
+        self.device.cmd_end_render_pass(command_buffer);
+
+        self.device.end_command_buffer(command_buffer)?;
+
+        Ok(())
+    }
+
+    /// Updates a secondary command buffer for our Vulkan app.
+    #[rustfmt::skip]
+    unsafe fn update_secondary_command_buffer(
+        &mut self,
+        image_index: usize,
+        model_index: usize,
+    ) -> Result<vk::CommandBuffer> {
+        // Allocate
+
+        let command_buffers = &mut self.data.secondary_command_buffers[image_index];
+        while model_index >= command_buffers.len() {
+            let allocate_info = vk::CommandBufferAllocateInfo::builder()
+                .command_pool(self.data.command_pools[image_index])
+                .level(vk::CommandBufferLevel::SECONDARY)
+                .command_buffer_count(1);
+
+            let command_buffer = self.device.allocate_command_buffers(&allocate_info)?[0];
+            command_buffers.push(command_buffer);
+        }
+
+        let command_buffer = command_buffers[model_index];
+
+        // Model
+
+        let y = (((model_index % 3) as f32) * 1.5) - 1.25;
+        let z = (((model_index / 3) as f32) * -1.0) + 1.0;
+
+        let time = self.start.elapsed().as_secs_f32();
+
+        let model = Mat4::from_translation(vec3(0.0, y, z)) * Mat4::from_axis_angle(
+            vec3(0.0, 0.0, 1.0),
+            Deg(90.0) * time
+        );
+
+        let model_bytes = &*slice_from_raw_parts(
+            &model as *const Mat4 as *const u8,
+            size_of::<Mat4>()
+        );
+
+        let opacity = (model_index + 1) as f32 * 0.2;
+        let opacity_bytes = &opacity.to_ne_bytes()[..];
+
+        // Commands
+
+        let inheritance_info = vk::CommandBufferInheritanceInfo::builder()
+            .render_pass(self.data.render_pass)
+            .subpass(0)
+            .framebuffer(self.data.framebuffers[image_index]);
+
+        let info = vk::CommandBufferBeginInfo::builder()
+            .flags(vk::CommandBufferUsageFlags::RENDER_PASS_CONTINUE)
+            .inheritance_info(&inheritance_info);
+
+        self.device.begin_command_buffer(command_buffer, &info)?;
+
         self.device.cmd_bind_pipeline(command_buffer, vk::PipelineBindPoint::GRAPHICS, self.data.pipeline);
         self.device.cmd_bind_vertex_buffers(command_buffer, 0, &[self.data.vertex_buffer], &[0]);
         self.device.cmd_bind_index_buffer(command_buffer, self.data.index_buffer, 0, vk::IndexType::UINT32);
@@ -293,11 +359,10 @@ impl App {
             opacity_bytes,
         );
         self.device.cmd_draw_indexed(command_buffer, self.data.indices.len() as u32, 1, 0, 0, 0);
-        self.device.cmd_end_render_pass(command_buffer);
 
         self.device.end_command_buffer(command_buffer)?;
 
-        Ok(())
+        Ok(command_buffer)
     }
 
     /// Updates the uniform buffer object for our Vulkan app.
@@ -305,7 +370,7 @@ impl App {
         // MVP
 
         let view = Mat4::look_at_rh(
-            point3::<f32>(2.0, 2.0, 2.0),
+            point3::<f32>(6.0, 0.0, 2.0),
             point3::<f32>(0.0, 0.0, 0.0),
             vec3(0.0, 0.0, 1.0),
         );
@@ -473,6 +538,7 @@ struct AppData {
     // Command Buffers
     command_pools: Vec<vk::CommandPool>,
     command_buffers: Vec<vk::CommandBuffer>,
+    secondary_command_buffers: Vec<Vec<vk::CommandBuffer>>,
     // Sync Objects
     image_available_semaphores: Vec<vk::Semaphore>,
     render_finished_semaphores: Vec<vk::Semaphore>,
@@ -1785,6 +1851,8 @@ unsafe fn create_command_buffers(device: &Device, data: &mut AppData) -> Result<
         let command_buffer = device.allocate_command_buffers(&allocate_info)?[0];
         data.command_buffers.push(command_buffer);
     }
+
+    data.secondary_command_buffers = vec![vec![]; data.swapchain_images.len()];
 
     Ok(())
 }
