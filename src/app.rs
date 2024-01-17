@@ -8,18 +8,20 @@
     clippy::unnecessary_wraps
 )]
 
-use std::collections::{HashMap, HashSet};
+use crate::model;
+use crate::model::Model;
+use crate::model::Mat4;
+use crate::model::Vertex;
+use std::collections::{HashSet};
+use cgmath::{point3, vec2, vec3, Deg};
 use std::ffi::CStr;
 use std::fs::File;
-use std::hash::{Hash, Hasher};
-use std::io::BufReader;
 use std::mem::size_of;
 use std::os::raw::c_void;
 use std::ptr::{copy_nonoverlapping as memcpy, slice_from_raw_parts};
 use std::time::Instant;
 
 use anyhow::{anyhow, Result};
-use cgmath::{point3, vec2, vec3, Deg};
 use log::*;
 use thiserror::Error;
 use vulkanalia::bytecode::Bytecode;
@@ -45,10 +47,6 @@ const PORTABILITY_MACOS_VERSION: Version = Version::new(1, 3, 216);
 
 /// The maximum number of frames that can be processed concurrently.
 const MAX_FRAMES_IN_FLIGHT: usize = 2;
-
-type Vec2 = cgmath::Vector2<f32>;
-type Vec3 = cgmath::Vector3<f32>;
-type Mat4 = cgmath::Matrix4<f32>;
 
 /// Our Vulkan app.
 #[derive(Clone, Debug)]
@@ -85,7 +83,7 @@ impl App {
         create_texture_image(&instance, &device, &mut data)?;
         create_texture_image_view(&device, &mut data)?;
         create_texture_sampler(&device, &mut data)?;
-        load_model(&mut data)?;
+        data.model.load_model()?;
         create_vertex_buffer(&instance, &device, &mut data)?;
         create_index_buffer(&instance, &device, &mut data)?;
         create_uniform_buffers(&instance, &device, &mut data)?;
@@ -303,7 +301,7 @@ impl App {
             64,
             opacity_bytes,
         );
-        self.device.cmd_draw_indexed(command_buffer, self.data.indices.len() as u32, 1, 0, 0, 0);
+        self.device.cmd_draw_indexed(command_buffer, self.data.model.indices.len() as u32, 1, 0, 0, 0);
 
         self.device.end_command_buffer(command_buffer)?;
 
@@ -467,9 +465,7 @@ pub struct AppData {
     texture_image_memory: vk::DeviceMemory,
     texture_image_view: vk::ImageView,
     texture_sampler: vk::Sampler,
-    // Model
-    vertices: Vec<Vertex>,
-    indices: Vec<u32>,
+    model: Model,
     // Buffers
     vertex_buffer: vk::Buffer,
     vertex_buffer_memory: vk::DeviceMemory,
@@ -965,7 +961,7 @@ unsafe fn create_pipeline(device: &Device, data: &mut AppData) -> Result<()> {
 
     // Vertex Input State
 
-    let binding_descriptions = &[Vertex::binding_description()];
+    let binding_descriptions = &[model::Vertex::binding_description()];
     let attribute_descriptions = Vertex::attribute_descriptions();
     let vertex_input_state = vk::PipelineVertexInputStateCreateInfo::builder()
         .vertex_binding_descriptions(binding_descriptions)
@@ -1539,67 +1535,13 @@ unsafe fn create_texture_sampler(device: &Device, data: &mut AppData) -> Result<
 }
 
 //================================================
-// Model
-//================================================
-
-fn load_model(data: &mut AppData) -> Result<()> {
-    // Model
-
-    let mut reader = BufReader::new(File::open("res/model/viking_room/viking_room.obj")?);
-
-    let (models, _) = tobj::load_obj_buf(
-        &mut reader,
-        &tobj::LoadOptions {
-            triangulate: true,
-            ..Default::default()
-        },
-        |_| Ok(Default::default()),
-    )?;
-
-    // Vertices / Indices
-
-    let mut unique_vertices = HashMap::new();
-
-    for model in &models {
-        for index in &model.mesh.indices {
-            let pos_offset = (3 * index) as usize;
-            let tex_coord_offset = (2 * index) as usize;
-
-            let vertex = Vertex {
-                pos: vec3(
-                    model.mesh.positions[pos_offset],
-                    model.mesh.positions[pos_offset + 1],
-                    model.mesh.positions[pos_offset + 2],
-                ),
-                color: vec3(1.0, 1.0, 1.0),
-                tex_coord: vec2(
-                    model.mesh.texcoords[tex_coord_offset],
-                    1.0 - model.mesh.texcoords[tex_coord_offset + 1],
-                ),
-            };
-
-            if let Some(index) = unique_vertices.get(&vertex) {
-                data.indices.push(*index as u32);
-            } else {
-                let index = data.vertices.len();
-                unique_vertices.insert(vertex, index);
-                data.vertices.push(vertex);
-                data.indices.push(index as u32);
-            }
-        }
-    }
-
-    Ok(())
-}
-
-//================================================
 // Buffers
 //================================================
 
 unsafe fn create_vertex_buffer(instance: &Instance, device: &Device, data: &mut AppData) -> Result<()> {
     // Create (staging)
 
-    let size = (size_of::<Vertex>() * data.vertices.len()) as u64;
+    let size = (size_of::<Vertex>() * data.model.vertices.len()) as u64;
 
     let (staging_buffer, staging_buffer_memory) = create_buffer(
         instance,
@@ -1614,7 +1556,7 @@ unsafe fn create_vertex_buffer(instance: &Instance, device: &Device, data: &mut 
 
     let memory = device.map_memory(staging_buffer_memory, 0, size, vk::MemoryMapFlags::empty())?;
 
-    memcpy(data.vertices.as_ptr(), memory.cast(), data.vertices.len());
+    memcpy(data.model.vertices.as_ptr(), memory.cast(), data.model.vertices.len());
 
     device.unmap_memory(staging_buffer_memory);
 
@@ -1647,7 +1589,7 @@ unsafe fn create_vertex_buffer(instance: &Instance, device: &Device, data: &mut 
 unsafe fn create_index_buffer(instance: &Instance, device: &Device, data: &mut AppData) -> Result<()> {
     // Create (staging)
 
-    let size = (size_of::<u32>() * data.indices.len()) as u64;
+    let size = (size_of::<u32>() * data.model.indices.len()) as u64;
 
     let (staging_buffer, staging_buffer_memory) = create_buffer(
         instance,
@@ -1662,7 +1604,7 @@ unsafe fn create_index_buffer(instance: &Instance, device: &Device, data: &mut A
 
     let memory = device.map_memory(staging_buffer_memory, 0, size, vk::MemoryMapFlags::empty())?;
 
-    memcpy(data.indices.as_ptr(), memory.cast(), data.indices.len());
+    memcpy(data.model.indices.as_ptr(), memory.cast(), data.model.indices.len());
 
     device.unmap_memory(staging_buffer_memory);
 
@@ -1881,71 +1823,6 @@ impl SwapchainSupport {
 struct UniformBufferObject {
     view: Mat4,
     proj: Mat4,
-}
-
-#[repr(C)]
-#[derive(Copy, Clone, Debug)]
-struct Vertex {
-    pos: Vec3,
-    color: Vec3,
-    tex_coord: Vec2,
-}
-
-impl Vertex {
-    fn new(pos: Vec3, color: Vec3, tex_coord: Vec2) -> Self {
-        Self { pos, color, tex_coord }
-    }
-
-    fn binding_description() -> vk::VertexInputBindingDescription {
-        vk::VertexInputBindingDescription::builder()
-            .binding(0)
-            .stride(size_of::<Vertex>() as u32)
-            .input_rate(vk::VertexInputRate::VERTEX)
-            .build()
-    }
-
-    fn attribute_descriptions() -> [vk::VertexInputAttributeDescription; 3] {
-        let pos = vk::VertexInputAttributeDescription::builder()
-            .binding(0)
-            .location(0)
-            .format(vk::Format::R32G32B32_SFLOAT)
-            .offset(0)
-            .build();
-        let color = vk::VertexInputAttributeDescription::builder()
-            .binding(0)
-            .location(1)
-            .format(vk::Format::R32G32B32_SFLOAT)
-            .offset(size_of::<Vec3>() as u32)
-            .build();
-        let tex_coord = vk::VertexInputAttributeDescription::builder()
-            .binding(0)
-            .location(2)
-            .format(vk::Format::R32G32_SFLOAT)
-            .offset((size_of::<Vec3>() + size_of::<Vec3>()) as u32)
-            .build();
-        [pos, color, tex_coord]
-    }
-}
-
-impl PartialEq for Vertex {
-    fn eq(&self, other: &Self) -> bool {
-        self.pos == other.pos && self.color == other.color && self.tex_coord == other.tex_coord
-    }
-}
-
-impl Eq for Vertex {}
-
-impl Hash for Vertex {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.pos[0].to_bits().hash(state);
-        self.pos[1].to_bits().hash(state);
-        self.pos[2].to_bits().hash(state);
-        self.color[0].to_bits().hash(state);
-        self.color[1].to_bits().hash(state);
-        self.color[2].to_bits().hash(state);
-        self.tex_coord[0].to_bits().hash(state);
-        self.tex_coord[1].to_bits().hash(state);
-    }
 }
 
 //================================================
