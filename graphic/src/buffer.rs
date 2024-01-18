@@ -16,7 +16,7 @@ pub struct Buffer {
 pub unsafe fn create_buffer(
     instance: &Instance,
     device: &Device,
-    physical_device: &vk::PhysicalDevice,
+    physical_device: vk::PhysicalDevice,
     size: vk::DeviceSize,
     usage: vk::BufferUsageFlags,
     properties: vk::MemoryPropertyFlags,
@@ -47,8 +47,8 @@ pub unsafe fn create_buffer(
 
 pub unsafe fn copy_buffer(
     device: &Device,
-    graphics_queue: &vk::Queue, 
-    command_pool: &vk::CommandPool,
+    graphics_queue: vk::Queue, 
+    command_pool: vk::CommandPool,
     source: vk::Buffer,
     destination: vk::Buffer,
     size: vk::DeviceSize,

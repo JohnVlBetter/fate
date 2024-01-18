@@ -20,9 +20,8 @@ impl Texture {
     // Texture
     //================================================
     
-    pub unsafe fn create_texture_image(&mut self, instance: &Instance, device: &Device,
-        physical_device: &vk::PhysicalDevice, graphics_queue: &vk::Queue, 
-        command_pool: &vk::CommandPool) -> Result<()> {
+    pub unsafe fn create_texture_image(&mut self, instance: &Instance, device: &Device, 
+        physical_device: vk::PhysicalDevice, graphics_queue: vk::Queue, command_pool: vk::CommandPool) -> Result<()> {
         // Load
     
         let image = File::open("res/model/viking_room/viking_room.png")?;
@@ -120,9 +119,9 @@ impl Texture {
     pub unsafe fn generate_mipmaps(
         instance: &Instance,
         device: &Device,
-        physical_device: &vk::PhysicalDevice,
-        graphics_queue: &vk::Queue, 
-        command_pool: &vk::CommandPool,
+        physical_device: vk::PhysicalDevice,
+        graphics_queue: vk::Queue, 
+        command_pool: vk::CommandPool,
         image: vk::Image,
         format: vk::Format,
         width: u32,
@@ -132,7 +131,7 @@ impl Texture {
         // Support
     
         if !instance
-            .get_physical_device_format_properties(*physical_device, format)
+            .get_physical_device_format_properties(physical_device, format)
             .optimal_tiling_features
             .contains(vk::FormatFeatureFlags::SAMPLED_IMAGE_FILTER_LINEAR)
         {
@@ -304,7 +303,7 @@ impl Texture {
 pub unsafe fn create_image(
     instance: &Instance,
     device: &Device,
-    physical_device: &vk::PhysicalDevice,
+    physical_device: vk::PhysicalDevice,
     width: u32,
     height: u32,
     mip_levels: u32,
@@ -362,10 +361,10 @@ pub unsafe fn create_image_view(
 }
 pub unsafe fn transition_image_layout(
     device: &Device,
-    graphics_queue: &vk::Queue, 
-    command_pool: &vk::CommandPool,
+    graphics_queue: vk::Queue, 
+    command_pool: vk::CommandPool,
     image: vk::Image,
-    format: vk::Format,
+    _format: vk::Format,
     old_layout: vk::ImageLayout,
     new_layout: vk::ImageLayout,
     mip_levels: u32,
@@ -415,8 +414,8 @@ pub unsafe fn transition_image_layout(
 }
 unsafe fn copy_buffer_to_image(
     device: &Device,
-    graphics_queue: &vk::Queue, 
-    command_pool: &vk::CommandPool,
+    graphics_queue: vk::Queue, 
+    command_pool: vk::CommandPool,
     buffer: vk::Buffer,
     image: vk::Image,
     width: u32,

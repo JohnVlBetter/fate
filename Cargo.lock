@@ -355,6 +355,7 @@ dependencies = [
  "thiserror",
  "tobj",
  "vulkanalia",
+ "winit",
 ]
 
 [[package]]

@@ -84,8 +84,8 @@ pub struct Model {
 }
 
 impl Model {
-    pub fn load_model(&mut self) -> Result<()> {
-        let mut reader = BufReader::new(File::open("res/model/viking_room/viking_room.obj")?);
+    pub fn new(&mut self, path: &str) -> Result<()> {
+        let mut reader = BufReader::new(File::open(path)?);
 
         let (models, _) = tobj::load_obj_buf(
             &mut reader,
