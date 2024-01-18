@@ -334,13 +334,27 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "cgmath",
+ "fate_graphic",
+ "log",
+ "png",
+ "pretty_env_logger",
+ "thiserror",
+ "vulkanalia",
+ "winit",
+]
+
+[[package]]
+name = "fate_graphic"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "cgmath",
  "log",
  "png",
  "pretty_env_logger",
  "thiserror",
  "tobj",
  "vulkanalia",
- "winit",
 ]
 
 [[package]]

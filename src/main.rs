@@ -3,7 +3,7 @@ use winit::event::{ElementState, Event, VirtualKeyCode, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
 use winit::window::WindowBuilder;
 
-use fate::app;
+mod app;
 use anyhow::Result;
 
 #[rustfmt::skip]

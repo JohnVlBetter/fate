@@ -8,12 +8,9 @@
     clippy::unnecessary_wraps
 )]
 
-use crate::model;
-use crate::model::Model;
-use crate::model::Mat4;
-use crate::model::Vertex;
-use std::collections::{HashSet};
-use cgmath::{point3, vec2, vec3, Deg};
+use fate_graphic::model::*;
+use std::collections::HashSet;
+use cgmath::{point3, vec3, Deg};
 use std::ffi::CStr;
 use std::fs::File;
 use std::mem::size_of;
@@ -961,7 +958,7 @@ unsafe fn create_pipeline(device: &Device, data: &mut AppData) -> Result<()> {
 
     // Vertex Input State
 
-    let binding_descriptions = &[model::Vertex::binding_description()];
+    let binding_descriptions = &[Vertex::binding_description()];
     let attribute_descriptions = Vertex::attribute_descriptions();
     let vertex_input_state = vk::PipelineVertexInputStateCreateInfo::builder()
         .vertex_binding_descriptions(binding_descriptions)

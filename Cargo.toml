@@ -1,3 +1,11 @@
+[workspace]
+resolver="2"
+members=[
+    "graphic",
+]
+[workspace.package]
+version = "0.1.0"
+
 [package]
 name = "fate"
 version = "0.1.0"
@@ -6,12 +14,12 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+fate_graphic = {path = "./graphic", version = "0.1.0"}
 anyhow = "1"
 log = "0.4"
 cgmath = "0.18"
 png = "0.17"
 pretty_env_logger = "0.4"
 thiserror = "1"
-tobj = { version = "3", features = ["log"] }
 vulkanalia = { version = "=0.22.0", features = ["libloading", "provisional", "window"] }
 winit = "0.28"
