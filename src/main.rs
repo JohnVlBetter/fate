@@ -1,3 +1,4 @@
+use app::App;
 use winit::dpi::LogicalSize;
 use winit::event::{ElementState, Event, VirtualKeyCode, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
@@ -19,8 +20,7 @@ fn main() -> Result<()> {
         .build(&event_loop)?;
 
     // App
-
-    let mut app = unsafe { app::App::create(&window)? };
+    let mut app = unsafe { App::create(&window) }?;
     let mut destroying = false;
     let mut minimized = false;
     event_loop.run(move |event, _, control_flow| {

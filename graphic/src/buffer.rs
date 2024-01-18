@@ -2,6 +2,7 @@ use crate::tools::*;
 use anyhow::Result;
 use vulkanalia::prelude::v1_0::*;
 
+#[derive(Clone, Debug, Default)]
 pub struct Buffer {
     // Buffers
     pub vertex_buffer: vk::Buffer,

@@ -77,8 +77,7 @@ impl Hash for Vertex {
     }
 }
 
-#[derive(Clone, Debug)]
-#[derive(Default)]
+#[derive(Clone, Debug, Default)]
 pub struct Model {
     pub vertices: Vec<Vertex>,
     pub indices: Vec<u32>,
