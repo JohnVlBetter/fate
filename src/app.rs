@@ -8,6 +8,7 @@
     clippy::unnecessary_wraps
 )]
 
+use fate_graphic::device::VkDevice;
 use fate_graphic::model::*;
 use fate_graphic::swapchain::Swapchain;
 use fate_graphic::texture::*;
@@ -37,16 +38,6 @@ use vulkanalia::vk::ExtDebugUtilsExtension;
 use vulkanalia::vk::KhrSurfaceExtension;
 use vulkanalia::vk::KhrSwapchainExtension;
 
-/// Whether the validation layers should be enabled.
-const VALIDATION_ENABLED: bool = cfg!(debug_assertions);
-/// The name of the validation layers.
-const VALIDATION_LAYER: vk::ExtensionName = vk::ExtensionName::from_bytes(b"VK_LAYER_KHRONOS_validation");
-
-/// The required device extensions.
-const DEVICE_EXTENSIONS: &[vk::ExtensionName] = &[vk::KHR_SWAPCHAIN_EXTENSION.name];
-/// The Vulkan SDK version that started requiring the portability subset extension for macOS.
-const PORTABILITY_MACOS_VERSION: Version = Version::new(1, 3, 216);
-
 /// The maximum number of frames that can be processed concurrently.
 const MAX_FRAMES_IN_FLIGHT: usize = 2;
 
@@ -56,7 +47,7 @@ pub struct App {
     pub entry: Entry,
     pub instance: Instance,
     pub data: AppData,
-    pub device: Device,
+    pub device: VkDevice,
     pub frame: usize,
     pub resized: bool,
     pub start: Instant,
@@ -435,11 +426,6 @@ pub struct AppData {
     messenger: vk::DebugUtilsMessengerEXT,
     // Surface
     surface: vk::SurfaceKHR,
-    // Physical Device / Logical Device
-    physical_device: vk::PhysicalDevice,
-    msaa_samples: vk::SampleCountFlags,
-    graphics_queue: vk::Queue,
-    present_queue: vk::Queue,
     // Pipeline
     render_pass: vk::RenderPass,
     descriptor_set_layout: vk::DescriptorSetLayout,
@@ -447,8 +433,6 @@ pub struct AppData {
     pipeline: vk::Pipeline,
     // Framebuffers
     framebuffers: Vec<vk::Framebuffer>,
-    // Command Pool
-    command_pool: vk::CommandPool,
     // Color
     color_image: vk::Image,
     color_image_memory: vk::DeviceMemory,
@@ -468,10 +452,6 @@ pub struct AppData {
     // Descriptors
     descriptor_pool: vk::DescriptorPool,
     descriptor_sets: Vec<vk::DescriptorSet>,
-    // Command Buffers
-    command_pools: Vec<vk::CommandPool>,
-    command_buffers: Vec<vk::CommandBuffer>,
-    secondary_command_buffers: Vec<Vec<vk::CommandBuffer>>,
     // Sync Objects
     image_available_semaphores: Vec<vk::Semaphore>,
     render_finished_semaphores: Vec<vk::Semaphore>,
@@ -580,142 +560,6 @@ extern "system" fn debug_callback(
     }
 
     vk::FALSE
-}
-
-//================================================
-// Physical Device
-//================================================
-
-unsafe fn pick_physical_device(instance: &Instance, data: &mut AppData) -> Result<()> {
-    for physical_device in instance.enumerate_physical_devices()? {
-        let properties = instance.get_physical_device_properties(physical_device);
-
-        if let Err(error) = check_physical_device(instance, data, physical_device) {
-            warn!("Skipping physical device (`{}`): {}", properties.device_name, error);
-        } else {
-            info!("Selected physical device (`{}`).", properties.device_name);
-            data.physical_device = physical_device;
-            data.msaa_samples = get_max_msaa_samples(instance, data);
-            return Ok(());
-        }
-    }
-
-    Err(anyhow!("Failed to find suitable physical device."))
-}
-
-unsafe fn check_physical_device(
-    instance: &Instance,
-    data: &AppData,
-    physical_device: vk::PhysicalDevice,
-) -> Result<()> {
-    QueueFamilyIndices::get(instance, data.surface, physical_device)?;
-    check_physical_device_extensions(instance, physical_device)?;
-
-    let support = SwapchainSupport::get(instance, physical_device, data.surface)?;
-    if support.formats.is_empty() || support.present_modes.is_empty() {
-        return Err(anyhow!(SuitabilityError("Insufficient swapchain support.")));
-    }
-
-    let features = instance.get_physical_device_features(physical_device);
-    if features.sampler_anisotropy != vk::TRUE {
-        return Err(anyhow!(SuitabilityError("No sampler anisotropy.")));
-    }
-
-    Ok(())
-}
-
-unsafe fn check_physical_device_extensions(instance: &Instance, physical_device: vk::PhysicalDevice) -> Result<()> {
-    let extensions = instance
-        .enumerate_device_extension_properties(physical_device, None)?
-        .iter()
-        .map(|e| e.extension_name)
-        .collect::<HashSet<_>>();
-    if DEVICE_EXTENSIONS.iter().all(|e| extensions.contains(e)) {
-        Ok(())
-    } else {
-        Err(anyhow!(SuitabilityError("Missing required device extensions.")))
-    }
-}
-
-unsafe fn get_max_msaa_samples(instance: &Instance, data: &AppData) -> vk::SampleCountFlags {
-    let properties = instance.get_physical_device_properties(data.physical_device);
-    let counts = properties.limits.framebuffer_color_sample_counts & properties.limits.framebuffer_depth_sample_counts;
-    [
-        vk::SampleCountFlags::_64,
-        vk::SampleCountFlags::_32,
-        vk::SampleCountFlags::_16,
-        vk::SampleCountFlags::_8,
-        vk::SampleCountFlags::_4,
-        vk::SampleCountFlags::_2,
-    ]
-    .iter()
-    .cloned()
-    .find(|c| counts.contains(*c))
-    .unwrap_or(vk::SampleCountFlags::_1)
-}
-
-//================================================
-// Logical Device
-//================================================
-
-unsafe fn create_logical_device(entry: &Entry, instance: &Instance, data: &mut AppData) -> Result<Device> {
-    // Queue Create Infos
-
-    let indices = QueueFamilyIndices::get(instance, data.surface, data.physical_device)?;
-
-    let mut unique_indices = HashSet::new();
-    unique_indices.insert(indices.graphics);
-    unique_indices.insert(indices.present);
-
-    let queue_priorities = &[1.0];
-    let queue_infos = unique_indices
-        .iter()
-        .map(|i| {
-            vk::DeviceQueueCreateInfo::builder()
-                .queue_family_index(*i)
-                .queue_priorities(queue_priorities)
-        })
-        .collect::<Vec<_>>();
-
-    // Layers
-
-    let layers = if VALIDATION_ENABLED {
-        vec![VALIDATION_LAYER.as_ptr()]
-    } else {
-        vec![]
-    };
-
-    // Extensions
-
-    let mut extensions = DEVICE_EXTENSIONS.iter().map(|n| n.as_ptr()).collect::<Vec<_>>();
-
-    // Required by Vulkan SDK on macOS since 1.3.216.
-    if cfg!(target_os = "macos") && entry.version()? >= PORTABILITY_MACOS_VERSION {
-        extensions.push(vk::KHR_PORTABILITY_SUBSET_EXTENSION.name.as_ptr());
-    }
-
-    // Features
-
-    let features = vk::PhysicalDeviceFeatures::builder()
-        .sampler_anisotropy(true)
-        .sample_rate_shading(true);
-
-    // Create
-
-    let info = vk::DeviceCreateInfo::builder()
-        .queue_create_infos(&queue_infos)
-        .enabled_layer_names(&layers)
-        .enabled_extension_names(&extensions)
-        .enabled_features(&features);
-
-    let device = instance.create_device(data.physical_device, &info, None)?;
-
-    // Queues
-
-    data.graphics_queue = device.get_device_queue(indices.graphics, 0);
-    data.present_queue = device.get_device_queue(indices.present, 0);
-
-    Ok(device)
 }
 
 //================================================
