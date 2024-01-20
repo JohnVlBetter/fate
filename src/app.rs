@@ -10,14 +10,11 @@
 
 use cgmath::{point3, vec3, Deg};
 use fate_graphic::buffer::*;
-use fate_graphic::buffer::*;
 use fate_graphic::device::*;
 use fate_graphic::model::*;
+use fate_graphic::shader::Shader;
 use fate_graphic::swapchain::Swapchain;
-use fate_graphic::swapchain::SwapchainSupport;
 use fate_graphic::texture::*;
-use fate_graphic::tools::QueueFamilyIndices;
-use fate_graphic::tools::SuitabilityError;
 use fate_graphic::tools::UniformBufferObject;
 use std::collections::HashSet;
 use std::ffi::CStr;
@@ -32,7 +29,6 @@ use vulkanalia::bytecode::Bytecode;
 use vulkanalia::loader::{LibloadingLoader, LIBRARY};
 use vulkanalia::prelude::v1_0::*;
 use vulkanalia::window as vk_window;
-use vulkanalia::Version;
 use winit::window::Window;
 
 use vulkanalia::vk::ExtDebugUtilsExtension;
@@ -716,26 +712,10 @@ unsafe fn create_descriptor_set_layout(device: &Device, data: &mut AppData) -> R
 }
 
 unsafe fn create_pipeline(device: &VkDevice, data: &mut AppData) -> Result<()> {
-    // Stages
-
-    let vert = include_bytes!("../shaders/shader.vert.spv");
-    let frag = include_bytes!("../shaders/shader.frag.spv");
-
-    let vert_shader_module = create_shader_module(&device.device, &vert[..])?;
-    let frag_shader_module = create_shader_module(&device.device, &frag[..])?;
-
-    let vert_stage = vk::PipelineShaderStageCreateInfo::builder()
-        .stage(vk::ShaderStageFlags::VERTEX)
-        .module(vert_shader_module)
-        .name(b"main\0");
-
-    let frag_stage = vk::PipelineShaderStageCreateInfo::builder()
-        .stage(vk::ShaderStageFlags::FRAGMENT)
-        .module(frag_shader_module)
-        .name(b"main\0");
+    // Shader
+    let mut shader = Shader::new(b"main\0", &device.device);
 
     // Vertex Input State
-
     let binding_descriptions = &[Vertex::binding_description()];
     let attribute_descriptions = Vertex::attribute_descriptions();
     let vertex_input_state = vk::PipelineVertexInputStateCreateInfo::builder()
@@ -838,6 +818,7 @@ unsafe fn create_pipeline(device: &VkDevice, data: &mut AppData) -> Result<()> {
 
     // Create
 
+    let (vert_stage, frag_stage) = shader.get_stages()?;
     let stages = &[vert_stage, frag_stage];
     let info = vk::GraphicsPipelineCreateInfo::builder()
         .stages(stages)
@@ -859,12 +840,7 @@ unsafe fn create_pipeline(device: &VkDevice, data: &mut AppData) -> Result<()> {
 
     // Cleanup
 
-    device
-        .device
-        .destroy_shader_module(vert_shader_module, None);
-    device
-        .device
-        .destroy_shader_module(frag_shader_module, None);
+    shader.destory(&device.device);
 
     Ok(())
 }
