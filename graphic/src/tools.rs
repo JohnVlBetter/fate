@@ -1,8 +1,8 @@
 use anyhow::{anyhow, Result};
 use vulkanalia::prelude::v1_0::*;
 
-use vulkanalia::vk::KhrSurfaceExtension;
 use thiserror::Error;
+use vulkanalia::vk::KhrSurfaceExtension;
 
 use crate::model;
 
@@ -17,7 +17,11 @@ pub struct QueueFamilyIndices {
 }
 
 impl QueueFamilyIndices {
-    pub unsafe fn get(instance: &Instance, surface: vk::SurfaceKHR, physical_device: vk::PhysicalDevice) -> Result<Self> {
+    pub unsafe fn get(
+        instance: &Instance,
+        surface: vk::SurfaceKHR,
+        physical_device: vk::PhysicalDevice,
+    ) -> Result<Self> {
         let properties = instance.get_physical_device_queue_family_properties(physical_device);
 
         let graphics = properties
@@ -27,7 +31,11 @@ impl QueueFamilyIndices {
 
         let mut present = None;
         for (index, _properties) in properties.iter().enumerate() {
-            if instance.get_physical_device_surface_support_khr(physical_device, index as u32, surface)? {
+            if instance.get_physical_device_surface_support_khr(
+                physical_device,
+                index as u32,
+                surface,
+            )? {
                 present = Some(index as u32);
                 break;
             }
@@ -36,7 +44,9 @@ impl QueueFamilyIndices {
         if let (Some(graphics), Some(present)) = (graphics, present) {
             Ok(Self { graphics, present })
         } else {
-            Err(anyhow!(SuitabilityError("Missing required queue families.")))
+            Err(anyhow!(SuitabilityError(
+                "Missing required queue families."
+            )))
         }
     }
 }
@@ -64,7 +74,10 @@ pub unsafe fn get_memory_type_index(
         .ok_or_else(|| anyhow!("Failed to find suitable memory type."))
 }
 
-pub unsafe fn begin_single_time_commands(device: &Device, command_pool: vk::CommandPool) -> Result<vk::CommandBuffer> {
+pub unsafe fn begin_single_time_commands(
+    device: &Device,
+    command_pool: vk::CommandPool,
+) -> Result<vk::CommandBuffer> {
     // Allocate
 
     let info = vk::CommandBufferAllocateInfo::builder()
@@ -76,14 +89,20 @@ pub unsafe fn begin_single_time_commands(device: &Device, command_pool: vk::Comm
 
     // Begin
 
-    let info = vk::CommandBufferBeginInfo::builder().flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
+    let info =
+        vk::CommandBufferBeginInfo::builder().flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
 
     device.begin_command_buffer(command_buffer, &info)?;
 
     Ok(command_buffer)
 }
 
-pub unsafe fn end_single_time_commands(device: &Device, graphics_queue: vk::Queue, command_pool: vk::CommandPool, command_buffer: vk::CommandBuffer) -> Result<()> {
+pub unsafe fn end_single_time_commands(
+    device: &Device,
+    graphics_queue: vk::Queue,
+    command_pool: vk::CommandPool,
+    command_buffer: vk::CommandBuffer,
+) -> Result<()> {
     // End
 
     device.end_command_buffer(command_buffer)?;

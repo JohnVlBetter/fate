@@ -14,11 +14,17 @@ pub struct SwapchainSupport {
 }
 
 impl SwapchainSupport {
-    pub unsafe fn get(instance: &Instance, physical_device: vk::PhysicalDevice, surface: vk::SurfaceKHR) -> Result<Self> {
+    pub unsafe fn get(
+        instance: &Instance,
+        physical_device: vk::PhysicalDevice,
+        surface: vk::SurfaceKHR,
+    ) -> Result<Self> {
         Ok(Self {
-            capabilities: instance.get_physical_device_surface_capabilities_khr(physical_device, surface)?,
+            capabilities: instance
+                .get_physical_device_surface_capabilities_khr(physical_device, surface)?,
             formats: instance.get_physical_device_surface_formats_khr(physical_device, surface)?,
-            present_modes: instance.get_physical_device_surface_present_modes_khr(physical_device, surface)?,
+            present_modes: instance
+                .get_physical_device_surface_present_modes_khr(physical_device, surface)?,
         })
     }
 }
@@ -33,8 +39,15 @@ pub struct Swapchain {
 }
 
 impl Swapchain {
-    pub unsafe fn new(&mut self, width: u32, height: u32, instance: &Instance, 
-        device: &Device, physical_device: vk::PhysicalDevice, surface: vk::SurfaceKHR) -> Result<()> {
+    pub unsafe fn new(
+        &mut self,
+        width: u32,
+        height: u32,
+        instance: &Instance,
+        device: &Device,
+        physical_device: vk::PhysicalDevice,
+        surface: vk::SurfaceKHR,
+    ) -> Result<()> {
         // Image
 
         let indices = QueueFamilyIndices::get(instance, surface, physical_device)?;
@@ -48,7 +61,9 @@ impl Swapchain {
         self.swapchain_extent = extent;
 
         let mut image_count = support.capabilities.min_image_count + 1;
-        if support.capabilities.max_image_count != 0 && image_count > support.capabilities.max_image_count {
+        if support.capabilities.max_image_count != 0
+            && image_count > support.capabilities.max_image_count
+        {
             image_count = support.capabilities.max_image_count;
         }
 
@@ -92,7 +107,15 @@ impl Swapchain {
         self.swapchain_image_views = self
             .swapchain_images
             .iter()
-            .map(|i| create_image_view(device, *i, self.swapchain_format, vk::ImageAspectFlags::COLOR, 1))
+            .map(|i| {
+                create_image_view(
+                    device,
+                    *i,
+                    self.swapchain_format,
+                    vk::ImageAspectFlags::COLOR,
+                    1,
+                )
+            })
             .collect::<Result<Vec<_>, _>>()?;
 
         Ok(())
@@ -102,7 +125,10 @@ impl Swapchain {
         formats
             .iter()
             .cloned()
-            .find(|f| f.format == vk::Format::B8G8R8A8_SRGB && f.color_space == vk::ColorSpaceKHR::SRGB_NONLINEAR)
+            .find(|f| {
+                f.format == vk::Format::B8G8R8A8_SRGB
+                    && f.color_space == vk::ColorSpaceKHR::SRGB_NONLINEAR
+            })
             .unwrap_or_else(|| formats[0])
     }
 
@@ -114,7 +140,11 @@ impl Swapchain {
             .unwrap_or(vk::PresentModeKHR::FIFO)
     }
 
-    fn get_swapchain_extent(width: u32, height: u32, capabilities: vk::SurfaceCapabilitiesKHR) -> vk::Extent2D {
+    fn get_swapchain_extent(
+        width: u32,
+        height: u32,
+        capabilities: vk::SurfaceCapabilitiesKHR,
+    ) -> vk::Extent2D {
         if capabilities.current_extent.width != u32::max_value() {
             capabilities.current_extent
         } else {

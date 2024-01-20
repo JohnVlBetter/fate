@@ -1,38 +1,25 @@
 use std::collections::HashSet;
-use cgmath::{point3, vec3, Deg};
-use std::ffi::CStr;
-use std::mem::size_of;
-use std::os::raw::c_void;
-use std::ptr::{copy_nonoverlapping as memcpy, slice_from_raw_parts};
-use std::time::Instant;
 
 use anyhow::{anyhow, Result};
 use log::*;
-use vulkanalia::bytecode::Bytecode;
-use vulkanalia::loader::{LibloadingLoader, LIBRARY};
 use vulkanalia::prelude::v1_0::*;
-use vulkanalia::window as vk_window;
+use vulkanalia::vk::CommandPool;
 use vulkanalia::Version;
-use winit::window::Window;
-
-use vulkanalia::vk::ExtDebugUtilsExtension;
-use vulkanalia::vk::KhrSurfaceExtension;
-use vulkanalia::vk::KhrSwapchainExtension;
 
 use crate::swapchain::SwapchainSupport;
 use crate::tools::{QueueFamilyIndices, SuitabilityError};
 
-
 /// Whether the validation layers should be enabled.
-const VALIDATION_ENABLED: bool = cfg!(debug_assertions);
+pub const VALIDATION_ENABLED: bool = cfg!(debug_assertions);
 /// The name of the validation layers.
-const VALIDATION_LAYER: vk::ExtensionName = vk::ExtensionName::from_bytes(b"VK_LAYER_KHRONOS_validation");
+pub const VALIDATION_LAYER: vk::ExtensionName =
+    vk::ExtensionName::from_bytes(b"VK_LAYER_KHRONOS_validation");
 
 /// The required device extensions.
-const DEVICE_EXTENSIONS: &[vk::ExtensionName] = &[vk::KHR_SWAPCHAIN_EXTENSION.name];
+pub const DEVICE_EXTENSIONS: &[vk::ExtensionName] = &[vk::KHR_SWAPCHAIN_EXTENSION.name];
 
 /// The Vulkan SDK version that started requiring the portability subset extension for macOS.
-const PORTABILITY_MACOS_VERSION: Version = Version::new(1, 3, 216);
+pub const PORTABILITY_MACOS_VERSION: Version = Version::new(1, 3, 216);
 
 #[derive(Clone, Debug)]
 pub struct VkDevice {
@@ -51,34 +38,64 @@ pub struct VkDevice {
 }
 
 impl VkDevice {
-}
-
-
-//================================================
-// Physical Device
-//================================================
-
-unsafe fn pick_physical_device(instance: &Instance, surface: vk::SurfaceKHR, device: &mut VkDevice) -> Result<()> {
-    for physical_device in instance.enumerate_physical_devices()? {
-        let properties = instance.get_physical_device_properties(physical_device);
-
-        if let Err(error) = check_physical_device(instance, surface, physical_device) {
-            warn!("Skipping physical device (`{}`): {}", properties.device_name, error);
-        } else {
-            info!("Selected physical device (`{}`).", properties.device_name);
-            device.physical_device = physical_device;
-            device.msaa_samples = get_max_msaa_samples(instance, physical_device);
-            return Ok(());
+    pub unsafe fn new(entry: &Entry, instance: &Instance, surface: vk::SurfaceKHR) -> Self {
+        let (physical_device, msaa_samples) = pick_physical_device(instance, surface).unwrap();
+        let (device, graphics_queue, present_queue) =
+            create_logical_device(entry, instance, surface, physical_device).unwrap();
+        Self {
+            device: device,
+            physical_device: physical_device,
+            msaa_samples: msaa_samples,
+            graphics_queue: graphics_queue,
+            present_queue: present_queue,
+            command_pool: CommandPool::null(),
+            command_pools: vec![],
+            command_buffers: vec![],
+            secondary_command_buffers: vec![],
         }
     }
 
-    Err(anyhow!("Failed to find suitable physical device."))
+    pub unsafe fn create_command_pools(
+        &mut self,
+        instance: &Instance,
+        surface: vk::SurfaceKHR,
+        num: usize,
+    ) -> Result<()> {
+        // Global
+
+        self.command_pool =
+            create_command_pool(instance, &self.device, surface, self.physical_device)?;
+
+        // Per-framebuffer
+        for _ in 0..num {
+            let command_pool =
+                create_command_pool(instance, &self.device, surface, self.physical_device)?;
+            self.command_pools.push(command_pool);
+        }
+
+        Ok(())
+    }
+}
+
+unsafe fn create_command_pool(
+    instance: &Instance,
+    device: &Device,
+    surface: vk::SurfaceKHR,
+    physical_device: vk::PhysicalDevice,
+) -> Result<vk::CommandPool> {
+    let indices = QueueFamilyIndices::get(instance, surface, physical_device)?;
+
+    let info = vk::CommandPoolCreateInfo::builder()
+        .flags(vk::CommandPoolCreateFlags::TRANSIENT)
+        .queue_family_index(indices.graphics);
+
+    Ok(device.create_command_pool(&info, None)?)
 }
 
 unsafe fn check_physical_device(
     instance: &Instance,
     surface: vk::SurfaceKHR,
-    physical_device: vk::PhysicalDevice
+    physical_device: vk::PhysicalDevice,
 ) -> Result<()> {
     QueueFamilyIndices::get(instance, surface, physical_device)?;
     check_physical_device_extensions(instance, physical_device)?;
@@ -96,7 +113,10 @@ unsafe fn check_physical_device(
     Ok(())
 }
 
-unsafe fn check_physical_device_extensions(instance: &Instance, physical_device: vk::PhysicalDevice) -> Result<()> {
+unsafe fn check_physical_device_extensions(
+    instance: &Instance,
+    physical_device: vk::PhysicalDevice,
+) -> Result<()> {
     let extensions = instance
         .enumerate_device_extension_properties(physical_device, None)?
         .iter()
@@ -105,13 +125,19 @@ unsafe fn check_physical_device_extensions(instance: &Instance, physical_device:
     if DEVICE_EXTENSIONS.iter().all(|e| extensions.contains(e)) {
         Ok(())
     } else {
-        Err(anyhow!(SuitabilityError("Missing required device extensions.")))
+        Err(anyhow!(SuitabilityError(
+            "Missing required device extensions."
+        )))
     }
 }
 
-unsafe fn get_max_msaa_samples(instance: &Instance, physical_device: vk::PhysicalDevice) -> vk::SampleCountFlags {
+unsafe fn get_max_msaa_samples(
+    instance: &Instance,
+    physical_device: vk::PhysicalDevice,
+) -> vk::SampleCountFlags {
     let properties = instance.get_physical_device_properties(physical_device);
-    let counts = properties.limits.framebuffer_color_sample_counts & properties.limits.framebuffer_depth_sample_counts;
+    let counts = properties.limits.framebuffer_color_sample_counts
+        & properties.limits.framebuffer_depth_sample_counts;
     [
         vk::SampleCountFlags::_64,
         vk::SampleCountFlags::_32,
@@ -126,15 +152,36 @@ unsafe fn get_max_msaa_samples(instance: &Instance, physical_device: vk::Physica
     .unwrap_or(vk::SampleCountFlags::_1)
 }
 
-//================================================
-// Logical Device
-//================================================
+unsafe fn pick_physical_device(
+    instance: &Instance,
+    surface: vk::SurfaceKHR,
+) -> Result<(vk::PhysicalDevice, vk::SampleCountFlags)> {
+    for physical_device in instance.enumerate_physical_devices()? {
+        let properties = instance.get_physical_device_properties(physical_device);
 
-unsafe fn create_logical_device(entry: &Entry, instance: &Instance, surface: vk::SurfaceKHR,
-    device: &mut VkDevice) -> Result<Device> {
+        if let Err(error) = check_physical_device(instance, surface, physical_device) {
+            warn!(
+                "Skipping physical device (`{}`): {}",
+                properties.device_name, error
+            );
+        } else {
+            info!("Selected physical device (`{}`).", properties.device_name);
+            let msaa_samples = get_max_msaa_samples(instance, physical_device);
+            return Ok((physical_device, msaa_samples));
+        }
+    }
+
+    Err(anyhow!("Failed to find suitable physical device."))
+}
+
+unsafe fn create_logical_device(
+    entry: &Entry,
+    instance: &Instance,
+    surface: vk::SurfaceKHR,
+    physical_device: vk::PhysicalDevice,
+) -> Result<(Device, vk::Queue, vk::Queue)> {
     // Queue Create Infos
-
-    let indices = QueueFamilyIndices::get(instance, surface, device.physical_device)?;
+    let indices = QueueFamilyIndices::get(instance, surface, physical_device)?;
 
     let mut unique_indices = HashSet::new();
     unique_indices.insert(indices.graphics);
@@ -160,7 +207,10 @@ unsafe fn create_logical_device(entry: &Entry, instance: &Instance, surface: vk:
 
     // Extensions
 
-    let mut extensions = DEVICE_EXTENSIONS.iter().map(|n| n.as_ptr()).collect::<Vec<_>>();
+    let mut extensions = DEVICE_EXTENSIONS
+        .iter()
+        .map(|n| n.as_ptr())
+        .collect::<Vec<_>>();
 
     // Required by Vulkan SDK on macOS since 1.3.216.
     if cfg!(target_os = "macos") && entry.version()? >= PORTABILITY_MACOS_VERSION {
@@ -181,12 +231,12 @@ unsafe fn create_logical_device(entry: &Entry, instance: &Instance, surface: vk:
         .enabled_extension_names(&extensions)
         .enabled_features(&features);
 
-    let logic_device = instance.create_device(device.physical_device, &info, None)?;
+    let logic_device = instance.create_device(physical_device, &info, None)?;
 
     // Queues
 
-    device.graphics_queue = logic_device.get_device_queue(indices.graphics, 0);
-    device.present_queue = logic_device.get_device_queue(indices.present, 0);
+    let graphics_queue = logic_device.get_device_queue(indices.graphics, 0);
+    let present_queue = logic_device.get_device_queue(indices.present, 0);
 
-    Ok(logic_device)
+    Ok((logic_device, graphics_queue, present_queue))
 }

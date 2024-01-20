@@ -1,12 +1,12 @@
 use std::fs::File;
 use std::io::BufReader;
 
-use std::collections::HashMap;
-use vulkanalia::vk::{self, HasBuilder};
-use std::hash::{Hash, Hasher};
-use cgmath::{vec2, vec3};
-use std::mem::size_of;
 use anyhow::Result;
+use cgmath::{vec2, vec3};
+use std::collections::HashMap;
+use std::hash::{Hash, Hasher};
+use std::mem::size_of;
+use vulkanalia::vk::{self, HasBuilder};
 
 pub type Vec2 = cgmath::Vector2<f32>;
 pub type Vec3 = cgmath::Vector3<f32>;
@@ -22,7 +22,11 @@ pub struct Vertex {
 
 impl Vertex {
     pub fn new(pos: Vec3, color: Vec3, tex_coord: Vec2) -> Self {
-        Self { pos, color, tex_coord }
+        Self {
+            pos,
+            color,
+            tex_coord,
+        }
     }
 
     pub fn binding_description() -> vk::VertexInputBindingDescription {
