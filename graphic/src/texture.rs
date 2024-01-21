@@ -5,6 +5,8 @@ use std::ptr::copy_nonoverlapping as memcpy;
 use anyhow::{anyhow, Result};
 use vulkanalia::prelude::v1_0::*;
 
+use crate::device::VkDevice;
+
 #[derive(Copy, Clone, Debug, Default)]
 pub struct Texture {
     // Texture
@@ -16,10 +18,6 @@ pub struct Texture {
 }
 
 impl Texture {
-    //================================================
-    // Texture
-    //================================================
-
     pub unsafe fn create_texture_image(
         &mut self,
         instance: &Instance,
@@ -314,6 +312,13 @@ impl Texture {
 
         Ok(())
     }
+
+    pub unsafe fn destory(&mut self, device: &VkDevice) ->() {
+        device.device.destroy_sampler(self.texture_sampler, None);
+        device.device.destroy_image_view(self.texture_image_view, None);
+        device.device.free_memory(self.texture_image_memory, None);
+        device.device.destroy_image(self.texture_image, None);
+    }
 }
 
 //================================================
@@ -363,6 +368,7 @@ pub unsafe fn create_image(
     device.bind_image_memory(image, image_memory, 0)?;
     Ok((image, image_memory))
 }
+
 pub unsafe fn create_image_view(
     device: &Device,
     image: vk::Image,
@@ -383,6 +389,7 @@ pub unsafe fn create_image_view(
         .subresource_range(subresource_range);
     Ok(device.create_image_view(&info, None)?)
 }
+
 pub unsafe fn transition_image_layout(
     device: &Device,
     graphics_queue: vk::Queue,
@@ -437,6 +444,7 @@ pub unsafe fn transition_image_layout(
     end_single_time_commands(device, graphics_queue, command_pool, command_buffer)?;
     Ok(())
 }
+
 unsafe fn copy_buffer_to_image(
     device: &Device,
     graphics_queue: vk::Queue,

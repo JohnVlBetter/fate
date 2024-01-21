@@ -1,5 +1,3 @@
-// SPDX-License-Identifier: Apache-2.0
-
 #![allow(
     dead_code,
     unused_variables,
@@ -25,7 +23,6 @@ use std::time::Instant;
 
 use anyhow::{anyhow, Result};
 use log::*;
-use vulkanalia::bytecode::Bytecode;
 use vulkanalia::loader::{LibloadingLoader, LIBRARY};
 use vulkanalia::prelude::v1_0::*;
 use vulkanalia::window as vk_window;
@@ -400,18 +397,11 @@ impl App {
         self.data.in_flight_fences.iter().for_each(|f| self.device.device.destroy_fence(*f, None));
         self.data.render_finished_semaphores.iter().for_each(|s| self.device.device.destroy_semaphore(*s, None));
         self.data.image_available_semaphores.iter().for_each(|s| self.device.device.destroy_semaphore(*s, None));
-        self.device.command_pools.iter().for_each(|p| self.device.device.destroy_command_pool(*p, None));
-        self.device.device.free_memory(self.data.buffer.index_buffer_memory, None);
-        self.device.device.destroy_buffer(self.data.buffer.index_buffer, None);
-        self.device.device.free_memory(self.data.buffer.vertex_buffer_memory, None);
-        self.device.device.destroy_buffer(self.data.buffer.vertex_buffer, None);
-        self.device.device.destroy_sampler(self.data.texture.texture_sampler, None);
-        self.device.device.destroy_image_view(self.data.texture.texture_image_view, None);
-        self.device.device.free_memory(self.data.texture.texture_image_memory, None);
-        self.device.device.destroy_image(self.data.texture.texture_image, None);
-        self.device.device.destroy_command_pool(self.device.command_pool, None);
+        self.device.destory_buffer(self.data.buffer.index_buffer, self.data.buffer.index_buffer_memory);
+        self.device.destory_buffer(self.data.buffer.vertex_buffer, self.data.buffer.vertex_buffer_memory);
+        self.data.texture.destory(&self.device);
         self.device.device.destroy_descriptor_set_layout(self.data.descriptor_set_layout, None);
-        self.device.device.destroy_device(None);
+        self.device.destory();
         self.instance.destroy_surface_khr(self.data.surface, None);
 
         if VALIDATION_ENABLED {
@@ -843,16 +833,6 @@ unsafe fn create_pipeline(device: &VkDevice, data: &mut AppData) -> Result<()> {
     shader.destory(&device.device);
 
     Ok(())
-}
-
-unsafe fn create_shader_module(device: &Device, bytecode: &[u8]) -> Result<vk::ShaderModule> {
-    let bytecode = Bytecode::new(bytecode).unwrap();
-
-    let info = vk::ShaderModuleCreateInfo::builder()
-        .code_size(bytecode.code_size())
-        .code(bytecode.code());
-
-    Ok(device.create_shader_module(&info, None)?)
 }
 
 //================================================
