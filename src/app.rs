@@ -58,16 +58,14 @@ impl App {
         data.surface = vk_window::create_surface(&instance, &window, &window)?;
         let mut device = VkDevice::new(&entry, &instance, data.surface);
         let size = window.inner_size();
-        data.swapchain.new(
+        data.swapchain = Swapchain::new(
             size.width,
             size.height,
             &instance,
             &device.device,
             device.physical_device,
             data.surface,
-        )?;
-        data.swapchain
-            .create_swapchain_image_views(&device.device)?;
+        );
         create_render_pass(&instance, &device, &mut data)?;
         create_descriptor_set_layout(&device.device, &mut data)?;
         create_pipeline(&device, &mut data)?;
@@ -372,8 +370,7 @@ impl App {
         self.device.device.device_wait_idle()?;
         self.destroy_swapchain();
         let size = window.inner_size();
-        self.data.swapchain.new(size.width, size.height, &self.instance, &self.device.device, self.device.physical_device, self.data.surface)?;
-        self.data.swapchain.create_swapchain_image_views(&self.device.device)?;
+        self.data.swapchain = Swapchain::new(size.width, size.height, &self.instance, &self.device.device, self.device.physical_device, self.data.surface);
         create_render_pass(&self.instance, &self.device, &mut self.data)?;
         create_pipeline(&self.device, &mut self.data)?;
         create_color_objects(&self.instance, &self.device, &mut self.data)?;
@@ -427,8 +424,8 @@ impl App {
         self.device.device.destroy_pipeline(self.data.pipeline, None);
         self.device.device.destroy_pipeline_layout(self.data.pipeline_layout, None);
         self.device.device.destroy_render_pass(self.data.render_pass, None);
-        self.data.swapchain.swapchain_image_views.iter().for_each(|v| self.device.device.destroy_image_view(*v, None));
-        self.device.device.destroy_swapchain_khr(self.data.swapchain.swapchain, None);
+
+        self.data.swapchain.destroy(&self.device);
     }
 }
 
