@@ -6,6 +6,7 @@ use vulkanalia::prelude::v1_0::*;
 use vulkanalia::vk::CommandPool;
 use vulkanalia::Version;
 
+use crate::buffer::*;
 use crate::swapchain::SwapchainSupport;
 use crate::tools::{QueueFamilyIndices, SuitabilityError};
 
@@ -76,15 +77,17 @@ impl VkDevice {
         Ok(())
     }
 
-    pub unsafe fn destory(&mut self) -> (){
-        self.command_pools.iter().for_each(|p| self.device.destroy_command_pool(*p, None));
+    pub unsafe fn destory(&mut self) -> () {
+        self.command_pools
+            .iter()
+            .for_each(|p| self.device.destroy_command_pool(*p, None));
         self.device.destroy_command_pool(self.command_pool, None);
         self.device.destroy_device(None);
     }
 
-    pub unsafe fn destory_buffer(&mut self, buffer: vk::Buffer, buffer_memory: vk::DeviceMemory) ->() {
-        self.device.free_memory(buffer_memory, None);
-        self.device.destroy_buffer(buffer, None);
+    pub unsafe fn destory_buffer(&mut self, buffer: &Buffer) -> () {
+        self.device.free_memory(buffer.buffer_memory, None);
+        self.device.destroy_buffer(buffer.buffer, None);
     }
 }
 

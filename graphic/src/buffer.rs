@@ -4,13 +4,8 @@ use vulkanalia::prelude::v1_0::*;
 
 #[derive(Clone, Debug, Default)]
 pub struct Buffer {
-    // Buffers
-    pub vertex_buffer: vk::Buffer,
-    pub vertex_buffer_memory: vk::DeviceMemory,
-    pub index_buffer: vk::Buffer,
-    pub index_buffer_memory: vk::DeviceMemory,
-    pub uniform_buffers: Vec<vk::Buffer>,
-    pub uniform_buffers_memory: Vec<vk::DeviceMemory>,
+    pub buffer: vk::Buffer,
+    pub buffer_memory: vk::DeviceMemory,
 }
 
 pub unsafe fn create_buffer(

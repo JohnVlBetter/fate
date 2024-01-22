@@ -288,8 +288,8 @@ impl App {
         self.device.device.begin_command_buffer(command_buffer, &info)?;
 
         self.device.device.cmd_bind_pipeline(command_buffer, vk::PipelineBindPoint::GRAPHICS, self.data.pipeline);
-        self.device.device.cmd_bind_vertex_buffers(command_buffer, 0, &[self.data.buffer.vertex_buffer], &[0]);
-        self.device.device.cmd_bind_index_buffer(command_buffer, self.data.buffer.index_buffer, 0, vk::IndexType::UINT32);
+        self.device.device.cmd_bind_vertex_buffers(command_buffer, 0, &[self.data.vertex_buffer.buffer], &[0]);
+        self.device.device.cmd_bind_index_buffer(command_buffer, self.data.index_buffer.buffer, 0, vk::IndexType::UINT32);
         self.device.device.cmd_bind_descriptor_sets(
             command_buffer,
             vk::PipelineBindPoint::GRAPHICS,
@@ -351,7 +351,7 @@ impl App {
         // Copy
 
         let memory = self.device.device.map_memory(
-            self.data.buffer.uniform_buffers_memory[image_index],
+            self.data.uniform_buffers[image_index].buffer_memory,
             0,
             size_of::<UniformBufferObject>() as u64,
             vk::MemoryMapFlags::empty(),
@@ -361,7 +361,7 @@ impl App {
 
         self.device
             .device
-            .unmap_memory(self.data.buffer.uniform_buffers_memory[image_index]);
+            .unmap_memory(self.data.uniform_buffers[image_index].buffer_memory);
 
         Ok(())
     }
@@ -397,8 +397,8 @@ impl App {
         self.data.in_flight_fences.iter().for_each(|f| self.device.device.destroy_fence(*f, None));
         self.data.render_finished_semaphores.iter().for_each(|s| self.device.device.destroy_semaphore(*s, None));
         self.data.image_available_semaphores.iter().for_each(|s| self.device.device.destroy_semaphore(*s, None));
-        self.device.destory_buffer(self.data.buffer.index_buffer, self.data.buffer.index_buffer_memory);
-        self.device.destory_buffer(self.data.buffer.vertex_buffer, self.data.buffer.vertex_buffer_memory);
+        self.device.destory_buffer(&self.data.index_buffer);
+        self.device.destory_buffer(&self.data.vertex_buffer);
         self.data.texture.destory(&self.device);
         self.device.device.destroy_descriptor_set_layout(self.data.descriptor_set_layout, None);
         self.device.destory();
@@ -415,8 +415,8 @@ impl App {
     #[rustfmt::skip]
     unsafe fn destroy_swapchain(&mut self) {
         self.device.device.destroy_descriptor_pool(self.data.descriptor_pool, None);
-        self.data.buffer.uniform_buffers_memory.iter().for_each(|m| self.device.device.free_memory(*m, None));
-        self.data.buffer.uniform_buffers.iter().for_each(|b| self.device.device.destroy_buffer(*b, None));
+        self.data.uniform_buffers.iter().for_each(|m| self.device.device.free_memory(m.buffer_memory, None));
+        self.data.uniform_buffers.iter().for_each(|b| self.device.device.destroy_buffer(b.buffer, None));
         self.device.device.destroy_image_view(self.data.depth_image_view, None);
         self.device.device.free_memory(self.data.depth_image_memory, None);
         self.device.device.destroy_image(self.data.depth_image, None);
@@ -459,7 +459,9 @@ pub struct AppData {
     // Model
     model: Model,
     //Buffer
-    buffer: Buffer,
+    vertex_buffer: Buffer,
+    index_buffer: Buffer,
+    uniform_buffers: Vec<Buffer>,
     //Swapchain
     pub swapchain: Swapchain,
     // Descriptors
@@ -1032,8 +1034,8 @@ unsafe fn create_vertex_buffer(
         vk::MemoryPropertyFlags::DEVICE_LOCAL,
     )?;
 
-    data.buffer.vertex_buffer = vertex_buffer;
-    data.buffer.vertex_buffer_memory = vertex_buffer_memory;
+    data.vertex_buffer.buffer = vertex_buffer;
+    data.vertex_buffer.buffer_memory = vertex_buffer_memory;
 
     // Copy (vertex)
 
@@ -1098,8 +1100,8 @@ unsafe fn create_index_buffer(
         vk::MemoryPropertyFlags::DEVICE_LOCAL,
     )?;
 
-    data.buffer.index_buffer = index_buffer;
-    data.buffer.index_buffer_memory = index_buffer_memory;
+    data.index_buffer.buffer = index_buffer;
+    data.index_buffer.buffer_memory = index_buffer_memory;
 
     // Copy (index)
 
@@ -1125,8 +1127,7 @@ unsafe fn create_uniform_buffers(
     device: &VkDevice,
     data: &mut AppData,
 ) -> Result<()> {
-    data.buffer.uniform_buffers.clear();
-    data.buffer.uniform_buffers_memory.clear();
+    data.uniform_buffers.clear();
 
     for _ in 0..data.swapchain.swapchain_images.len() {
         let (uniform_buffer, uniform_buffer_memory) = create_buffer(
@@ -1138,10 +1139,10 @@ unsafe fn create_uniform_buffers(
             vk::MemoryPropertyFlags::HOST_COHERENT | vk::MemoryPropertyFlags::HOST_VISIBLE,
         )?;
 
-        data.buffer.uniform_buffers.push(uniform_buffer);
-        data.buffer
-            .uniform_buffers_memory
-            .push(uniform_buffer_memory);
+        data.uniform_buffers.push(Buffer {
+            buffer: uniform_buffer,
+            buffer_memory: uniform_buffer_memory,
+        });
     }
 
     Ok(())
@@ -1184,7 +1185,7 @@ unsafe fn create_descriptor_sets(device: &Device, data: &mut AppData) -> Result<
 
     for i in 0..data.swapchain.swapchain_images.len() {
         let info = vk::DescriptorBufferInfo::builder()
-            .buffer(data.buffer.uniform_buffers[i])
+            .buffer(data.uniform_buffers[i].buffer)
             .offset(0)
             .range(size_of::<UniformBufferObject>() as u64);
 
