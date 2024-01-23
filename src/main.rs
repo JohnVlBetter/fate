@@ -12,7 +12,6 @@ fn main() -> Result<()> {
     pretty_env_logger::init();
 
     // Window
-
     let event_loop = EventLoop::new();
     let window = WindowBuilder::new()
         .with_title("Fate Engine v1.0.0 <Vulkan>")
@@ -20,15 +19,14 @@ fn main() -> Result<()> {
         .build(&event_loop)?;
 
     // App
-    let mut app = unsafe { App::create(&window) }?;
+    let mut app = unsafe { App::new(&window) }?;
     let mut destroying = false;
     let mut minimized = false;
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Poll;
         match event {
-            // Render a frame if our Vulkan app is not being destroyed.
             Event::MainEventsCleared if !destroying && !minimized => unsafe { app.render(&window) }.unwrap(),
-            // Mark the window as having been resized.
+            
             Event::WindowEvent { event: WindowEvent::Resized(size), .. } => {
                 if size.width == 0 || size.height == 0 {
                     minimized = true;
@@ -37,13 +35,13 @@ fn main() -> Result<()> {
                     app.resized = true;
                 }
             }
-            // Destroy our Vulkan app.
+
             Event::WindowEvent { event: WindowEvent::CloseRequested, .. } => {
                 destroying = true;
                 *control_flow = ControlFlow::Exit;
                 unsafe { app.destroy(); }
             }
-            // Handle keyboard events.
+
             Event::WindowEvent { event: WindowEvent::KeyboardInput { input, .. }, .. } => {
                 if input.state == ElementState::Pressed {
                     match input.virtual_keycode {

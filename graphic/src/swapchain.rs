@@ -47,9 +47,9 @@ impl Swapchain {
         device: &Device,
         physical_device: vk::PhysicalDevice,
         surface: vk::SurfaceKHR,
-    ) -> Self {
-        let indices = QueueFamilyIndices::get(instance, surface, physical_device).unwrap();
-        let support = SwapchainSupport::get(instance, physical_device, surface).unwrap();
+    ) -> Result<Self> {
+        let indices = QueueFamilyIndices::get(instance, surface, physical_device)?;
+        let support = SwapchainSupport::get(instance, physical_device, surface)?;
 
         let surface_format = get_swapchain_surface_format(&support.formats);
         let present_mode = get_swapchain_present_mode(&support.present_modes);
@@ -90,25 +90,24 @@ impl Swapchain {
             .clipped(true)
             .old_swapchain(vk::SwapchainKHR::null());
 
-        let swapchain = device.create_swapchain_khr(&info, None).unwrap();
+        let swapchain = device.create_swapchain_khr(&info, None)?;
 
-        let swapchain_images = device.get_swapchain_images_khr(swapchain).unwrap();
+        let swapchain_images = device.get_swapchain_images_khr(swapchain)?;
 
         let swapchain_image_views = swapchain_images
             .iter()
             .map(|i| {
                 create_image_view(device, *i, swapchain_format, vk::ImageAspectFlags::COLOR, 1)
             })
-            .collect::<Result<Vec<_>, _>>()
-            .unwrap();
+            .collect::<Result<Vec<_>, _>>()?;
 
-        Self {
+        Ok(Self {
             swapchain_format,
             swapchain_extent,
             swapchain,
             swapchain_images,
             swapchain_image_views,
-        }
+        })
     }
 
     pub unsafe fn destroy(&mut self, device: &VkDevice) {

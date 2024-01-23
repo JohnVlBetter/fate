@@ -18,14 +18,14 @@ pub struct Texture {
 }
 
 impl Texture {
-    pub unsafe fn new(path: &str, instance: &Instance, device: &VkDevice) -> Self {
-        let image = File::open(path).unwrap();
+    pub unsafe fn new(path: &str, instance: &Instance, device: &VkDevice) -> Result<Self> {
+        let image = File::open(path)?;
 
         let decoder = png::Decoder::new(image);
-        let mut reader = decoder.read_info().unwrap();
+        let mut reader = decoder.read_info()?;
 
         let mut pixels = vec![0; reader.info().raw_bytes()];
-        reader.next_frame(&mut pixels).unwrap();
+        reader.next_frame(&mut pixels)?;
 
         let size = reader.info().raw_bytes() as u64;
         let (width, height) = reader.info().size();
@@ -43,14 +43,15 @@ impl Texture {
             size,
             vk::BufferUsageFlags::TRANSFER_SRC,
             vk::MemoryPropertyFlags::HOST_COHERENT | vk::MemoryPropertyFlags::HOST_VISIBLE,
-        )
-        .unwrap();
+        )?;
 
         // Copy (staging)
-        let memory = device
-            .device
-            .map_memory(staging_buffer_memory, 0, size, vk::MemoryMapFlags::empty())
-            .unwrap();
+        let memory = device.device.map_memory(
+            staging_buffer_memory,
+            0,
+            size,
+            vk::MemoryMapFlags::empty(),
+        )?;
 
         memcpy(pixels.as_ptr(), memory.cast(), pixels.len());
 
@@ -71,8 +72,7 @@ impl Texture {
                 | vk::ImageUsageFlags::TRANSFER_DST
                 | vk::ImageUsageFlags::TRANSFER_SRC,
             vk::MemoryPropertyFlags::DEVICE_LOCAL,
-        )
-        .unwrap();
+        )?;
 
         let texture_image = texture_image;
         let texture_image_memory = texture_image_memory;
@@ -87,8 +87,7 @@ impl Texture {
             vk::ImageLayout::UNDEFINED,
             vk::ImageLayout::TRANSFER_DST_OPTIMAL,
             mip_levels,
-        )
-        .unwrap();
+        )?;
 
         copy_buffer_to_image(
             &device.device,
@@ -98,8 +97,7 @@ impl Texture {
             texture_image,
             width,
             height,
-        )
-        .unwrap();
+        )?;
 
         // Cleanup
 
@@ -118,8 +116,7 @@ impl Texture {
             width,
             height,
             mip_levels,
-        )
-        .unwrap();
+        )?;
 
         let texture_image_view = create_image_view(
             &device.device,
@@ -127,8 +124,7 @@ impl Texture {
             vk::Format::R8G8B8A8_SRGB,
             vk::ImageAspectFlags::COLOR,
             mip_levels,
-        )
-        .unwrap();
+        )?;
 
         let info = vk::SamplerCreateInfo::builder()
             .mag_filter(vk::Filter::LINEAR)
@@ -147,15 +143,15 @@ impl Texture {
             .max_lod(mip_levels as f32)
             .mip_lod_bias(0.0);
 
-        let texture_sampler = device.device.create_sampler(&info, None).unwrap();
+        let texture_sampler = device.device.create_sampler(&info, None)?;
 
-        Self {
+        Ok(Self {
             mip_levels,
             texture_image,
             texture_image_memory,
             texture_image_view,
             texture_sampler,
-        }
+        })
     }
 
     pub unsafe fn destory(&mut self, device: &VkDevice) -> () {

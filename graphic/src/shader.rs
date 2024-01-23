@@ -14,11 +14,14 @@ pub struct Shader<'a> {
 }
 
 impl<'a> Shader<'a> {
-    pub unsafe fn new(/*_name: String, */ main_func_name: &'a [u8], device: &Device) -> Self {
+    pub unsafe fn new(
+        main_func_name: &'a [u8],
+        device: &Device,
+    ) -> Result<Self> {
         let vert = include_bytes!("../../shaders/shader.vert.spv");
         let frag = include_bytes!("../../shaders/shader.frag.spv");
-        let vert_shader_module = create_shader_module(device, &vert[..]).unwrap();
-        let frag_shader_module = create_shader_module(device, &frag[..]).unwrap();
+        let vert_shader_module = create_shader_module(device, &vert[..])?;
+        let frag_shader_module = create_shader_module(device, &frag[..])?;
 
         let vert_stage = vk::PipelineShaderStageCreateInfo::builder()
             .stage(vk::ShaderStageFlags::VERTEX)
@@ -29,12 +32,12 @@ impl<'a> Shader<'a> {
             .module(frag_shader_module)
             .name(main_func_name);
 
-        Self {
+        Ok(Self {
             vert_shader_module,
             frag_shader_module,
             vert_stage,
             frag_stage,
-        }
+        })
     }
 
     pub unsafe fn get_stages(
@@ -53,7 +56,7 @@ impl<'a> Shader<'a> {
 }
 
 unsafe fn create_shader_module(device: &Device, bytecode: &[u8]) -> Result<vk::ShaderModule> {
-    let bytecode = Bytecode::new(bytecode).unwrap();
+    let bytecode = Bytecode::new(bytecode)?;
 
     let info = vk::ShaderModuleCreateInfo::builder()
         .code_size(bytecode.code_size())

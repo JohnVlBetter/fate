@@ -39,11 +39,11 @@ pub struct VkDevice {
 }
 
 impl VkDevice {
-    pub unsafe fn new(entry: &Entry, instance: &Instance, surface: vk::SurfaceKHR) -> Self {
-        let (physical_device, msaa_samples) = pick_physical_device(instance, surface).unwrap();
+    pub unsafe fn new(entry: &Entry, instance: &Instance, surface: vk::SurfaceKHR) -> Result<Self> {
+        let (physical_device, msaa_samples) = pick_physical_device(instance, surface)?;
         let (device, graphics_queue, present_queue) =
-            create_logical_device(entry, instance, surface, physical_device).unwrap();
-        Self {
+            create_logical_device(entry, instance, surface, physical_device)?;
+        Ok(Self {
             device: device,
             physical_device: physical_device,
             msaa_samples: msaa_samples,
@@ -53,7 +53,7 @@ impl VkDevice {
             command_pools: vec![],
             command_buffers: vec![],
             secondary_command_buffers: vec![],
-        }
+        })
     }
 
     pub unsafe fn create_command_pools(

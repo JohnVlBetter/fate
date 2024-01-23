@@ -6,6 +6,7 @@ use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use std::mem::size_of;
 use vulkanalia::vk::{self, HasBuilder};
+use anyhow::Result;
 
 pub type Vec2 = cgmath::Vector2<f32>;
 pub type Vec3 = cgmath::Vector3<f32>;
@@ -87,8 +88,8 @@ pub struct Model {
 }
 
 impl Model {
-    pub fn new(path: &str) -> Self {
-        let mut reader = BufReader::new(File::open(path).unwrap());
+    pub fn new(path: &str) -> Result<Self> {
+        let mut reader = BufReader::new(File::open(path)?);
 
         let (models, _) = tobj::load_obj_buf(
             &mut reader,
@@ -97,8 +98,7 @@ impl Model {
                 ..Default::default()
             },
             |_| Ok(Default::default()),
-        )
-        .unwrap();
+        )?;
 
         // Vertices / Indices
 
@@ -134,6 +134,6 @@ impl Model {
                 }
             }
         }
-        Self { vertices, indices }
+        Ok(Self { vertices, indices })
     }
 }

@@ -9,6 +9,7 @@
 use cgmath::{point3, vec3, Deg};
 use fate_graphic::buffer::*;
 use fate_graphic::device::*;
+use fate_graphic::framebuffer::*;
 use fate_graphic::model::*;
 use fate_graphic::shader::Shader;
 use fate_graphic::swapchain::Swapchain;
@@ -50,13 +51,13 @@ pub struct App {
 
 impl App {
     /// Creates our Vulkan app.
-    pub unsafe fn create(window: &Window) -> Result<Self> {
+    pub unsafe fn new(window: &Window) -> Result<Self> {
         let loader = LibloadingLoader::new(LIBRARY)?;
         let entry = Entry::new(loader).map_err(|b| anyhow!("{}", b))?;
         let mut data = AppData::default();
         let instance = create_instance(window, &entry, &mut data)?;
         data.surface = vk_window::create_surface(&instance, &window, &window)?;
-        let mut device = VkDevice::new(&entry, &instance, data.surface);
+        let mut device = VkDevice::new(&entry, &instance, data.surface)?;
         let size = window.inner_size();
         data.swapchain = Swapchain::new(
             size.width,
@@ -65,17 +66,17 @@ impl App {
             &device.device,
             device.physical_device,
             data.surface,
-        );
+        )?;
         create_render_pass(&instance, &device, &mut data)?;
         create_descriptor_set_layout(&device.device, &mut data)?;
         create_pipeline(&device, &mut data)?;
         let num_images: usize = data.swapchain.swapchain_images.len();
         device.create_command_pools(&instance, data.surface, num_images)?;
-        create_color_objects(&instance, &device, &mut data)?;
-        create_depth_objects(&instance, &device, &mut data)?;
+        data.color_attachment = ColorAttachment::new(&instance, &device, &data.swapchain)?;
+        data.depth_attachment = DepthAttachment::new(&instance, &device, &data.swapchain)?;
         create_framebuffers(&device.device, &mut data)?;
-        data.texture = Texture::new("res/model/viking_room/viking_room.png", &instance, &device);
-        data.model = Model::new("res/model/viking_room/viking_room.obj");
+        data.texture = Texture::new("res/model/viking_room/viking_room.png", &instance, &device)?;
+        data.model = Model::new("res/model/viking_room/viking_room.obj")?;
         create_vertex_buffer(&instance, &device, &mut data)?;
         create_index_buffer(&instance, &device, &mut data)?;
         create_uniform_buffers(&instance, &device, &mut data)?;
@@ -362,11 +363,11 @@ impl App {
         self.device.device.device_wait_idle()?;
         self.destroy_swapchain();
         let size = window.inner_size();
-        self.data.swapchain = Swapchain::new(size.width, size.height, &self.instance, &self.device.device, self.device.physical_device, self.data.surface);
+        self.data.swapchain = Swapchain::new(size.width, size.height, &self.instance, &self.device.device, self.device.physical_device, self.data.surface)?;
         create_render_pass(&self.instance, &self.device, &mut self.data)?;
         create_pipeline(&self.device, &mut self.data)?;
-        create_color_objects(&self.instance, &self.device, &mut self.data)?;
-        create_depth_objects(&self.instance, &self.device, &mut self.data)?;
+        self.data.color_attachment = ColorAttachment::new(&self.instance, &self.device, &self.data.swapchain)?;
+        self.data.depth_attachment = DepthAttachment::new(&self.instance, &self.device, &self.data.swapchain)?;
         create_framebuffers(&self.device.device, &mut self.data)?;
         create_uniform_buffers(&self.instance, &self.device, &mut self.data)?;
         create_descriptor_pool(&self.device.device, &mut self.data)?;
@@ -406,12 +407,8 @@ impl App {
         self.device.device.destroy_descriptor_pool(self.data.descriptor_pool, None);
         self.data.uniform_buffers.iter().for_each(|m| self.device.device.free_memory(m.buffer_memory, None));
         self.data.uniform_buffers.iter().for_each(|b| self.device.device.destroy_buffer(b.buffer, None));
-        self.device.device.destroy_image_view(self.data.depth_image_view, None);
-        self.device.device.free_memory(self.data.depth_image_memory, None);
-        self.device.device.destroy_image(self.data.depth_image, None);
-        self.device.device.destroy_image_view(self.data.color_image_view, None);
-        self.device.device.free_memory(self.data.color_image_memory, None);
-        self.device.device.destroy_image(self.data.color_image, None);
+        self.data.depth_attachment.destory(&self.device);
+        self.data.color_attachment.destory(&self.device);
         self.data.framebuffers.iter().for_each(|f| self.device.device.destroy_framebuffer(*f, None));
         self.device.device.destroy_pipeline(self.data.pipeline, None);
         self.device.device.destroy_pipeline_layout(self.data.pipeline_layout, None);
@@ -436,13 +433,9 @@ pub struct AppData {
     // Framebuffers
     framebuffers: Vec<vk::Framebuffer>,
     // Color
-    color_image: vk::Image,
-    color_image_memory: vk::DeviceMemory,
-    color_image_view: vk::ImageView,
+    pub color_attachment: ColorAttachment,
     // Depth
-    depth_image: vk::Image,
-    depth_image_memory: vk::DeviceMemory,
-    depth_image_view: vk::ImageView,
+    pub depth_attachment: DepthAttachment,
     //Texture
     pub texture: Texture,
     // Model
@@ -694,7 +687,7 @@ unsafe fn create_descriptor_set_layout(device: &Device, data: &mut AppData) -> R
 
 unsafe fn create_pipeline(device: &VkDevice, data: &mut AppData) -> Result<()> {
     // Shader
-    let mut shader = Shader::new(b"main\0", &device.device);
+    let mut shader = Shader::new(b"main\0", &device.device)?;
 
     // Vertex Input State
     let binding_descriptions = &[Vertex::binding_description()];
@@ -836,7 +829,11 @@ unsafe fn create_framebuffers(device: &Device, data: &mut AppData) -> Result<()>
         .swapchain_image_views
         .iter()
         .map(|i| {
-            let attachments = &[data.color_image_view, data.depth_image_view, *i];
+            let attachments = &[
+                data.color_attachment.color_image_view,
+                data.depth_attachment.depth_image_view,
+                *i,
+            ];
             let create_info = vk::FramebufferCreateInfo::builder()
                 .render_pass(data.render_pass)
                 .attachments(attachments)
@@ -849,130 +846,6 @@ unsafe fn create_framebuffers(device: &Device, data: &mut AppData) -> Result<()>
         .collect::<Result<Vec<_>, _>>()?;
 
     Ok(())
-}
-
-//================================================
-// Color Objects
-//================================================
-
-unsafe fn create_color_objects(
-    instance: &Instance,
-    device: &VkDevice,
-    data: &mut AppData,
-) -> Result<()> {
-    // Image + Image Memory
-
-    let (color_image, color_image_memory) = create_image(
-        instance,
-        &device.device,
-        device.physical_device,
-        data.swapchain.swapchain_extent.width,
-        data.swapchain.swapchain_extent.height,
-        1,
-        device.msaa_samples,
-        data.swapchain.swapchain_format,
-        vk::ImageTiling::OPTIMAL,
-        vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::TRANSIENT_ATTACHMENT,
-        vk::MemoryPropertyFlags::DEVICE_LOCAL,
-    )?;
-
-    data.color_image = color_image;
-    data.color_image_memory = color_image_memory;
-
-    // Image View
-
-    data.color_image_view = create_image_view(
-        &device.device,
-        data.color_image,
-        data.swapchain.swapchain_format,
-        vk::ImageAspectFlags::COLOR,
-        1,
-    )?;
-
-    Ok(())
-}
-
-//================================================
-// Depth Objects
-//================================================
-
-unsafe fn create_depth_objects(
-    instance: &Instance,
-    device: &VkDevice,
-    data: &mut AppData,
-) -> Result<()> {
-    // Image + Image Memory
-
-    let format = get_depth_format(instance, device.physical_device)?;
-
-    let (depth_image, depth_image_memory) = create_image(
-        instance,
-        &device.device,
-        device.physical_device,
-        data.swapchain.swapchain_extent.width,
-        data.swapchain.swapchain_extent.height,
-        1,
-        device.msaa_samples,
-        format,
-        vk::ImageTiling::OPTIMAL,
-        vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT,
-        vk::MemoryPropertyFlags::DEVICE_LOCAL,
-    )?;
-
-    data.depth_image = depth_image;
-    data.depth_image_memory = depth_image_memory;
-
-    // Image View
-
-    data.depth_image_view = create_image_view(
-        &device.device,
-        data.depth_image,
-        format,
-        vk::ImageAspectFlags::DEPTH,
-        1,
-    )?;
-
-    Ok(())
-}
-
-unsafe fn get_depth_format(
-    instance: &Instance,
-    physical_device: vk::PhysicalDevice,
-) -> Result<vk::Format> {
-    let candidates = &[
-        vk::Format::D32_SFLOAT,
-        vk::Format::D32_SFLOAT_S8_UINT,
-        vk::Format::D24_UNORM_S8_UINT,
-    ];
-
-    get_supported_format(
-        instance,
-        physical_device,
-        candidates,
-        vk::ImageTiling::OPTIMAL,
-        vk::FormatFeatureFlags::DEPTH_STENCIL_ATTACHMENT,
-    )
-}
-
-unsafe fn get_supported_format(
-    instance: &Instance,
-    physical_device: vk::PhysicalDevice,
-    candidates: &[vk::Format],
-    tiling: vk::ImageTiling,
-    features: vk::FormatFeatureFlags,
-) -> Result<vk::Format> {
-    candidates
-        .iter()
-        .cloned()
-        .find(|f| {
-            let properties = instance.get_physical_device_format_properties(physical_device, *f);
-            match tiling {
-                vk::ImageTiling::LINEAR => properties.linear_tiling_features.contains(features),
-                vk::ImageTiling::OPTIMAL => properties.optimal_tiling_features.contains(features),
-                _ => false,
-            }
-        })
-        .ok_or_else(|| anyhow!("Failed to find supported format!"))
 }
 
 //================================================
