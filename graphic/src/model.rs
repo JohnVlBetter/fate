@@ -1,7 +1,6 @@
 use std::fs::File;
 use std::io::BufReader;
 
-use anyhow::Result;
 use cgmath::{vec2, vec3};
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
@@ -88,8 +87,8 @@ pub struct Model {
 }
 
 impl Model {
-    pub fn new(&mut self, path: &str) -> Result<()> {
-        let mut reader = BufReader::new(File::open(path)?);
+    pub fn new(path: &str) -> Self {
+        let mut reader = BufReader::new(File::open(path).unwrap());
 
         let (models, _) = tobj::load_obj_buf(
             &mut reader,
@@ -98,11 +97,14 @@ impl Model {
                 ..Default::default()
             },
             |_| Ok(Default::default()),
-        )?;
+        )
+        .unwrap();
 
         // Vertices / Indices
 
         let mut unique_vertices = HashMap::new();
+        let mut indices: Vec<u32> = Vec::new();
+        let mut vertices: Vec<Vertex> = Vec::new();
 
         for model in &models {
             for index in &model.mesh.indices {
@@ -123,15 +125,15 @@ impl Model {
                 };
 
                 if let Some(index) = unique_vertices.get(&vertex) {
-                    self.indices.push(*index as u32);
+                    indices.push(*index as u32);
                 } else {
-                    let index = self.vertices.len();
+                    let index = vertices.len();
                     unique_vertices.insert(vertex, index);
-                    self.vertices.push(vertex);
-                    self.indices.push(index as u32);
+                    vertices.push(vertex);
+                    indices.push(index as u32);
                 }
             }
         }
-        Ok(())
+        Self { vertices, indices }
     }
 }

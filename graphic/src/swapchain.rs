@@ -51,9 +51,9 @@ impl Swapchain {
         let indices = QueueFamilyIndices::get(instance, surface, physical_device).unwrap();
         let support = SwapchainSupport::get(instance, physical_device, surface).unwrap();
 
-        let surface_format = Self::get_swapchain_surface_format(&support.formats);
-        let present_mode = Self::get_swapchain_present_mode(&support.present_modes);
-        let extent = Self::get_swapchain_extent(width, height, support.capabilities);
+        let surface_format = get_swapchain_surface_format(&support.formats);
+        let present_mode = get_swapchain_present_mode(&support.present_modes);
+        let extent = get_swapchain_extent(width, height, support.capabilities);
 
         let swapchain_format = surface_format.format;
         let swapchain_extent = extent;
@@ -117,47 +117,47 @@ impl Swapchain {
             .for_each(|v| device.device.destroy_image_view(*v, None));
         device.device.destroy_swapchain_khr(self.swapchain, None);
     }
+}
 
-    fn get_swapchain_surface_format(formats: &[vk::SurfaceFormatKHR]) -> vk::SurfaceFormatKHR {
-        formats
-            .iter()
-            .cloned()
-            .find(|f| {
-                f.format == vk::Format::B8G8R8A8_SRGB
-                    && f.color_space == vk::ColorSpaceKHR::SRGB_NONLINEAR
-            })
-            .unwrap_or_else(|| formats[0])
-    }
+fn get_swapchain_surface_format(formats: &[vk::SurfaceFormatKHR]) -> vk::SurfaceFormatKHR {
+    formats
+        .iter()
+        .cloned()
+        .find(|f| {
+            f.format == vk::Format::B8G8R8A8_SRGB
+                && f.color_space == vk::ColorSpaceKHR::SRGB_NONLINEAR
+        })
+        .unwrap_or_else(|| formats[0])
+}
 
-    fn get_swapchain_present_mode(present_modes: &[vk::PresentModeKHR]) -> vk::PresentModeKHR {
-        present_modes
-            .iter()
-            .cloned()
-            .find(|m| *m == vk::PresentModeKHR::MAILBOX)
-            .unwrap_or(vk::PresentModeKHR::FIFO)
-    }
+fn get_swapchain_present_mode(present_modes: &[vk::PresentModeKHR]) -> vk::PresentModeKHR {
+    present_modes
+        .iter()
+        .cloned()
+        .find(|m| *m == vk::PresentModeKHR::MAILBOX)
+        .unwrap_or(vk::PresentModeKHR::FIFO)
+}
 
-    fn get_swapchain_extent(
-        width: u32,
-        height: u32,
-        capabilities: vk::SurfaceCapabilitiesKHR,
-    ) -> vk::Extent2D {
-        if capabilities.current_extent.width != u32::max_value() {
-            capabilities.current_extent
-        } else {
-            let clamp = |min: u32, max: u32, v: u32| min.max(max.min(v));
-            vk::Extent2D::builder()
-                .width(clamp(
-                    capabilities.min_image_extent.width,
-                    capabilities.max_image_extent.width,
-                    width,
-                ))
-                .height(clamp(
-                    capabilities.min_image_extent.height,
-                    capabilities.max_image_extent.height,
-                    height,
-                ))
-                .build()
-        }
+fn get_swapchain_extent(
+    width: u32,
+    height: u32,
+    capabilities: vk::SurfaceCapabilitiesKHR,
+) -> vk::Extent2D {
+    if capabilities.current_extent.width != u32::max_value() {
+        capabilities.current_extent
+    } else {
+        let clamp = |min: u32, max: u32, v: u32| min.max(max.min(v));
+        vk::Extent2D::builder()
+            .width(clamp(
+                capabilities.min_image_extent.width,
+                capabilities.max_image_extent.width,
+                width,
+            ))
+            .height(clamp(
+                capabilities.min_image_extent.height,
+                capabilities.max_image_extent.height,
+                height,
+            ))
+            .build()
     }
 }

@@ -74,16 +74,8 @@ impl App {
         create_color_objects(&instance, &device, &mut data)?;
         create_depth_objects(&instance, &device, &mut data)?;
         create_framebuffers(&device.device, &mut data)?;
-        data.texture.create_texture_image(
-            &instance,
-            &device.device,
-            device.physical_device,
-            device.graphics_queue,
-            device.command_pool,
-        )?;
-        data.texture.create_texture_image_view(&device.device)?;
-        data.texture.create_texture_sampler(&device.device)?;
-        data.model.new("res/model/viking_room/viking_room.obj")?;
+        data.texture = Texture::new("res/model/viking_room/viking_room.png", &instance, &device);
+        data.model = Model::new("res/model/viking_room/viking_room.obj");
         create_vertex_buffer(&instance, &device, &mut data)?;
         create_index_buffer(&instance, &device, &mut data)?;
         create_uniform_buffers(&instance, &device, &mut data)?;
