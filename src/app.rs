@@ -20,6 +20,7 @@ use std::ffi::CStr;
 use std::mem::size_of;
 use std::os::raw::c_void;
 use std::ptr::{copy_nonoverlapping as memcpy, slice_from_raw_parts};
+use std::rc::Rc;
 use std::time::Instant;
 
 use anyhow::{anyhow, Result};
@@ -205,7 +206,7 @@ impl App {
         let clear_values = &[color_clear_value, depth_clear_value];
         let info = vk::RenderPassBeginInfo::builder()
             .render_pass(self.data.render_pass)
-            .framebuffer(self.data.framebuffers[image_index])
+            .framebuffer(self.data.framebuffers[image_index].frame_buffer)
             .render_area(render_area)
             .clear_values(clear_values);
 
@@ -270,7 +271,7 @@ impl App {
         let inheritance_info = vk::CommandBufferInheritanceInfo::builder()
             .render_pass(self.data.render_pass)
             .subpass(0)
-            .framebuffer(self.data.framebuffers[image_index]);
+            .framebuffer(self.data.framebuffers[image_index].frame_buffer);
 
         let info = vk::CommandBufferBeginInfo::builder()
             .flags(vk::CommandBufferUsageFlags::RENDER_PASS_CONTINUE)
@@ -409,7 +410,7 @@ impl App {
         self.data.uniform_buffers.iter().for_each(|b| self.device.device.destroy_buffer(b.buffer, None));
         self.data.depth_attachment.destory(&self.device);
         self.data.color_attachment.destory(&self.device);
-        self.data.framebuffers.iter().for_each(|f| self.device.device.destroy_framebuffer(*f, None));
+        self.data.framebuffers.iter().for_each(|f| self.device.device.destroy_framebuffer(f.frame_buffer, None));
         self.device.device.destroy_pipeline(self.data.pipeline, None);
         self.device.device.destroy_pipeline_layout(self.data.pipeline_layout, None);
         self.device.device.destroy_render_pass(self.data.render_pass, None);
@@ -431,7 +432,7 @@ pub struct AppData {
     pipeline_layout: vk::PipelineLayout,
     pipeline: vk::Pipeline,
     // Framebuffers
-    framebuffers: Vec<vk::Framebuffer>,
+    framebuffers: Vec<Framebuffer>,
     // Color
     pub color_attachment: ColorAttachment,
     // Depth
@@ -824,27 +825,22 @@ unsafe fn create_pipeline(device: &VkDevice, data: &mut AppData) -> Result<()> {
 //================================================
 
 unsafe fn create_framebuffers(device: &Device, data: &mut AppData) -> Result<()> {
-    data.framebuffers = data
-        .swapchain
-        .swapchain_image_views
-        .iter()
-        .map(|i| {
-            let attachments = &[
-                data.color_attachment.color_image_view,
-                data.depth_attachment.depth_image_view,
-                *i,
-            ];
-            let create_info = vk::FramebufferCreateInfo::builder()
-                .render_pass(data.render_pass)
-                .attachments(attachments)
-                .width(data.swapchain.swapchain_extent.width)
-                .height(data.swapchain.swapchain_extent.height)
-                .layers(1);
-
-            device.create_framebuffer(&create_info, None)
-        })
-        .collect::<Result<Vec<_>, _>>()?;
-
+    let count = data.swapchain.swapchain_image_views.len();
+    data.framebuffers = vec![];
+    let rc_color_attachment = Rc::new(data.color_attachment);
+    let rc_depth_attachment = Rc::new(data.depth_attachment);
+    for idx in 0..count {
+        data.framebuffers.push(Framebuffer::new(
+            device,
+            &data.swapchain,
+            &rc_color_attachment,
+            &rc_depth_attachment,
+            data.render_pass,
+            idx,
+        )?);
+    }
+    drop(rc_depth_attachment);
+    drop(rc_color_attachment);
     Ok(())
 }
 

@@ -1,12 +1,48 @@
+use std::rc::Rc;
+
 use crate::{device::VkDevice, swapchain::Swapchain, texture::*};
 use anyhow::{anyhow, Result};
 use vulkanalia::prelude::v1_0::*;
 
 #[derive(Clone, Debug, Default)]
-pub struct Framebuffer {}
-impl Framebuffer {}
+pub struct Framebuffer {
+    pub color_attachment: Rc<ColorAttachment>,
+    pub depth_attachment: Rc<DepthAttachment>,
+    pub frame_buffer: vk::Framebuffer,
+}
 
-#[derive(Clone, Debug, Default)]
+impl Framebuffer {
+    pub unsafe fn new(
+        device: &Device,
+        swapchain: &Swapchain,
+        color_attachment: &Rc<ColorAttachment>,
+        depth_attachment: &Rc<DepthAttachment>,
+        render_pass: vk::RenderPass,
+        idx: usize,
+    ) -> Result<Self> {
+        let attachments = &[
+            color_attachment.color_image_view,
+            depth_attachment.depth_image_view,
+            swapchain.swapchain_image_views[idx],
+        ];
+        let create_info = vk::FramebufferCreateInfo::builder()
+            .render_pass(render_pass)
+            .attachments(attachments)
+            .width(swapchain.swapchain_extent.width)
+            .height(swapchain.swapchain_extent.height)
+            .layers(1);
+
+        let frame_buffer = device.create_framebuffer(&create_info, None)?;
+
+        Ok(Self {
+            color_attachment: Rc::clone(color_attachment),
+            depth_attachment: Rc::clone(depth_attachment),
+            frame_buffer,
+        })
+    }
+}
+
+#[derive(Clone, Debug, Default, Copy)]
 pub struct ColorAttachment {
     pub color_image: vk::Image,
     pub color_image_memory: vk::DeviceMemory,
@@ -59,7 +95,7 @@ impl ColorAttachment {
     }
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, Copy)]
 pub struct DepthAttachment {
     pub depth_image: vk::Image,
     pub depth_image_memory: vk::DeviceMemory,
