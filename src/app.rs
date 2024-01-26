@@ -11,6 +11,7 @@ use fate_graphic::buffer::*;
 use fate_graphic::device::*;
 use fate_graphic::framebuffer::*;
 use fate_graphic::model::*;
+use fate_graphic::render_pass::RenderPass;
 use fate_graphic::shader::Shader;
 use fate_graphic::swapchain::Swapchain;
 use fate_graphic::texture::*;
@@ -34,10 +35,8 @@ use vulkanalia::vk::ExtDebugUtilsExtension;
 use vulkanalia::vk::KhrSurfaceExtension;
 use vulkanalia::vk::KhrSwapchainExtension;
 
-/// The maximum number of frames that can be processed concurrently.
 const MAX_FRAMES_IN_FLIGHT: usize = 2;
 
-/// Our Vulkan app.
 #[derive(Clone, Debug)]
 pub struct App {
     pub entry: Entry,
@@ -51,7 +50,6 @@ pub struct App {
 }
 
 impl App {
-    /// Creates our Vulkan app.
     pub unsafe fn new(window: &Window) -> Result<Self> {
         let loader = LibloadingLoader::new(LIBRARY)?;
         let entry = Entry::new(loader).map_err(|b| anyhow!("{}", b))?;
@@ -68,7 +66,7 @@ impl App {
             device.physical_device,
             data.surface,
         )?;
-        create_render_pass(&instance, &device, &mut data)?;
+        data.render_pass = RenderPass::new(&instance, &device, &data.swapchain)?;
         create_descriptor_set_layout(&device.device, &mut data)?;
         create_pipeline(&device, &mut data)?;
         let num_images: usize = data.swapchain.swapchain_images.len();
@@ -97,7 +95,6 @@ impl App {
         })
     }
 
-    /// Renders a frame for our Vulkan app.
     pub unsafe fn render(&mut self, window: &Window) -> Result<()> {
         let in_flight_fence = self.data.in_flight_fences[self.frame];
 
@@ -173,7 +170,6 @@ impl App {
         Ok(())
     }
 
-    /// Updates a command buffer for our Vulkan app.
     #[rustfmt::skip]
     unsafe fn update_command_buffer(&mut self, image_index: usize) -> Result<()> {
         // Reset
@@ -205,7 +201,7 @@ impl App {
 
         let clear_values = &[color_clear_value, depth_clear_value];
         let info = vk::RenderPassBeginInfo::builder()
-            .render_pass(self.data.render_pass)
+            .render_pass(self.data.render_pass.render_pass)
             .framebuffer(self.data.framebuffers[image_index].frame_buffer)
             .render_area(render_area)
             .clear_values(clear_values);
@@ -224,7 +220,6 @@ impl App {
         Ok(())
     }
 
-    /// Updates a secondary command buffer for our Vulkan app.
     #[rustfmt::skip]
     unsafe fn update_secondary_command_buffer(
         &mut self,
@@ -269,7 +264,7 @@ impl App {
         // Commands
 
         let inheritance_info = vk::CommandBufferInheritanceInfo::builder()
-            .render_pass(self.data.render_pass)
+            .render_pass(self.data.render_pass.render_pass)
             .subpass(0)
             .framebuffer(self.data.framebuffers[image_index].frame_buffer);
 
@@ -311,7 +306,6 @@ impl App {
         Ok(command_buffer)
     }
 
-    /// Updates the uniform buffer object for our Vulkan app.
     unsafe fn update_uniform_buffer(&self, image_index: usize) -> Result<()> {
         // MVP
 
@@ -358,14 +352,13 @@ impl App {
         Ok(())
     }
 
-    /// Recreates the swapchain for our Vulkan app.
     #[rustfmt::skip]
     unsafe fn recreate_swapchain(&mut self, window: &Window) -> Result<()> {
         self.device.device.device_wait_idle()?;
         self.destroy_swapchain();
         let size = window.inner_size();
         self.data.swapchain = Swapchain::new(size.width, size.height, &self.instance, &self.device.device, self.device.physical_device, self.data.surface)?;
-        create_render_pass(&self.instance, &self.device, &mut self.data)?;
+        self.data.render_pass = RenderPass::new(&self.instance, &self.device, &self.data.swapchain)?;
         create_pipeline(&self.device, &mut self.data)?;
         self.data.color_attachment = ColorAttachment::new(&self.instance, &self.device, &self.data.swapchain)?;
         self.data.depth_attachment = DepthAttachment::new(&self.instance, &self.device, &self.data.swapchain)?;
@@ -378,7 +371,6 @@ impl App {
         Ok(())
     }
 
-    /// Destroys our Vulkan app.
     #[rustfmt::skip]
     pub unsafe fn destroy(&mut self) {
         self.device.device.device_wait_idle().unwrap();
@@ -402,7 +394,6 @@ impl App {
         self.instance.destroy_instance(None);
     }
 
-    /// Destroys the parts of our Vulkan app related to the swapchain.
     #[rustfmt::skip]
     unsafe fn destroy_swapchain(&mut self) {
         self.device.device.destroy_descriptor_pool(self.data.descriptor_pool, None);
@@ -413,13 +404,11 @@ impl App {
         self.data.framebuffers.iter().for_each(|f| self.device.device.destroy_framebuffer(f.frame_buffer, None));
         self.device.device.destroy_pipeline(self.data.pipeline, None);
         self.device.device.destroy_pipeline_layout(self.data.pipeline_layout, None);
-        self.device.device.destroy_render_pass(self.data.render_pass, None);
 
         self.data.swapchain.destroy(&self.device);
     }
 }
 
-/// The Vulkan handles and associated properties used by our Vulkan app.
 #[derive(Clone, Debug, Default)]
 pub struct AppData {
     // Debug
@@ -427,7 +416,7 @@ pub struct AppData {
     // Surface
     surface: vk::SurfaceKHR,
     // Pipeline
-    render_pass: vk::RenderPass,
+    pub render_pass: RenderPass,
     descriptor_set_layout: vk::DescriptorSetLayout,
     pipeline_layout: vk::PipelineLayout,
     pipeline: vk::Pipeline,
@@ -456,10 +445,6 @@ pub struct AppData {
     in_flight_fences: Vec<vk::Fence>,
     images_in_flight: Vec<vk::Fence>,
 }
-
-//================================================
-// Instance
-//================================================
 
 unsafe fn create_instance(window: &Window, entry: &Entry, data: &mut AppData) -> Result<Instance> {
     // Application Info
@@ -567,103 +552,6 @@ extern "system" fn debug_callback(
 //================================================
 // Pipeline
 //================================================
-
-unsafe fn create_render_pass(
-    instance: &Instance,
-    device: &VkDevice,
-    data: &mut AppData,
-) -> Result<()> {
-    // Attachments
-
-    let color_attachment = vk::AttachmentDescription::builder()
-        .format(data.swapchain.swapchain_format)
-        .samples(device.msaa_samples)
-        .load_op(vk::AttachmentLoadOp::CLEAR)
-        .store_op(vk::AttachmentStoreOp::STORE)
-        .stencil_load_op(vk::AttachmentLoadOp::DONT_CARE)
-        .stencil_store_op(vk::AttachmentStoreOp::DONT_CARE)
-        .initial_layout(vk::ImageLayout::UNDEFINED)
-        .final_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL);
-
-    let depth_stencil_attachment = vk::AttachmentDescription::builder()
-        .format(get_depth_format(instance, device.physical_device)?)
-        .samples(device.msaa_samples)
-        .load_op(vk::AttachmentLoadOp::CLEAR)
-        .store_op(vk::AttachmentStoreOp::DONT_CARE)
-        .stencil_load_op(vk::AttachmentLoadOp::DONT_CARE)
-        .stencil_store_op(vk::AttachmentStoreOp::DONT_CARE)
-        .initial_layout(vk::ImageLayout::UNDEFINED)
-        .final_layout(vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
-
-    let color_resolve_attachment = vk::AttachmentDescription::builder()
-        .format(data.swapchain.swapchain_format)
-        .samples(vk::SampleCountFlags::_1)
-        .load_op(vk::AttachmentLoadOp::DONT_CARE)
-        .store_op(vk::AttachmentStoreOp::STORE)
-        .stencil_load_op(vk::AttachmentLoadOp::DONT_CARE)
-        .stencil_store_op(vk::AttachmentStoreOp::DONT_CARE)
-        .initial_layout(vk::ImageLayout::UNDEFINED)
-        .final_layout(vk::ImageLayout::PRESENT_SRC_KHR);
-
-    // Subpasses
-
-    let color_attachment_ref = vk::AttachmentReference::builder()
-        .attachment(0)
-        .layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL);
-
-    let depth_stencil_attachment_ref = vk::AttachmentReference::builder()
-        .attachment(1)
-        .layout(vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
-
-    let color_resolve_attachment_ref = vk::AttachmentReference::builder()
-        .attachment(2)
-        .layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL);
-
-    let color_attachments = &[color_attachment_ref];
-    let resolve_attachments = &[color_resolve_attachment_ref];
-    let subpass = vk::SubpassDescription::builder()
-        .pipeline_bind_point(vk::PipelineBindPoint::GRAPHICS)
-        .color_attachments(color_attachments)
-        .depth_stencil_attachment(&depth_stencil_attachment_ref)
-        .resolve_attachments(resolve_attachments);
-
-    // Dependencies
-
-    let dependency = vk::SubpassDependency::builder()
-        .src_subpass(vk::SUBPASS_EXTERNAL)
-        .dst_subpass(0)
-        .src_stage_mask(
-            vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT
-                | vk::PipelineStageFlags::EARLY_FRAGMENT_TESTS,
-        )
-        .src_access_mask(vk::AccessFlags::empty())
-        .dst_stage_mask(
-            vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT
-                | vk::PipelineStageFlags::EARLY_FRAGMENT_TESTS,
-        )
-        .dst_access_mask(
-            vk::AccessFlags::COLOR_ATTACHMENT_WRITE
-                | vk::AccessFlags::DEPTH_STENCIL_ATTACHMENT_WRITE,
-        );
-
-    // Create
-
-    let attachments = &[
-        color_attachment,
-        depth_stencil_attachment,
-        color_resolve_attachment,
-    ];
-    let subpasses = &[subpass];
-    let dependencies = &[dependency];
-    let info = vk::RenderPassCreateInfo::builder()
-        .attachments(attachments)
-        .subpasses(subpasses)
-        .dependencies(dependencies);
-
-    data.render_pass = device.device.create_render_pass(&info, None)?;
-
-    Ok(())
-}
 
 unsafe fn create_descriptor_set_layout(device: &Device, data: &mut AppData) -> Result<()> {
     let ubo_binding = vk::DescriptorSetLayoutBinding::builder()
@@ -805,7 +693,7 @@ unsafe fn create_pipeline(device: &VkDevice, data: &mut AppData) -> Result<()> {
         .depth_stencil_state(&depth_stencil_state)
         .color_blend_state(&color_blend_state)
         .layout(data.pipeline_layout)
-        .render_pass(data.render_pass)
+        .render_pass(data.render_pass.render_pass)
         .subpass(0);
 
     data.pipeline = device
@@ -835,7 +723,7 @@ unsafe fn create_framebuffers(device: &Device, data: &mut AppData) -> Result<()>
             &data.swapchain,
             &rc_color_attachment,
             &rc_depth_attachment,
-            data.render_pass,
+            data.render_pass.render_pass,
             idx,
         )?);
     }
