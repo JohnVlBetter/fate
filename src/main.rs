@@ -1,24 +1,23 @@
+mod app;
+
 use app::App;
+
+use anyhow::Result;
 use winit::dpi::LogicalSize;
 use winit::event::{ElementState, Event, VirtualKeyCode, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
 use winit::window::WindowBuilder;
 
-mod app;
-use anyhow::Result;
-
 #[rustfmt::skip]
 fn main() -> Result<()> {
-    pretty_env_logger::init();
+    pretty_env_logger::init();    
 
-    // Window
     let event_loop = EventLoop::new();
     let window = WindowBuilder::new()
         .with_title("Fate Engine v1.0.0 <Vulkan>")
         .with_inner_size(LogicalSize::new(1920, 1080))
         .build(&event_loop)?;
 
-    // App
     let mut app = unsafe { App::new(&window) }?;
     let mut destroying = false;
     let mut minimized = false;

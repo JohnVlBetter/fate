@@ -5,13 +5,13 @@ use anyhow::{anyhow, Result};
 use vulkanalia::prelude::v1_0::*;
 
 #[derive(Clone, Debug, Default)]
-pub struct Framebuffer {
+pub struct FrameBuffer {
     pub color_attachment: Rc<ColorAttachment>,
     pub depth_attachment: Rc<DepthAttachment>,
     pub frame_buffer: vk::Framebuffer,
 }
 
-impl Framebuffer {
+impl FrameBuffer {
     pub unsafe fn new(
         device: &Device,
         swapchain: &Swapchain,

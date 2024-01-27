@@ -4,8 +4,6 @@ use vulkanalia::prelude::v1_0::*;
 use thiserror::Error;
 use vulkanalia::vk::KhrSurfaceExtension;
 
-use crate::model;
-
 #[derive(Debug, Error)]
 #[error("{0}")]
 pub struct SuitabilityError(pub &'static str);
@@ -49,13 +47,6 @@ impl QueueFamilyIndices {
             )))
         }
     }
-}
-
-#[repr(C)]
-#[derive(Copy, Clone, Debug)]
-pub struct UniformBufferObject {
-    pub view: model::Mat4,
-    pub proj: model::Mat4,
 }
 
 pub unsafe fn get_memory_type_index(

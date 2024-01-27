@@ -7,7 +7,6 @@
 )]
 
 use cgmath::{point3, vec3, Deg};
-use fate_graphic::buffer::*;
 use fate_graphic::device::*;
 use fate_graphic::frame_buffer::*;
 use fate_graphic::model::*;
@@ -15,7 +14,8 @@ use fate_graphic::render_pass::RenderPass;
 use fate_graphic::shader::Shader;
 use fate_graphic::swapchain::Swapchain;
 use fate_graphic::texture::*;
-use fate_graphic::tools::UniformBufferObject;
+use fate_graphic::uniform_buffer::UniformBuffer;
+use fate_graphic::uniform_buffer::UniformBufferObject;
 use std::collections::HashSet;
 use std::ffi::CStr;
 use std::mem::size_of;
@@ -329,23 +329,12 @@ impl App {
                 0.1,
                 10.0,
             );
+        
+        let color = Vec4::new(1.0,0.0,0.0,1.0);
 
-        let ubo = UniformBufferObject { view, proj };
+        let ubo = UniformBufferObject { view, proj, color };
 
-        // Copy
-
-        let memory = self.device.device.map_memory(
-            self.data.uniform_buffers[image_index].buffer_memory,
-            0,
-            size_of::<UniformBufferObject>() as u64,
-            vk::MemoryMapFlags::empty(),
-        )?;
-
-        memcpy(&ubo, memory.cast(), 1);
-
-        self.device
-            .device
-            .unmap_memory(self.data.uniform_buffers[image_index].buffer_memory);
+        self.data.uniform_buffers[image_index].update(&ubo, &self.device)?;
 
         Ok(())
     }
@@ -394,8 +383,7 @@ impl App {
     #[rustfmt::skip]
     unsafe fn destroy_swapchain(&mut self) {
         self.device.device.destroy_descriptor_pool(self.data.descriptor_pool, None);
-        self.data.uniform_buffers.iter().for_each(|m| self.device.device.free_memory(m.buffer_memory, None));
-        self.data.uniform_buffers.iter().for_each(|b| self.device.device.destroy_buffer(b.buffer, None));
+        self.data.uniform_buffers.iter_mut().for_each(|b| b.destory(&self.device));
         self.data.depth_attachment.destory(&self.device);
         self.data.color_attachment.destory(&self.device);
         self.data.framebuffers.iter().for_each(|f| self.device.device.destroy_framebuffer(f.frame_buffer, None));
@@ -419,7 +407,7 @@ pub struct AppData {
     pipeline_layout: vk::PipelineLayout,
     pipeline: vk::Pipeline,
     // Framebuffers
-    framebuffers: Vec<Framebuffer>,
+    framebuffers: Vec<FrameBuffer>,
     // Color
     pub color_attachment: ColorAttachment,
     // Depth
@@ -429,7 +417,7 @@ pub struct AppData {
     // Model
     model: Model,
     //Buffer
-    uniform_buffers: Vec<Buffer>,
+    uniform_buffers: Vec<UniformBuffer>,
     //Swapchain
     pub swapchain: Swapchain,
     // Descriptors
@@ -706,7 +694,7 @@ unsafe fn create_framebuffers(device: &Device, data: &mut AppData) -> Result<()>
     let rc_color_attachment = Rc::new(data.color_attachment);
     let rc_depth_attachment = Rc::new(data.depth_attachment);
     for idx in 0..count {
-        data.framebuffers.push(Framebuffer::new(
+        data.framebuffers.push(FrameBuffer::new(
             device,
             &data.swapchain,
             &rc_color_attachment,
@@ -728,19 +716,8 @@ unsafe fn create_uniform_buffers(
     data.uniform_buffers.clear();
 
     for _ in 0..data.swapchain.swapchain_images.len() {
-        let (uniform_buffer, uniform_buffer_memory) = create_buffer(
-            instance,
-            &device.device,
-            device.physical_device,
-            size_of::<UniformBufferObject>() as u64,
-            vk::BufferUsageFlags::UNIFORM_BUFFER,
-            vk::MemoryPropertyFlags::HOST_COHERENT | vk::MemoryPropertyFlags::HOST_VISIBLE,
-        )?;
-
-        data.uniform_buffers.push(Buffer {
-            buffer: uniform_buffer,
-            buffer_memory: uniform_buffer_memory,
-        });
+        data.uniform_buffers
+            .push(UniformBuffer::new(instance, device)?);
     }
 
     Ok(())
@@ -779,7 +756,7 @@ unsafe fn create_descriptor_sets(device: &Device, data: &mut AppData) -> Result<
 
     for i in 0..data.swapchain.swapchain_images.len() {
         let info = vk::DescriptorBufferInfo::builder()
-            .buffer(data.uniform_buffers[i].buffer)
+            .buffer(data.uniform_buffers[i].buffer.buffer)
             .offset(0)
             .range(size_of::<UniformBufferObject>() as u64);
 
