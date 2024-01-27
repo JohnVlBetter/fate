@@ -149,6 +149,13 @@ impl Model {
             index_buffer,
         })
     }
+
+    pub unsafe fn destory(&mut self, device: &mut VkDevice) {
+        self.vertices.clear();
+        self.indices.clear();
+        device.destory_buffer(&self.index_buffer);
+        device.destory_buffer(&self.vertex_buffer);
+    }
 }
 
 unsafe fn create_vertex_buffer(

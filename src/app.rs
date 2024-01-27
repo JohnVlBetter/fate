@@ -378,8 +378,7 @@ impl App {
         self.data.in_flight_fences.iter().for_each(|f| self.device.device.destroy_fence(*f, None));
         self.data.render_finished_semaphores.iter().for_each(|s| self.device.device.destroy_semaphore(*s, None));
         self.data.image_available_semaphores.iter().for_each(|s| self.device.device.destroy_semaphore(*s, None));
-        self.device.destory_buffer(&self.data.model.index_buffer);
-        self.device.destory_buffer(&self.data.model.vertex_buffer);
+        self.data.model.destory(&mut self.device);
         self.data.texture.destory(&self.device);
         self.device.device.destroy_descriptor_set_layout(self.data.descriptor_set_layout, None);
         self.device.destory();
