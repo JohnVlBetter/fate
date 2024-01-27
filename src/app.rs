@@ -9,7 +9,7 @@
 use cgmath::{point3, vec3, Deg};
 use fate_graphic::buffer::*;
 use fate_graphic::device::*;
-use fate_graphic::framebuffer::*;
+use fate_graphic::frame_buffer::*;
 use fate_graphic::model::*;
 use fate_graphic::render_pass::RenderPass;
 use fate_graphic::shader::Shader;
@@ -401,6 +401,7 @@ impl App {
         self.data.framebuffers.iter().for_each(|f| self.device.device.destroy_framebuffer(f.frame_buffer, None));
         self.device.device.destroy_pipeline(self.data.pipeline, None);
         self.device.device.destroy_pipeline_layout(self.data.pipeline_layout, None);
+        self.data.render_pass.destory(&self.device);
 
         self.data.swapchain.destroy(&self.device);
     }
@@ -543,10 +544,6 @@ extern "system" fn debug_callback(
 
     vk::FALSE
 }
-
-//================================================
-// Pipeline
-//================================================
 
 unsafe fn create_descriptor_set_layout(device: &Device, data: &mut AppData) -> Result<()> {
     let ubo_binding = vk::DescriptorSetLayoutBinding::builder()
@@ -703,10 +700,6 @@ unsafe fn create_pipeline(device: &VkDevice, data: &mut AppData) -> Result<()> {
     Ok(())
 }
 
-//================================================
-// Framebuffers
-//================================================
-
 unsafe fn create_framebuffers(device: &Device, data: &mut AppData) -> Result<()> {
     let count = data.swapchain.swapchain_image_views.len();
     data.framebuffers = vec![];
@@ -726,10 +719,6 @@ unsafe fn create_framebuffers(device: &Device, data: &mut AppData) -> Result<()>
     drop(rc_color_attachment);
     Ok(())
 }
-
-//================================================
-// Buffers
-//================================================
 
 unsafe fn create_uniform_buffers(
     instance: &Instance,
@@ -756,10 +745,6 @@ unsafe fn create_uniform_buffers(
 
     Ok(())
 }
-
-//================================================
-// Descriptors
-//================================================
 
 unsafe fn create_descriptor_pool(device: &Device, data: &mut AppData) -> Result<()> {
     let ubo_size = vk::DescriptorPoolSize::builder()
@@ -825,10 +810,6 @@ unsafe fn create_descriptor_sets(device: &Device, data: &mut AppData) -> Result<
     Ok(())
 }
 
-//================================================
-// Command Buffers
-//================================================
-
 unsafe fn create_command_buffers(device: &mut VkDevice, data: &mut AppData) -> Result<()> {
     let num_images = data.swapchain.swapchain_images.len();
     for image_index in 0..num_images {
@@ -845,10 +826,6 @@ unsafe fn create_command_buffers(device: &mut VkDevice, data: &mut AppData) -> R
 
     Ok(())
 }
-
-//================================================
-// Sync Objects
-//================================================
 
 unsafe fn create_sync_objects(device: &Device, data: &mut AppData) -> Result<()> {
     let semaphore_info = vk::SemaphoreCreateInfo::builder();
