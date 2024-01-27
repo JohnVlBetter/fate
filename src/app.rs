@@ -75,9 +75,7 @@ impl App {
         data.depth_attachment = DepthAttachment::new(&instance, &device, &data.swapchain)?;
         create_framebuffers(&device.device, &mut data)?;
         data.texture = Texture::new("res/model/viking_room/viking_room.png", &instance, &device)?;
-        data.model = Model::new("res/model/viking_room/viking_room.obj")?;
-        create_vertex_buffer(&instance, &device, &mut data)?;
-        create_index_buffer(&instance, &device, &mut data)?;
+        data.model = Model::new("res/model/viking_room/viking_room.obj", &instance, &device)?;
         create_uniform_buffers(&instance, &device, &mut data)?;
         create_descriptor_pool(&device.device, &mut data)?;
         create_descriptor_sets(&device.device, &mut data)?;
@@ -275,8 +273,8 @@ impl App {
         self.device.device.begin_command_buffer(command_buffer, &info)?;
 
         self.device.device.cmd_bind_pipeline(command_buffer, vk::PipelineBindPoint::GRAPHICS, self.data.pipeline);
-        self.device.device.cmd_bind_vertex_buffers(command_buffer, 0, &[self.data.vertex_buffer.buffer], &[0]);
-        self.device.device.cmd_bind_index_buffer(command_buffer, self.data.index_buffer.buffer, 0, vk::IndexType::UINT32);
+        self.device.device.cmd_bind_vertex_buffers(command_buffer, 0, &[self.data.model.vertex_buffer.buffer], &[0]);
+        self.device.device.cmd_bind_index_buffer(command_buffer, self.data.model.index_buffer.buffer, 0, vk::IndexType::UINT32);
         self.device.device.cmd_bind_descriptor_sets(
             command_buffer,
             vk::PipelineBindPoint::GRAPHICS,
@@ -380,8 +378,8 @@ impl App {
         self.data.in_flight_fences.iter().for_each(|f| self.device.device.destroy_fence(*f, None));
         self.data.render_finished_semaphores.iter().for_each(|s| self.device.device.destroy_semaphore(*s, None));
         self.data.image_available_semaphores.iter().for_each(|s| self.device.device.destroy_semaphore(*s, None));
-        self.device.destory_buffer(&self.data.index_buffer);
-        self.device.destory_buffer(&self.data.vertex_buffer);
+        self.device.destory_buffer(&self.data.model.index_buffer);
+        self.device.destory_buffer(&self.data.model.vertex_buffer);
         self.data.texture.destory(&self.device);
         self.device.device.destroy_descriptor_set_layout(self.data.descriptor_set_layout, None);
         self.device.destory();
@@ -431,8 +429,6 @@ pub struct AppData {
     // Model
     model: Model,
     //Buffer
-    vertex_buffer: Buffer,
-    index_buffer: Buffer,
     uniform_buffers: Vec<Buffer>,
     //Swapchain
     pub swapchain: Swapchain,
@@ -735,138 +731,6 @@ unsafe fn create_framebuffers(device: &Device, data: &mut AppData) -> Result<()>
 //================================================
 // Buffers
 //================================================
-
-unsafe fn create_vertex_buffer(
-    instance: &Instance,
-    device: &VkDevice,
-    data: &mut AppData,
-) -> Result<()> {
-    // Create (staging)
-
-    let size = (size_of::<Vertex>() * data.model.vertices.len()) as u64;
-
-    let (staging_buffer, staging_buffer_memory) = create_buffer(
-        instance,
-        &device.device,
-        device.physical_device,
-        size,
-        vk::BufferUsageFlags::TRANSFER_SRC,
-        vk::MemoryPropertyFlags::HOST_COHERENT | vk::MemoryPropertyFlags::HOST_VISIBLE,
-    )?;
-
-    // Copy (staging)
-
-    let memory =
-        device
-            .device
-            .map_memory(staging_buffer_memory, 0, size, vk::MemoryMapFlags::empty())?;
-
-    memcpy(
-        data.model.vertices.as_ptr(),
-        memory.cast(),
-        data.model.vertices.len(),
-    );
-
-    device.device.unmap_memory(staging_buffer_memory);
-
-    // Create (vertex)
-
-    let (vertex_buffer, vertex_buffer_memory) = create_buffer(
-        instance,
-        &device.device,
-        device.physical_device,
-        size,
-        vk::BufferUsageFlags::TRANSFER_DST | vk::BufferUsageFlags::VERTEX_BUFFER,
-        vk::MemoryPropertyFlags::DEVICE_LOCAL,
-    )?;
-
-    data.vertex_buffer.buffer = vertex_buffer;
-    data.vertex_buffer.buffer_memory = vertex_buffer_memory;
-
-    // Copy (vertex)
-
-    copy_buffer(
-        &device.device,
-        device.graphics_queue,
-        device.command_pool,
-        staging_buffer,
-        vertex_buffer,
-        size,
-    )?;
-
-    // Cleanup
-
-    device.device.destroy_buffer(staging_buffer, None);
-    device.device.free_memory(staging_buffer_memory, None);
-
-    Ok(())
-}
-
-unsafe fn create_index_buffer(
-    instance: &Instance,
-    device: &VkDevice,
-    data: &mut AppData,
-) -> Result<()> {
-    // Create (staging)
-
-    let size = (size_of::<u32>() * data.model.indices.len()) as u64;
-
-    let (staging_buffer, staging_buffer_memory) = create_buffer(
-        instance,
-        &device.device,
-        device.physical_device,
-        size,
-        vk::BufferUsageFlags::TRANSFER_SRC,
-        vk::MemoryPropertyFlags::HOST_COHERENT | vk::MemoryPropertyFlags::HOST_VISIBLE,
-    )?;
-
-    // Copy (staging)
-
-    let memory =
-        device
-            .device
-            .map_memory(staging_buffer_memory, 0, size, vk::MemoryMapFlags::empty())?;
-
-    memcpy(
-        data.model.indices.as_ptr(),
-        memory.cast(),
-        data.model.indices.len(),
-    );
-
-    device.device.unmap_memory(staging_buffer_memory);
-
-    // Create (index)
-
-    let (index_buffer, index_buffer_memory) = create_buffer(
-        instance,
-        &device.device,
-        device.physical_device,
-        size,
-        vk::BufferUsageFlags::TRANSFER_DST | vk::BufferUsageFlags::INDEX_BUFFER,
-        vk::MemoryPropertyFlags::DEVICE_LOCAL,
-    )?;
-
-    data.index_buffer.buffer = index_buffer;
-    data.index_buffer.buffer_memory = index_buffer_memory;
-
-    // Copy (index)
-
-    copy_buffer(
-        &device.device,
-        device.graphics_queue,
-        device.command_pool,
-        staging_buffer,
-        index_buffer,
-        size,
-    )?;
-
-    // Cleanup
-
-    device.device.destroy_buffer(staging_buffer, None);
-    device.device.free_memory(staging_buffer_memory, None);
-
-    Ok(())
-}
 
 unsafe fn create_uniform_buffers(
     instance: &Instance,

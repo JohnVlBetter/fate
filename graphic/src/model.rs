@@ -1,12 +1,16 @@
 use std::fs::File;
 use std::io::BufReader;
 
+use anyhow::Result;
 use cgmath::{vec2, vec3};
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use std::mem::size_of;
-use vulkanalia::vk::{self, HasBuilder};
-use anyhow::Result;
+use std::ptr::copy_nonoverlapping as memcpy;
+use vulkanalia::prelude::v1_0::*;
+
+use crate::buffer::{copy_buffer, create_buffer, Buffer};
+use crate::device::VkDevice;
 
 pub type Vec2 = cgmath::Vector2<f32>;
 pub type Vec3 = cgmath::Vector3<f32>;
@@ -85,10 +89,12 @@ impl Hash for Vertex {
 pub struct Model {
     pub vertices: Vec<Vertex>,
     pub indices: Vec<u32>,
+    pub vertex_buffer: Buffer,
+    pub index_buffer: Buffer,
 }
 
 impl Model {
-    pub fn new(path: &str) -> Result<Self> {
+    pub unsafe fn new(path: &str, instance: &Instance, device: &VkDevice) -> Result<Self> {
         let mut reader = BufReader::new(File::open(path)?);
 
         let (models, _) = tobj::load_obj_buf(
@@ -99,8 +105,6 @@ impl Model {
             },
             |_| Ok(Default::default()),
         )?;
-
-        // Vertices / Indices
 
         let mut unique_vertices = HashMap::new();
         let mut indices: Vec<u32> = Vec::new();
@@ -134,6 +138,123 @@ impl Model {
                 }
             }
         }
-        Ok(Self { vertices, indices })
+
+        let vertex_buffer = create_vertex_buffer(instance, device, &vertices)?;
+        let index_buffer = create_index_buffer(instance, device, &indices)?;
+
+        Ok(Self {
+            vertices,
+            indices,
+            vertex_buffer,
+            index_buffer,
+        })
     }
+}
+
+unsafe fn create_vertex_buffer(
+    instance: &Instance,
+    device: &VkDevice,
+    vertices: &Vec<Vertex>,
+) -> Result<Buffer> {
+    let size = (size_of::<Vertex>() * vertices.len()) as u64;
+
+    let (staging_buffer, staging_buffer_memory) = create_buffer(
+        instance,
+        &device.device,
+        device.physical_device,
+        size,
+        vk::BufferUsageFlags::TRANSFER_SRC,
+        vk::MemoryPropertyFlags::HOST_COHERENT | vk::MemoryPropertyFlags::HOST_VISIBLE,
+    )?;
+
+    let memory =
+        device
+            .device
+            .map_memory(staging_buffer_memory, 0, size, vk::MemoryMapFlags::empty())?;
+
+    memcpy(vertices.as_ptr(), memory.cast(), vertices.len());
+
+    device.device.unmap_memory(staging_buffer_memory);
+
+    let (vertex_buffer, vertex_buffer_memory) = create_buffer(
+        instance,
+        &device.device,
+        device.physical_device,
+        size,
+        vk::BufferUsageFlags::TRANSFER_DST | vk::BufferUsageFlags::VERTEX_BUFFER,
+        vk::MemoryPropertyFlags::DEVICE_LOCAL,
+    )?;
+
+    let buffer: Buffer = Buffer {
+        buffer: vertex_buffer,
+        buffer_memory: vertex_buffer_memory,
+    };
+
+    copy_buffer(
+        &device.device,
+        device.graphics_queue,
+        device.command_pool,
+        staging_buffer,
+        buffer.buffer,
+        size,
+    )?;
+
+    device.device.destroy_buffer(staging_buffer, None);
+    device.device.free_memory(staging_buffer_memory, None);
+
+    Ok(buffer)
+}
+
+unsafe fn create_index_buffer(
+    instance: &Instance,
+    device: &VkDevice,
+    indices: &Vec<u32>,
+) -> Result<Buffer> {
+    let size = (size_of::<u32>() * indices.len()) as u64;
+
+    let (staging_buffer, staging_buffer_memory) = create_buffer(
+        instance,
+        &device.device,
+        device.physical_device,
+        size,
+        vk::BufferUsageFlags::TRANSFER_SRC,
+        vk::MemoryPropertyFlags::HOST_COHERENT | vk::MemoryPropertyFlags::HOST_VISIBLE,
+    )?;
+
+    let memory =
+        device
+            .device
+            .map_memory(staging_buffer_memory, 0, size, vk::MemoryMapFlags::empty())?;
+
+    memcpy(indices.as_ptr(), memory.cast(), indices.len());
+
+    device.device.unmap_memory(staging_buffer_memory);
+
+    let (index_buffer, index_buffer_memory) = create_buffer(
+        instance,
+        &device.device,
+        device.physical_device,
+        size,
+        vk::BufferUsageFlags::TRANSFER_DST | vk::BufferUsageFlags::INDEX_BUFFER,
+        vk::MemoryPropertyFlags::DEVICE_LOCAL,
+    )?;
+
+    let buffer: Buffer = Buffer {
+        buffer: index_buffer,
+        buffer_memory: index_buffer_memory,
+    };
+
+    copy_buffer(
+        &device.device,
+        device.graphics_queue,
+        device.command_pool,
+        staging_buffer,
+        buffer.buffer,
+        size,
+    )?;
+
+    device.device.destroy_buffer(staging_buffer, None);
+    device.device.free_memory(staging_buffer_memory, None);
+
+    Ok(buffer)
 }
