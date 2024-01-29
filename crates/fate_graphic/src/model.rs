@@ -22,14 +22,16 @@ pub type Mat4 = cgmath::Matrix4<f32>;
 pub struct Vertex {
     pos: Vec3,
     color: Vec3,
+    normal: Vec3,
     tex_coord: Vec2,
 }
 
 impl Vertex {
-    pub fn new(pos: Vec3, color: Vec3, tex_coord: Vec2) -> Self {
+    pub fn new(pos: Vec3, color: Vec3, normal: Vec3, tex_coord: Vec2) -> Self {
         Self {
             pos,
             color,
+            normal,
             tex_coord,
         }
     }
@@ -42,7 +44,7 @@ impl Vertex {
             .build()
     }
 
-    pub fn attribute_descriptions() -> [vk::VertexInputAttributeDescription; 3] {
+    pub fn attribute_descriptions() -> [vk::VertexInputAttributeDescription; 4] {
         let pos = vk::VertexInputAttributeDescription::builder()
             .binding(0)
             .location(0)
@@ -55,19 +57,28 @@ impl Vertex {
             .format(vk::Format::R32G32B32_SFLOAT)
             .offset(size_of::<Vec3>() as u32)
             .build();
-        let tex_coord = vk::VertexInputAttributeDescription::builder()
+        let normal = vk::VertexInputAttributeDescription::builder()
             .binding(0)
             .location(2)
-            .format(vk::Format::R32G32_SFLOAT)
+            .format(vk::Format::R32G32B32_SFLOAT)
             .offset((size_of::<Vec3>() + size_of::<Vec3>()) as u32)
             .build();
-        [pos, color, tex_coord]
+        let tex_coord = vk::VertexInputAttributeDescription::builder()
+            .binding(0)
+            .location(3)
+            .format(vk::Format::R32G32_SFLOAT)
+            .offset((size_of::<Vec3>() + size_of::<Vec3>() + size_of::<Vec3>()) as u32)
+            .build();
+        [pos, color, normal, tex_coord]
     }
 }
 
 impl PartialEq for Vertex {
     fn eq(&self, other: &Self) -> bool {
-        self.pos == other.pos && self.color == other.color && self.tex_coord == other.tex_coord
+        self.pos == other.pos
+            && self.color == other.color
+            && self.normal == other.normal
+            && self.tex_coord == other.tex_coord
     }
 }
 
@@ -112,7 +123,10 @@ impl Model {
         let mut vertices: Vec<Vertex> = Vec::new();
 
         for model in &models {
-            for index in &model.mesh.indices {
+            let len = model.mesh.indices.len();
+            for idx in 0..len {
+                let index = model.mesh.indices[idx];
+                let normal_index = model.mesh.normal_indices[idx] as usize;
                 let pos_offset = (3 * index) as usize;
                 let tex_coord_offset = (2 * index) as usize;
 
@@ -123,6 +137,11 @@ impl Model {
                         model.mesh.positions[pos_offset + 2],
                     ),
                     color: vec3(1.0, 1.0, 1.0),
+                    normal: vec3(
+                        model.mesh.normals[normal_index * 3],
+                        model.mesh.normals[normal_index * 3 + 1],
+                        model.mesh.normals[normal_index * 3 + 2],
+                    ),
                     tex_coord: vec2(
                         model.mesh.texcoords[tex_coord_offset],
                         1.0 - model.mesh.texcoords[tex_coord_offset + 1],
