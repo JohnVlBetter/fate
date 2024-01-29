@@ -1,4 +1,5 @@
 pub mod buffer;
+pub mod camera;
 pub mod device;
 pub mod frame_buffer;
 pub mod model;

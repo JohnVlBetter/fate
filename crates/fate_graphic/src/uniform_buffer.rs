@@ -40,7 +40,7 @@ impl UniformBuffer {
         })
     }
 
-    pub unsafe fn update(&self, ubo: &UniformBufferObject, device: &VkDevice) -> Result<()>{
+    pub unsafe fn update(&self, ubo: &UniformBufferObject, device: &VkDevice) -> Result<()> {
         let memory = device.device.map_memory(
             self.buffer.buffer_memory,
             0,
@@ -50,9 +50,7 @@ impl UniformBuffer {
 
         memcpy(ubo, memory.cast(), 1);
 
-        device
-            .device
-            .unmap_memory(self.buffer.buffer_memory);
+        device.device.unmap_memory(self.buffer.buffer_memory);
         Ok(())
     }
 

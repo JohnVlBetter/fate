@@ -7,6 +7,7 @@
 )]
 
 use cgmath::{point3, vec3, Deg};
+use fate_graphic::camera::Camera;
 use fate_graphic::device::*;
 use fate_graphic::frame_buffer::*;
 use fate_graphic::model::*;
@@ -20,7 +21,7 @@ use std::collections::HashSet;
 use std::ffi::CStr;
 use std::mem::size_of;
 use std::os::raw::c_void;
-use std::ptr::{copy_nonoverlapping as memcpy, slice_from_raw_parts};
+use std::ptr::slice_from_raw_parts;
 use std::rc::Rc;
 use std::time::Instant;
 
@@ -47,6 +48,7 @@ pub struct App {
     pub resized: bool,
     pub start: Instant,
     pub models: usize,
+    pub camera: Camera,
 }
 
 impl App {
@@ -81,6 +83,14 @@ impl App {
         create_descriptor_sets(&device.device, &mut data)?;
         create_command_buffers(&mut device, &mut data)?;
         create_sync_objects(&device.device, &mut data)?;
+        let camera = Camera::new(
+            point3::<f32>(6.0, 0.0, 2.0),
+            point3::<f32>(0.0, 0.0, 0.0),
+            vec3(0.0, 0.0, 1.0),
+            45.0,
+            0.1,
+            10.0,
+        )?;
         Ok(Self {
             entry,
             instance,
@@ -90,6 +100,7 @@ impl App {
             resized: false,
             start: Instant::now(),
             models: 1,
+            camera,
         })
     }
 
@@ -307,11 +318,7 @@ impl App {
     unsafe fn update_uniform_buffer(&self, image_index: usize) -> Result<()> {
         // MVP
 
-        let view = Mat4::look_at_rh(
-            point3::<f32>(6.0, 0.0, 2.0),
-            point3::<f32>(0.0, 0.0, 0.0),
-            vec3(0.0, 0.0, 1.0),
-        );
+        let view = self.camera.get_view_mat();
 
         #[rustfmt::skip]
         let correction = Mat4::new(
@@ -322,15 +329,12 @@ impl App {
         );
 
         let proj = correction
-            * cgmath::perspective(
-                Deg(45.0),
-                self.data.swapchain.swapchain_extent.width as f32
-                    / self.data.swapchain.swapchain_extent.height as f32,
-                0.1,
-                10.0,
+            * self.camera.get_proj_mat(
+                self.data.swapchain.swapchain_extent.width as f32,
+                self.data.swapchain.swapchain_extent.height as f32,
             );
-        
-        let color = Vec4::new(1.0,0.0,0.0,1.0);
+
+        let color = Vec4::new(1.0, 0.0, 0.0, 1.0);
 
         let ubo = UniformBufferObject { view, proj, color };
 
