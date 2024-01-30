@@ -99,7 +99,7 @@ impl App {
         create_command_buffers(&mut device, &mut data)?;
         create_sync_objects(&device.device, &mut data)?;
         let camera = Camera::new(
-            point3::<f32>(6.0, 0.0, 2.0),
+            point3::<f32>(0.0, -5.0, 2.0),
             point3::<f32>(0.0, 0.0, 0.0),
             vec3(0.0, 0.0, 1.0),
             45.0,
@@ -107,7 +107,7 @@ impl App {
             10.0,
         )?;
         let main_light = Light::new(
-            model::Vec4::new(0.0, 1.0, 0.0, 1.0),
+            model::Vec4::new(1.0, 1.0, -1.0, 1.0),
             model::Vec4::new(1.0, 1.0, 1.0, 1.0),
         )?;
         Ok(Self {
@@ -277,9 +277,9 @@ impl App {
 
         let time = self.start.elapsed().as_secs_f32();
 
-        let model = Mat4::from_translation(vec3(0.0, y, z)) * Mat4::from_axis_angle(
+        let model = Mat4::from_translation(vec3(0.0, 0.0, 0.0)) * Mat4::from_axis_angle(
             vec3(0.0, 0.0, 1.0),
-            Deg(90.0) * time
+            Deg(-120.0)/*  * time*/
         );
 
         let model_bytes = &*slice_from_raw_parts(
