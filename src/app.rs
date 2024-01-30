@@ -10,6 +10,8 @@ use cgmath::{point3, vec3, Deg};
 use fate_graphic::camera::Camera;
 use fate_graphic::device::*;
 use fate_graphic::frame_buffer::*;
+use fate_graphic::light::Light;
+use fate_graphic::model;
 use fate_graphic::model::*;
 use fate_graphic::render_pass::RenderPass;
 use fate_graphic::shader::Shader;
@@ -49,6 +51,19 @@ pub struct App {
     pub start: Instant,
     pub models: usize,
     pub camera: Camera,
+    pub main_light: Light,
+}
+
+pub fn simplify_path(path: String) -> String {
+    let mut stack = Vec::new();
+    path.split("/").for_each(|x| {
+        match x {
+            "." | "" => (),
+            ".." => {stack.pop();},
+            _ => {stack.push(x);}
+        }
+    });
+    "/".to_string() + &stack.join("/")
 }
 
 impl App {
@@ -91,6 +106,10 @@ impl App {
             0.1,
             10.0,
         )?;
+        let main_light = Light::new(
+            model::Vec4::new(0.0, 1.0, 0.0, 1.0),
+            model::Vec4::new(1.0, 1.0, 1.0, 1.0),
+        )?;
         Ok(Self {
             entry,
             instance,
@@ -101,6 +120,7 @@ impl App {
             start: Instant::now(),
             models: 1,
             camera,
+            main_light,
         })
     }
 
@@ -336,7 +356,14 @@ impl App {
 
         let color = Vec4::new(1.0, 0.0, 0.0, 1.0);
 
-        let ubo = UniformBufferObject { view, proj, color };
+        let ubo = UniformBufferObject {
+            view,
+            proj,
+            color,
+            main_light_direction: self.main_light.direction,
+            main_light_color: self.main_light.color,
+            camera_pos: Vec4::new(self.camera.eye.x, self.camera.eye.y, self.camera.eye.z, 1.0),
+        };
 
         self.data.uniform_buffers[image_index].update(&ubo, &self.device)?;
 

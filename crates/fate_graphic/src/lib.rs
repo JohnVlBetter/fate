@@ -2,6 +2,7 @@ pub mod buffer;
 pub mod camera;
 pub mod device;
 pub mod frame_buffer;
+pub mod light;
 pub mod model;
 pub mod render_pass;
 pub mod shader;

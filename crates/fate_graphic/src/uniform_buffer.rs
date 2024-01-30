@@ -14,6 +14,10 @@ pub struct UniformBufferObject {
     pub view: model::Mat4,
     pub proj: model::Mat4,
     pub color: model::Vec4,
+    pub main_light_direction: model::Vec4,
+    pub main_light_color: model::Vec4,
+    //pub main_light_intensity: f32,
+    pub camera_pos: model::Vec4,
 }
 
 #[derive(Clone, Debug, Default)]
