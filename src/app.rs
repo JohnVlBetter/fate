@@ -95,7 +95,7 @@ impl App {
         data.depth_attachment = DepthAttachment::new(&instance, &device, &data.swapchain)?;
         create_framebuffers(&device.device, &mut data)?;
         data.texture = Texture::new("res/model/viking_room/viking_room.png", &instance, &device)?;
-        let model = Model::new("res/model/viking_room/viking_room.obj", &instance, &device)?;
+        let model = Model::new("res/model/DamagedHelmet/glTF/DamagedHelmet.gltf", &instance, &device)?;
         create_uniform_buffers(&instance, &device, &mut data)?;
         create_descriptor_pool(&device.device, &mut data)?;
         create_descriptor_sets(&device.device, &mut data)?;
@@ -110,7 +110,7 @@ impl App {
             10.0,
         )?;
         let main_light = Light::new(
-            model::Vec4::new(1.0, 1.0, -1.0, 1.0),
+            model::Vec4::new(1.0, -1.0, -1.0, 1.0),
             model::Vec4::new(1.0, 1.0, 1.0, 1.0),
         )?;
         Ok(Self {

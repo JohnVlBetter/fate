@@ -3,6 +3,7 @@ use std::io::BufReader;
 
 use anyhow::Result;
 use cgmath::{vec2, vec3};
+use gltf::Gltf;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use std::mem::size_of;
@@ -111,54 +112,104 @@ pub struct Model {
 
 impl Model {
     pub unsafe fn new(path: &str, instance: &Instance, device: &VkDevice) -> Result<Self> {
-        let mut reader = BufReader::new(File::open(path)?);
-
-        let (models, _) = tobj::load_obj_buf(
-            &mut reader,
-            &tobj::LoadOptions {
-                triangulate: true,
-                ..Default::default()
-            },
-            |_| Ok(Default::default()),
-        )?;
-
         let mut unique_vertices = HashMap::new();
         let mut indices: Vec<u32> = Vec::new();
         let mut vertices: Vec<Vertex> = Vec::new();
 
-        for model in &models {
-            let len = model.mesh.indices.len();
-            for idx in 0..len {
-                let index = model.mesh.indices[idx];
-                let normal_index = model.mesh.normal_indices[idx] as usize;
-                let pos_offset = (3 * index) as usize;
-                let tex_coord_offset = (2 * index) as usize;
+        if path.ends_with(".obj") {
+            let mut reader = BufReader::new(File::open(path)?);
 
-                let vertex = Vertex {
-                    pos: vec3(
-                        model.mesh.positions[pos_offset],
-                        model.mesh.positions[pos_offset + 1],
-                        model.mesh.positions[pos_offset + 2],
-                    ),
-                    color: vec3(1.0, 1.0, 1.0),
-                    normal: vec3(
-                        model.mesh.normals[normal_index * 3],
-                        model.mesh.normals[normal_index * 3 + 1],
-                        model.mesh.normals[normal_index * 3 + 2],
-                    ),
-                    tex_coord: vec2(
-                        model.mesh.texcoords[tex_coord_offset],
-                        1.0 - model.mesh.texcoords[tex_coord_offset + 1],
-                    ),
-                };
+            let (models, _) = tobj::load_obj_buf(
+                &mut reader,
+                &tobj::LoadOptions {
+                    triangulate: true,
+                    ..Default::default()
+                },
+                |_| Ok(Default::default()),
+            )?;
 
-                if let Some(index) = unique_vertices.get(&vertex) {
-                    indices.push(*index as u32);
-                } else {
-                    let index = vertices.len();
-                    unique_vertices.insert(vertex, index);
-                    vertices.push(vertex);
-                    indices.push(index as u32);
+            for model in &models {
+                let len = model.mesh.indices.len();
+                for idx in 0..len {
+                    let index = model.mesh.indices[idx];
+                    let normal_index = model.mesh.normal_indices[idx] as usize;
+                    let pos_offset = (3 * index) as usize;
+                    let tex_coord_offset = (2 * index) as usize;
+
+                    let vertex = Vertex {
+                        pos: vec3(
+                            model.mesh.positions[pos_offset],
+                            model.mesh.positions[pos_offset + 1],
+                            model.mesh.positions[pos_offset + 2],
+                        ),
+                        color: vec3(1.0, 1.0, 1.0),
+                        normal: vec3(
+                            model.mesh.normals[normal_index * 3],
+                            model.mesh.normals[normal_index * 3 + 1],
+                            model.mesh.normals[normal_index * 3 + 2],
+                        ),
+                        tex_coord: vec2(
+                            model.mesh.texcoords[tex_coord_offset],
+                            1.0 - model.mesh.texcoords[tex_coord_offset + 1],
+                        ),
+                    };
+
+                    if let Some(index) = unique_vertices.get(&vertex) {
+                        indices.push(*index as u32);
+                    } else {
+                        let index = vertices.len();
+                        unique_vertices.insert(vertex, index);
+                        vertices.push(vertex);
+                        indices.push(index as u32);
+                    }
+                }
+            }
+        } else if path.ends_with(".gltf") {
+            let (gltf, buffers, _) = gltf::import(path)?;
+            for mesh in gltf.meshes() {
+                for primitive in mesh.primitives() {
+                    let r = primitive.reader(|buffer| Some(&buffers[buffer.index()]));
+                    if let Some(iter) = r.read_indices()
+                    {
+                        for v in iter.into_u32() {
+                            indices.push(v);
+                        }
+                    }
+                    let mut positions = Vec::new();
+                    if let Some(iter) = r.read_positions() {
+                        for v in iter {
+                            positions.push(v);
+                        }
+                    }
+                    let mut uvs = Vec::new();
+                    if let Some(gltf::mesh::util::ReadTexCoords::F32(
+                        gltf::accessor::Iter::Standard(iter),
+                    )) = r.read_tex_coords(0)
+                    {
+                        for v in iter {
+                            uvs.push(v);
+                        }
+                    }
+                    let mut normals = Vec::new();
+                    if let Some(iter) = r.read_normals() {
+                        for v in iter {
+                            normals.push(v);
+                        }
+                    }
+
+                    let size = positions.len();
+                    for idx in 0..size {
+                        let pos = positions[idx];
+                        let normal = normals[idx];
+                        let uv = uvs[idx];
+                        let vertex = Vertex {
+                            pos: vec3(pos[0], pos[2], pos[1]),
+                            color: vec3(1.0, 1.0, 1.0),
+                            normal: vec3(normal[0], normal[2], normal[1]),
+                            tex_coord: vec2(uv[0], 1.0 - uv[1]),
+                        };
+                        vertices.push(vertex);
+                    }
                 }
             }
         }

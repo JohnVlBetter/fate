@@ -1,2 +1,3 @@
 /target
 /libvulkan.dylib
+/res/model/*
