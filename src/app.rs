@@ -6,7 +6,7 @@
     clippy::unnecessary_wraps
 )]
 
-use cgmath::{point3, vec3, Deg};
+use cgmath::{point3, vec3};
 use fate_graphic::camera::Camera;
 use fate_graphic::device::*;
 use fate_graphic::frame_buffer::*;
@@ -52,15 +52,18 @@ pub struct App {
     pub models: usize,
     pub camera: Camera,
     pub main_light: Light,
+    pub model: Model,
 }
 
 pub fn simplify_path(path: String) -> String {
     let mut stack = Vec::new();
-    path.split("/").for_each(|x| {
-        match x {
-            "." | "" => (),
-            ".." => {stack.pop();},
-            _ => {stack.push(x);}
+    path.split("/").for_each(|x| match x {
+        "." | "" => (),
+        ".." => {
+            stack.pop();
+        }
+        _ => {
+            stack.push(x);
         }
     });
     "/".to_string() + &stack.join("/")
@@ -92,7 +95,7 @@ impl App {
         data.depth_attachment = DepthAttachment::new(&instance, &device, &data.swapchain)?;
         create_framebuffers(&device.device, &mut data)?;
         data.texture = Texture::new("res/model/viking_room/viking_room.png", &instance, &device)?;
-        data.model = Model::new("res/model/viking_room/viking_room.obj", &instance, &device)?;
+        let model = Model::new("res/model/viking_room/viking_room.obj", &instance, &device)?;
         create_uniform_buffers(&instance, &device, &mut data)?;
         create_descriptor_pool(&device.device, &mut data)?;
         create_descriptor_sets(&device.device, &mut data)?;
@@ -121,6 +124,7 @@ impl App {
             models: 1,
             camera,
             main_light,
+            model,
         })
     }
 
@@ -277,10 +281,7 @@ impl App {
 
         let time = self.start.elapsed().as_secs_f32();
 
-        let model = Mat4::from_translation(vec3(0.0, 0.0, 0.0)) * Mat4::from_axis_angle(
-            vec3(0.0, 0.0, 1.0),
-            Deg(-120.0)/*  * time*/
-        );
+        let model = self.model.transform.local_to_world_matrix();
 
         let model_bytes = &*slice_from_raw_parts(
             &model as *const Mat4 as *const u8,
@@ -304,8 +305,8 @@ impl App {
         self.device.device.begin_command_buffer(command_buffer, &info)?;
 
         self.device.device.cmd_bind_pipeline(command_buffer, vk::PipelineBindPoint::GRAPHICS, self.data.pipeline);
-        self.device.device.cmd_bind_vertex_buffers(command_buffer, 0, &[self.data.model.vertex_buffer.buffer], &[0]);
-        self.device.device.cmd_bind_index_buffer(command_buffer, self.data.model.index_buffer.buffer, 0, vk::IndexType::UINT32);
+        self.device.device.cmd_bind_vertex_buffers(command_buffer, 0, &[self.model.vertex_buffer.buffer], &[0]);
+        self.device.device.cmd_bind_index_buffer(command_buffer, self.model.index_buffer.buffer, 0, vk::IndexType::UINT32);
         self.device.device.cmd_bind_descriptor_sets(
             command_buffer,
             vk::PipelineBindPoint::GRAPHICS,
@@ -328,7 +329,7 @@ impl App {
             64,
             opacity_bytes,
         );
-        self.device.device.cmd_draw_indexed(command_buffer, self.data.model.indices.len() as u32, 1, 0, 0, 0);
+        self.device.device.cmd_draw_indexed(command_buffer, self.model.indices.len() as u32, 1, 0, 0, 0);
 
         self.device.device.end_command_buffer(command_buffer)?;
 
@@ -398,7 +399,7 @@ impl App {
         self.data.in_flight_fences.iter().for_each(|f| self.device.device.destroy_fence(*f, None));
         self.data.render_finished_semaphores.iter().for_each(|s| self.device.device.destroy_semaphore(*s, None));
         self.data.image_available_semaphores.iter().for_each(|s| self.device.device.destroy_semaphore(*s, None));
-        self.data.model.destory(&mut self.device);
+        self.model.destory(&mut self.device);
         self.data.texture.destory(&self.device);
         self.device.device.destroy_descriptor_set_layout(self.data.descriptor_set_layout, None);
         self.device.destory();
@@ -445,8 +446,6 @@ pub struct AppData {
     pub depth_attachment: DepthAttachment,
     //Texture
     pub texture: Texture,
-    // Model
-    model: Model,
     //Buffer
     uniform_buffers: Vec<UniformBuffer>,
     //Swapchain

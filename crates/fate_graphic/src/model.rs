@@ -11,6 +11,7 @@ use vulkanalia::prelude::v1_0::*;
 
 use crate::buffer::{copy_buffer, create_buffer, Buffer};
 use crate::device::VkDevice;
+use crate::transform::Transform;
 
 pub type Vec2 = cgmath::Vector2<f32>;
 pub type Vec3 = cgmath::Vector3<f32>;
@@ -97,12 +98,15 @@ impl Hash for Vertex {
     }
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct Model {
     pub vertices: Vec<Vertex>,
     pub indices: Vec<u32>,
     pub vertex_buffer: Buffer,
     pub index_buffer: Buffer,
+
+    //现在没接ecs transform先放这
+    pub transform: Transform,
 }
 
 impl Model {
@@ -162,11 +166,18 @@ impl Model {
         let vertex_buffer = create_vertex_buffer(instance, device, &vertices)?;
         let index_buffer = create_index_buffer(instance, device, &indices)?;
 
+        let transform = Transform::new(
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(1.0, 1.0, 1.0),
+        )?;
+
         Ok(Self {
             vertices,
             indices,
             vertex_buffer,
             index_buffer,
+            transform,
         })
     }
 
