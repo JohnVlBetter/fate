@@ -5,7 +5,7 @@ use std::path::Path;
 use anyhow::Result;
 use cgmath::{vec2, vec3};
 use gltf::image::Source;
-use gltf::Gltf;
+use image::GenericImageView;
 use image::ImageFormat::{JPEG, PNG};
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
@@ -168,7 +168,7 @@ impl Model {
                 }
             }
         } else if path.ends_with(".gltf") || path.ends_with(".glb") {
-            let (gltf, buffers, images) = gltf::import(path)?;
+            let (gltf, buffers, _images) = gltf::import(path)?;
             for mesh in gltf.meshes() {
                 for primitive in mesh.primitives() {
                     let r = primitive.reader(|buffer| Some(&buffers[buffer.index()]));
@@ -292,6 +292,18 @@ impl Model {
                         }
                     }
                 };
+                let dyn_img = img.expect("Image loading failed.");
+
+                /*let format = match dyn_img {
+                    ImageLuma8(_) => vk::RED,
+                    ImageLumaA8(_) => gl::RG,
+                    ImageRgb8(_) => gl::RGB,
+                    ImageRgba8(_) => gl::RGBA,
+                    ImageBgr8(_) => gl::BGR,
+                    ImageBgra8(_) => gl::BGRA,
+                };*/
+                let (_data, _width, _height) =
+                    (dyn_img.raw_pixels(), dyn_img.width(), dyn_img.height());
             }
         }
 
