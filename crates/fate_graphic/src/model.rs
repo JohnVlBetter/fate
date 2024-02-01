@@ -1,5 +1,6 @@
-use std::fs::File;
-use std::io::BufReader;
+use std::fs::{self, File};
+use std::io::{self, BufReader};
+use std::path::Path;
 
 use anyhow::Result;
 use cgmath::{vec2, vec3};
@@ -223,15 +224,18 @@ impl Model {
                         match mime_type {
                             "image/jpeg" => image::load_from_memory_with_format(data, JPEG),
                             "image/png" => image::load_from_memory_with_format(data, PNG),
-                            _ => panic!("{}", format!(
-                                "unsupported image type (image: {}, mime_type: {})",
-                                image.index(),
-                                mime_type
-                            )),
+                            _ => panic!(
+                                "{}",
+                                format!(
+                                    "unsupported image type (image: {}, mime_type: {})",
+                                    image.index(),
+                                    mime_type
+                                )
+                            ),
                         }
                     }
                     Source::Uri { uri, mime_type } => {
-                        //if uri.starts_with("data:") {
+                        if uri.starts_with("data:") {
                             let encoded = uri.split(',').nth(1).unwrap();
                             let data = base64::decode(&encoded).unwrap();
                             let mime_type = if let Some(ty) = mime_type {
@@ -251,14 +255,17 @@ impl Model {
                             match mime_type {
                                 "image/jpeg" => image::load_from_memory_with_format(&data, JPEG),
                                 "image/png" => image::load_from_memory_with_format(&data, PNG),
-                                _ => panic!("{}", format!(
-                                    "unsupported image type (image: {}, mime_type: {})",
-                                    image.index(),
-                                    mime_type
-                                )),
+                                _ => panic!(
+                                    "{}",
+                                    format!(
+                                        "unsupported image type (image: {}, mime_type: {})",
+                                        image.index(),
+                                        mime_type
+                                    )
+                                ),
                             }
-                        /*}else{()} else if let Some(mime_type) = mime_type {
-                            let path = base_path
+                        } else if let Some(mime_type) = mime_type {
+                            let path = Path::new(path)
                                 .parent()
                                 .unwrap_or_else(|| Path::new("./"))
                                 .join(uri);
@@ -267,19 +274,22 @@ impl Model {
                             match mime_type {
                                 "image/jpeg" => image::load(reader, JPEG),
                                 "image/png" => image::load(reader, PNG),
-                                _ => panic!(format!(
-                                    "unsupported image type (image: {}, mime_type: {})",
-                                    g_img.index(),
-                                    mime_type
-                                )),
+                                _ => panic!(
+                                    "{}",
+                                    format!(
+                                        "unsupported image type (image: {}, mime_type: {})",
+                                        image.index(),
+                                        mime_type
+                                    )
+                                ),
                             }
                         } else {
-                            let path = base_path
+                            let path = Path::new(path)
                                 .parent()
                                 .unwrap_or_else(|| Path::new("./"))
                                 .join(uri);
                             image::open(path)
-                        }*/
+                        }
                     }
                 };
             }
