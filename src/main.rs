@@ -8,8 +8,12 @@ use winit::event::{ElementState, Event, VirtualKeyCode, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
 use winit::window::WindowBuilder;
 
+use fate_rt::light::Light;
+
 #[rustfmt::skip]
 fn main() -> Result<()> {
+    let _test_light: fate_rt::light::Light = Light::new()?;
+
     pretty_env_logger::init();    
 
     let event_loop = EventLoop::new();

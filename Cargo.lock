@@ -406,6 +406,7 @@ dependencies = [
  "anyhow",
  "cgmath",
  "fate_graphic",
+ "fate_rt",
  "log",
  "png 0.17.10",
  "pretty_env_logger",
@@ -430,6 +431,14 @@ dependencies = [
  "tobj",
  "vulkanalia",
  "winit",
+]
+
+[[package]]
+name = "fate_rt"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "fate_graphic",
 ]
 
 [[package]]
