@@ -407,6 +407,7 @@ dependencies = [
  "cgmath",
  "fate_graphic",
  "fate_rt",
+ "image 0.21.3",
  "log",
  "png 0.17.10",
  "pretty_env_logger",
