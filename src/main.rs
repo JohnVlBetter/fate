@@ -62,7 +62,7 @@ fn main() -> Result<()> {
         });
     }
     else {
-        let mut bytes: Vec<u8> = Vec::with_capacity(WIDTH * HEIGHT * 4);
+        let mut bytes: Vec<u8> = Vec::with_capacity(WIDTH * HEIGHT * 3);
     
         for j in (0..HEIGHT).rev() {
             for i in 0..WIDTH {
