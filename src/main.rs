@@ -3,16 +3,16 @@ mod app;
 use app::App;
 
 use anyhow::Result;
+use std::path::Path;
 use winit::dpi::LogicalSize;
 use winit::event::{ElementState, Event, VirtualKeyCode, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
 use winit::window::WindowBuilder;
-use image::*;
 
 const OPEN_RUNTIME_MODE: bool = false;
 
-const WIDTH: u32 = 256;
-const HEIGHT: u32 = 256;
+const WIDTH: usize = 256;
+const HEIGHT: usize = 256;
 
 #[rustfmt::skip]
 fn main() -> Result<()> {
@@ -22,7 +22,7 @@ fn main() -> Result<()> {
         let event_loop = EventLoop::new();
         let window = WindowBuilder::new()
             .with_title("Fate Engine v1.0.0 <Vulkan>")
-            .with_inner_size(LogicalSize::new(WIDTH, HEIGHT))
+            .with_inner_size(LogicalSize::new(WIDTH as u32, HEIGHT as u32))
             .build(&event_loop)?;
     
         let mut app = unsafe { App::new(&window) }?;
@@ -62,9 +62,7 @@ fn main() -> Result<()> {
         });
     }
     else {
-        println!("P3");
-        println!("{} {}", WIDTH, HEIGHT);
-        println!("255");
+        let mut bytes: Vec<u8> = Vec::with_capacity(WIDTH * HEIGHT * 4);
     
         for j in (0..HEIGHT).rev() {
             for i in 0..WIDTH {
@@ -76,9 +74,14 @@ fn main() -> Result<()> {
                 let ig = (255.999 * g) as u64;
                 let ib = (255.999 * b) as u64;
     
-                println!("{} {} {}", ir, ig, ib);
+                bytes.push(ir as u8);
+                bytes.push(ig as u8);
+                bytes.push(ib as u8);
             }
         }
+        
+        image::save_buffer(&Path::new("output.jpeg"), &bytes, WIDTH as u32, HEIGHT as u32, image::ColorType::Rgb8)?;
+        println!("渲染完成");
         return Ok(());
     }
 }
