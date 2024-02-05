@@ -466,6 +466,7 @@ name = "fate_rt"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "cgmath",
  "fate_graphic",
  "image 0.24.8",
 ]
