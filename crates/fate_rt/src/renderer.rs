@@ -6,7 +6,7 @@ use std::{
 use anyhow::Result;
 use cgmath::{InnerSpace, Point3, Vector3};
 
-use crate::ray::Ray;
+use crate::{hit::Hit, ray::Ray, scene::World, sphere::Sphere};
 
 #[derive(Copy, Clone, Debug)]
 pub struct Renderer {}
@@ -30,6 +30,13 @@ impl Renderer {
         let lower_left_corner =
             origin - horizontal / 2.0 - vertical / 2.0 - Vector3::new(0.0, 0.0, focal_length);
 
+        let mut world = World::new();
+        world.push(Box::new(Sphere::new(Point3::new(0.0, 0.0, -1.0), 0.5)?));
+        world.push(Box::new(Sphere::new(
+            Point3::new(0.0, -100.5, -1.0),
+            100.0,
+        )?));
+
         for j in (0..height).rev() {
             eprint!("\r进度: {:3}", height - j - 1);
             stderr().flush().unwrap();
@@ -41,7 +48,7 @@ impl Renderer {
                     origin,
                     lower_left_corner + u * horizontal + v * vertical - origin,
                 );
-                let pixel_color = ray_color(&r);
+                let pixel_color = ray_color(&r, &mut world);
                 let final_color = format_color(pixel_color);
 
                 bytes.push(final_color.x as u8);
@@ -77,30 +84,14 @@ fn hit_sphere(center: Point3<f64>, radius: f64, r: &Ray) -> f64 {
     }
 }
 
-fn ray_color(r: &Ray) -> Vector3<f64> {
-    let t = hit_sphere(
-        Point3 {
-            x: 0.0,
-            y: 0.0,
-            z: -1.0,
-        },
-        0.5,
-        r,
-    );
-    if t > 0.0 {
-        let normal = (r.at(t)
-            - Point3 {
-                x: 0.0,
-                y: 0.0,
-                z: -1.0,
-            })
-        .normalize();
-        return Vector3::new(1.0 + normal.x, 1.0 + normal.y, 1.0 + normal.z) * 0.5;
+fn ray_color(r: &Ray, world: &mut World) -> Vector3<f64> {
+    if let Some(rec) = world.hit(r, 0.0, f64::INFINITY) {
+        0.5 * (rec.normal + Vector3::new(1.0, 1.0, 1.0))
+    } else {
+        let unit_direction = r.direction().normalize();
+        let t = 0.5 * (unit_direction.y + 1.0);
+        (1.0 - t) * Vector3::new(1.0, 1.0, 1.0) + t * Vector3::new(0.5, 0.7, 1.0)
     }
-
-    let unit_direction = r.direction().normalize();
-    let t = 0.5 * (unit_direction.y + 1.0);
-    (1.0 - t) * Vector3::new(1.0, 1.0, 1.0) + t * Vector3::new(0.5, 0.7, 1.0)
 }
 
 pub fn format_color(color: Vector3<f64>) -> Vector3<f64> {

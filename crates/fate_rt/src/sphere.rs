@@ -1,5 +1,5 @@
 use anyhow::Result;
-use cgmath::{InnerSpace, Point3};
+use cgmath::{InnerSpace, Point3, Vector3};
 
 use crate::{
     hit::{Hit, HitRecord},
@@ -18,17 +18,17 @@ impl Sphere {
 }
 
 impl Hit for Sphere {
-    fn hit(&mut self, ray: Ray, t_min: f64, t_max: f64) -> Option<HitRecord> {
+    fn hit(&mut self, ray: &Ray, t_min: f64, t_max: f64) -> Option<HitRecord> {
         let oc = ray.origin() - self.center;
         let a = ray.direction().magnitude().powi(2);
         let half_b = oc.dot(ray.direction());
         let c = oc.magnitude().powi(2) - self.radius.powi(2);
-        
+
         let discriminant = half_b.powi(2) - a * c;
         if discriminant < 0.0 {
             return None;
         }
-    
+
         let sqrtd = discriminant.sqrt();
         let mut root = (-half_b - sqrtd) / a;
         if root < t_min || t_max < root {
@@ -37,14 +37,18 @@ impl Hit for Sphere {
                 return None;
             }
         }
-    
-        let p = ray.at(root);
-        let rec = HitRecord {
+
+        let p: Point3<f64> = ray.at(root);
+        let mut rec = HitRecord {
             t: root,
             p: p,
-            normal: (p - self.center) / self.radius
+            normal: Vector3::new(0.0, 0.0, 0.0),
+            front_face: false,
         };
-    
+
+        let outward_normal = (rec.p - self.center) / self.radius;
+        rec.set_face_normal(&ray, outward_normal);
+
         Some(rec)
     }
 }
