@@ -63,7 +63,41 @@ impl Renderer {
     }
 }
 
+fn hit_sphere(center: Point3<f64>, radius: f64, r: &Ray) -> f64 {
+    let oc = r.origin() - center;
+    let a = r.direction().magnitude().powi(2);
+    let half_b = oc.dot(r.direction());
+    let c = oc.magnitude().powi(2) - radius * radius;
+    let discriminant = half_b * half_b - a * c;
+
+    if discriminant < 0.0 {
+        -1.0
+    } else {
+        (-half_b - discriminant.sqrt()) / a
+    }
+}
+
 fn ray_color(r: &Ray) -> Vector3<f64> {
+    let t = hit_sphere(
+        Point3 {
+            x: 0.0,
+            y: 0.0,
+            z: -1.0,
+        },
+        0.5,
+        r,
+    );
+    if t > 0.0 {
+        let normal = (r.at(t)
+            - Point3 {
+                x: 0.0,
+                y: 0.0,
+                z: -1.0,
+            })
+        .normalize();
+        return Vector3::new(1.0 + normal.x, 1.0 + normal.y, 1.0 + normal.z) * 0.5;
+    }
+
     let unit_direction = r.direction().normalize();
     let t = 0.5 * (unit_direction.y + 1.0);
     (1.0 - t) * Vector3::new(1.0, 1.0, 1.0) + t * Vector3::new(0.5, 0.7, 1.0)

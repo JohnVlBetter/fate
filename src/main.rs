@@ -55,7 +55,7 @@ fn main() -> Result<()> {
                         Some(VirtualKeyCode::Left) if app.models > 1 => app.models -= 1,
                         Some(VirtualKeyCode::Right) if app.models < 9 => app.models += 1,
                         Some(VirtualKeyCode::Space) => {
-                            let _ = renderer.render(WIDTH, HEIGHT, Path::new("output.jpeg"));
+                            let _ = renderer.render(WIDTH, HEIGHT, Path::new("output.ppm"));
                         }
                         _ => { }
                     }
