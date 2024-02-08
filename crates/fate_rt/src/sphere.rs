@@ -1,19 +1,21 @@
+use std::rc::Rc;
+
 use anyhow::Result;
 use cgmath::{InnerSpace, Point3, Vector3};
 
 use crate::{
-    hit::{Hit, HitRecord},
-    ray::Ray,
+    hit::{Hit, HitRecord}, material::Scatter, ray::Ray
 };
 
 pub struct Sphere {
     pub center: Point3<f64>,
     pub radius: f64,
+    pub mat: Rc<dyn Scatter>,
 }
 
 impl Sphere {
-    pub fn new(center: Point3<f64>, radius: f64) -> Result<Self> {
-        Ok(Self { center, radius })
+    pub fn new(center: Point3<f64>, radius: f64, mat: Rc<dyn Scatter>) -> Result<Self> {
+        Ok(Self { center, radius, mat })
     }
 }
 
@@ -43,6 +45,7 @@ impl Hit for Sphere {
             t: root,
             p: p,
             normal: Vector3::new(0.0, 0.0, 0.0),
+            mat: self.mat.clone(),
             front_face: false,
         };
 

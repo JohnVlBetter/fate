@@ -1,6 +1,8 @@
+pub mod camera;
 pub mod hit;
+pub mod material;
 pub mod ray;
 pub mod renderer;
-pub mod sphere;
 pub mod scene;
-pub mod camera;
+pub mod sphere;
+pub mod utils;

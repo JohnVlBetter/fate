@@ -1,10 +1,13 @@
+use std::rc::Rc;
+
 use cgmath::{InnerSpace, Point3, Vector3};
 
-use crate::ray::Ray;
+use crate::{material::Scatter, ray::Ray};
 
 pub struct HitRecord {
     pub p: Point3<f64>,
     pub normal: Vector3<f64>,
+    pub mat: Rc<dyn Scatter>,
     pub t: f64,
     pub front_face: bool,
 }
