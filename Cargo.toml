@@ -4,21 +4,22 @@ version = "0.1.0"
 edition = "2021"
 
 [workspace]
-members=[
-    "crates/fate_graphic/",
-    "crates/fate_rt/",
-]
+members = ["crates/fate_graphic/", "crates/fate_rt/"]
 [workspace.package]
 version = "0.1.0"
 
 [dependencies]
-fate_graphic = {path = "./crates/fate_graphic", version = "0.1.0"}
-fate_rt = {path = "./crates/fate_rt", version = "0.1.0"}
+fate_graphic = { path = "./crates/fate_graphic", version = "0.1.0" }
+fate_rt = { path = "./crates/fate_rt", version = "0.1.0" }
 anyhow = "1"
 log = "0.4"
 cgmath = "0.18"
 png = "0.17"
 pretty_env_logger = "0.4"
 thiserror = "1"
-vulkanalia = { version = "=0.22.0", features = ["libloading", "provisional", "window"] }
+vulkanalia = { version = "=0.22.0", features = [
+    "libloading",
+    "provisional",
+    "window",
+] }
 winit = "0.28"
