@@ -39,3 +39,10 @@ pub fn near_zero(vec: &Vector3<f64>) -> bool {
 pub fn reflect(vec: &Vector3<f64>, n: &Vector3<f64>) -> Vector3<f64> {
     vec - 2.0 * vec.dot(*n) * n
 }
+
+pub fn refract(vec: &Vector3<f64>, n: &Vector3<f64>, etai_over_etat: f64) -> Vector3<f64> {
+    let cos_theta = ((-1.0) * vec).dot(*n).min(1.0);
+    let r_out_perp = etai_over_etat * (vec + cos_theta * n);
+    let r_out_parallel = -(1.0 - r_out_perp.magnitude().powi(2)).abs().sqrt() * n;
+    r_out_perp + r_out_parallel
+}
