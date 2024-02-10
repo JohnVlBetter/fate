@@ -31,10 +31,8 @@ impl Renderer {
     pub fn render(&self, width: usize, height: usize, path: &Path) -> anyhow::Result<()> {
         let mut bytes: Vec<u8> = Vec::with_capacity(width * height * 3);
 
-        // Camera
-        let camera = Camera::new(width, height);
-
         let mut world = World::new();
+
         let mat_ground = Rc::new(Lambertian::new(Vector3::new(0.8, 0.8, 0.0)));
         let mat_center = Rc::new(Lambertian::new(Vector3::new(0.1, 0.2, 0.5)));
         let mat_left = Rc::new(Dielectric::new(1.5));
@@ -44,7 +42,7 @@ impl Renderer {
         let sphere_ground = Sphere::new(Point3::new(0.0, -100.5, -1.0), 100.0, mat_ground)?;
         let sphere_center = Sphere::new(Point3::new(0.0, 0.0, -1.0), 0.5, mat_center)?;
         let sphere_left = Sphere::new(Point3::new(-1.0, 0.0, -1.0), 0.5, mat_left)?;
-        let sphere_left_inner = Sphere::new(Point3::new(-1.0, 0.0, -1.0), -0.4, mat_left_inner)?;
+        let sphere_left_inner = Sphere::new(Point3::new(-1.0, 0.0, -1.0), -0.45, mat_left_inner)?;
         let sphere_right = Sphere::new(Point3::new(1.0, 0.0, -1.0), 0.5, mat_right)?;
 
         world.push(Box::new(sphere_ground));
@@ -52,6 +50,14 @@ impl Renderer {
         world.push(Box::new(sphere_left));
         world.push(Box::new(sphere_left_inner));
         world.push(Box::new(sphere_right));
+
+        let cam = Camera::new(
+            Point3::new(-2.0, 2.0, 1.0),
+            Point3::new(0.0, 0.0, -1.0),
+            Vector3::new(0.0, 1.0, 0.0),
+            20.0,
+            (width / height) as f64,
+        );
 
         let mut rng = rand::thread_rng();
         for j in (0..height).rev() {
@@ -66,7 +72,7 @@ impl Renderer {
                     let u = ((i as f64) + random_u) / ((width - 1) as f64);
                     let v = ((j as f64) + random_v) / ((height - 1) as f64);
 
-                    let r = camera.get_ray(u, v);
+                    let r = cam.get_ray(u, v);
                     pixel_color += ray_color(&r, &mut world, MAX_DEPTH);
                 }
                 let final_color = format_color(pixel_color, SAMPLES_PER_PIXEL);
