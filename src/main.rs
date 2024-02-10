@@ -10,8 +10,8 @@ use winit::event::{ElementState, Event, VirtualKeyCode, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
 use winit::window::WindowBuilder;
 
-const WIDTH: usize = 256;
-const HEIGHT: usize = 256;
+const WIDTH: usize = 1200;
+const HEIGHT: usize = 800;
 
 #[rustfmt::skip]
 fn main() -> Result<()> {

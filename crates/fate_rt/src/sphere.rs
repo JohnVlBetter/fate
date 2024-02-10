@@ -1,26 +1,32 @@
-use std::rc::Rc;
+use std::sync::Arc;
 
 use anyhow::Result;
 use cgmath::{InnerSpace, Point3, Vector3};
 
 use crate::{
-    hit::{Hit, HitRecord}, material::Scatter, ray::Ray
+    hit::{Hit, HitRecord},
+    material::Scatter,
+    ray::Ray,
 };
 
 pub struct Sphere {
     pub center: Point3<f64>,
     pub radius: f64,
-    pub mat: Rc<dyn Scatter>,
+    pub mat: Arc<dyn Scatter>,
 }
 
 impl Sphere {
-    pub fn new(center: Point3<f64>, radius: f64, mat: Rc<dyn Scatter>) -> Result<Self> {
-        Ok(Self { center, radius, mat })
+    pub fn new(center: Point3<f64>, radius: f64, mat: Arc<dyn Scatter>) -> Result<Self> {
+        Ok(Self {
+            center,
+            radius,
+            mat,
+        })
     }
 }
 
 impl Hit for Sphere {
-    fn hit(&mut self, ray: &Ray, t_min: f64, t_max: f64) -> Option<HitRecord> {
+    fn hit(&self, ray: &Ray, t_min: f64, t_max: f64) -> Option<HitRecord> {
         let oc = ray.origin() - self.center;
         let a = ray.direction().magnitude().powi(2);
         let half_b = oc.dot(ray.direction());

@@ -6,7 +6,7 @@ use crate::{
 pub type World = Vec<Box<dyn Hit>>;
 
 impl Hit for World {
-    fn hit(&mut self, r: &Ray, t_min: f64, t_max: f64) -> Option<hit::HitRecord> {
+    fn hit(&self, r: &Ray, t_min: f64, t_max: f64) -> Option<hit::HitRecord> {
         let mut tmp_rec = None;
         let mut closest_so_far = t_max;
 

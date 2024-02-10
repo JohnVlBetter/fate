@@ -7,7 +7,7 @@ use crate::{
     utils::{near_zero, random_in_unit_sphere, reflect, refract},
 };
 
-pub trait Scatter {
+pub trait Scatter: Send + Sync {
     fn scatter(&self, r_in: &Ray, rec: &HitRecord) -> Option<(Vector3<f64>, Ray)>;
 }
 pub struct Lambertian {
@@ -21,7 +21,7 @@ impl Lambertian {
 }
 
 impl Scatter for Lambertian {
-    fn scatter(&self, r_in: &Ray, rec: &HitRecord) -> Option<(Vector3<f64>, Ray)> {
+    fn scatter(&self, _r_in: &Ray, rec: &HitRecord) -> Option<(Vector3<f64>, Ray)> {
         let mut scatter_direction = rec.normal + random_in_unit_sphere().normalize();
         if near_zero(&scatter_direction) {
             scatter_direction = rec.normal;
@@ -58,13 +58,13 @@ impl Scatter for Metal {
 }
 
 pub struct Dielectric {
-    ir: f64
+    ir: f64,
 }
 
 impl Dielectric {
     pub fn new(index_of_refraction: f64) -> Dielectric {
         Dielectric {
-            ir: index_of_refraction
+            ir: index_of_refraction,
         }
     }
 
