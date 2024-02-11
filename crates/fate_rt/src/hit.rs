@@ -2,8 +2,9 @@ use std::sync::Arc;
 
 use cgmath::{InnerSpace, Point3, Vector3};
 
-use crate::{material::Scatter, ray::Ray};
+use crate::{aabb::Aabb, interval::Interval, material::Scatter, ray::Ray};
 
+#[derive(Clone)]
 pub struct HitRecord {
     pub p: Point3<f64>,
     pub normal: Vector3<f64>,
@@ -24,5 +25,6 @@ impl HitRecord {
 }
 
 pub trait Hit: Send + Sync {
-    fn hit(&self, ray: &Ray, t_min: f64, t_max: f64) -> Option<HitRecord>;
+    fn hit(&self, r: &Ray, ray_t: &Interval, hit_record: &mut HitRecord) -> bool;
+    fn bounding_box(&self) -> &Aabb;
 }

@@ -1,8 +1,11 @@
+pub mod aabb;
+pub mod bvh;
 pub mod camera;
 pub mod hit;
+pub mod hittable_list;
+pub mod interval;
 pub mod material;
 pub mod ray;
 pub mod renderer;
-pub mod scene;
 pub mod sphere;
 pub mod utils;
