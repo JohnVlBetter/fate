@@ -471,6 +471,7 @@ dependencies = [
  "image 0.24.8",
  "rand",
  "rayon",
+ "stb_image",
 ]
 
 [[package]]
@@ -1430,6 +1431,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6980e8d7511241f8acf4aebddbb1ff938df5eebe98691418c4468d0b72a96a67"
 dependencies = [
  "lock_api",
+]
+
+[[package]]
+name = "stb_image"
+version = "0.2.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e865fe63d814d367599a0198cb95049f7e81ea4fd5c6b302c825278a2b43c064"
+dependencies = [
+ "cc",
+ "libc",
 ]
 
 [[package]]

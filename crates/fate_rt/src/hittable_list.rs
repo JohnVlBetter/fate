@@ -45,6 +45,8 @@ impl Hit for HittableList {
             normal: Vector3::new(0.0, 0.0, 0.0),
             mat: Arc::new(Metal::new(Vector3::new(0.0, 0.0, 0.0), 0.0)),
             t: 0.0,
+            u: 0.0,
+            v: 0.0,
             front_face: true,
         };
         let mut hit_anything = false;

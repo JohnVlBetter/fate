@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{f64::consts::PI, sync::Arc};
 
 use anyhow::Result;
 use cgmath::{InnerSpace, Point3, Vector3};
@@ -27,6 +27,13 @@ impl Sphere {
             mat,
             bbox: Aabb::new_with_point(&(center - rvec), &(center + rvec)),
         })
+    }
+
+    fn get_sphere_uv(p: Vector3<f64>) -> (f64, f64) {
+        let theta = (-p.y).acos();
+        let phi = (-p.z).atan2(p.x) + PI;
+    
+        (phi / (2.0 * PI), theta / PI)
     }
 }
 
@@ -58,6 +65,7 @@ impl Hit for Sphere {
 
         let outward_normal = (hit_record.p - self.center) / self.radius;
         hit_record.set_face_normal(&ray, outward_normal);
+        (hit_record.u, hit_record.v) = Self::get_sphere_uv(outward_normal);
 
         true
     }

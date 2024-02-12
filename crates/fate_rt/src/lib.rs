@@ -9,3 +9,5 @@ pub mod ray;
 pub mod renderer;
 pub mod sphere;
 pub mod utils;
+pub mod texture;
+pub mod image;

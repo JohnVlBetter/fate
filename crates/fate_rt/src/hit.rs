@@ -10,6 +10,8 @@ pub struct HitRecord {
     pub normal: Vector3<f64>,
     pub mat: Arc<dyn Scatter>,
     pub t: f64,
+    pub u: f64,
+    pub v: f64,
     pub front_face: bool,
 }
 

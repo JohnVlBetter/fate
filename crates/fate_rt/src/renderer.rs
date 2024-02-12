@@ -14,10 +14,11 @@ use crate::{
     material::{Dielectric, Lambertian, Metal},
     ray::Ray,
     sphere::Sphere,
+    texture::{CheckerTexture, ImageTexture, Texture},
     utils::random,
 };
 
-const SAMPLES_PER_PIXEL: u64 = 50;
+const SAMPLES_PER_PIXEL: u64 = 5;
 const MAX_DEPTH: u64 = 5;
 
 #[derive(Copy, Clone, Debug)]
@@ -31,10 +32,10 @@ impl Renderer {
     pub fn render(&self, width: usize, height: usize, path: &Path) -> anyhow::Result<()> {
         let mut bytes: Vec<u8> = Vec::with_capacity(width * height * 3);
 
-        let mut world = random_scene();
+        let mut world = earth();
         let world = HittableList::new(Arc::new(BvhNode::new(&mut world)));
 
-        let lookfrom = Point3::new(13.0, 2.0, 3.0);
+        let lookfrom = Point3::new(0.0, 0.0, 12.0);
         let lookat = Point3::new(0.0, 0.0, 0.0);
         let vup = Vector3::new(0.0, 1.0, 0.0);
         let dist_to_focus = 10.0;
@@ -98,12 +99,27 @@ impl Renderer {
     }
 }
 
+fn earth() -> HittableList {
+    let earth_texture: Arc<dyn Texture> = Arc::new(ImageTexture::new("earthmap.jpg"));
+    let earth_surface = Arc::new(Lambertian::new_with_texture(Arc::clone(&earth_texture)));
+    let globe = Sphere::new(Point3::new(0.0, 0.0, 0.0), 2.0, earth_surface).unwrap();
+    let mut world = HittableList::default();
+    world.add(Arc::new(globe));
+    world
+}
+
 fn random_scene() -> HittableList {
     let mut rng = rand::thread_rng();
     let mut world = HittableList::default();
 
-    let ground_mat = Arc::new(Lambertian::new(Vector3::new(0.5, 0.5, 0.5)));
-    let ground_sphere = Sphere::new(Point3::new(0.0, -1000.0, 0.0), 1000.0, ground_mat).unwrap();
+    let checker: Arc<dyn Texture> = Arc::new(CheckerTexture::new_with_color(
+        0.32,
+        Vector3::new(0.2, 0.3, 0.1),
+        Vector3::new(0.9, 0.9, 0.9),
+    ));
+    let ground_material = Arc::new(Lambertian::new_with_texture(Arc::clone(&checker)));
+    let ground_sphere =
+        Sphere::new(Point3::new(0.0, -1000.0, 0.0), 1000.0, ground_material).unwrap();
 
     world.add(Arc::new(ground_sphere));
 
@@ -159,6 +175,8 @@ fn ray_color(r: &Ray, world: &dyn Hit, depth: u64) -> Vector3<f64> {
         normal: Vector3::new(0.0, 0.0, 0.0),
         mat: Arc::new(Metal::new(Vector3::new(0.0, 0.0, 0.0), 0.0)),
         t: 0.0,
+        u: 0.0,
+        v: 0.0,
         front_face: true,
     };
 
