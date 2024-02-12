@@ -45,8 +45,8 @@ impl Renderer {
             lookfrom,
             lookat,
             vup,
-            20.0,
-            (width / height) as f64,
+            45.0,
+            width as f64 / height as f64,
             aperture,
             dist_to_focus,
         );
