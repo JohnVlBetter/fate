@@ -12,6 +12,7 @@ use crate::{
     hittable_list::HittableList,
     interval::Interval,
     material::{Dielectric, Lambertian, Metal},
+    quad::Quad,
     ray::Ray,
     sphere::Sphere,
     texture::{CheckerTexture, ImageTexture, Texture},
@@ -32,10 +33,10 @@ impl Renderer {
     pub fn render(&self, width: usize, height: usize, path: &Path) -> anyhow::Result<()> {
         let mut bytes: Vec<u8> = Vec::with_capacity(width * height * 3);
 
-        let mut world = earth();
+        let mut world = quads();
         let world = HittableList::new(Arc::new(BvhNode::new(&mut world)));
 
-        let lookfrom = Point3::new(0.0, 0.0, 12.0);
+        let lookfrom = Point3::new(0.0, 0.0, 9.0);
         let lookat = Point3::new(0.0, 0.0, 0.0);
         let vup = Vector3::new(0.0, 1.0, 0.0);
         let dist_to_focus = 10.0;
@@ -45,7 +46,7 @@ impl Renderer {
             lookfrom,
             lookat,
             vup,
-            45.0,
+            80.0,
             width as f64 / height as f64,
             aperture,
             dist_to_focus,
@@ -105,6 +106,51 @@ fn earth() -> HittableList {
     let globe = Sphere::new(Point3::new(0.0, 0.0, 0.0), 2.0, earth_surface).unwrap();
     let mut world = HittableList::default();
     world.add(Arc::new(globe));
+    world
+}
+
+fn quads() -> HittableList {
+    let mut world = HittableList::default();
+
+    // Material
+    let left_red = Arc::new(Lambertian::new(Vector3::new(1.0, 0.2, 0.2)));
+    let back_green = Arc::new(Lambertian::new(Vector3::new(0.2, 1.0, 0.2)));
+    let right_blue = Arc::new(Lambertian::new(Vector3::new(0.2, 0.2, 1.0)));
+    let upper_orange = Arc::new(Lambertian::new(Vector3::new(1.0, 0.5, 0.0)));
+    let lower_teal = Arc::new(Lambertian::new(Vector3::new(0.2, 0.8, 0.8)));
+
+    // Quad
+    world.add(Arc::new(Quad::new(
+        Point3::new(-3.0, -2.0, 5.0),
+        Vector3::new(0.0, 0.0, -4.0),
+        Vector3::new(0.0, 4.0, 0.0),
+        left_red,
+    )));
+    world.add(Arc::new(Quad::new(
+        Point3::new(-2.0, -2.0, 0.0),
+        Vector3::new(4.0, 0.0, 0.0),
+        Vector3::new(0.0, 4.0, 0.0),
+        back_green,
+    )));
+    world.add(Arc::new(Quad::new(
+        Point3::new(3.0, -2.0, 1.0),
+        Vector3::new(0.0, 0.0, 4.0),
+        Vector3::new(0.0, 4.0, 0.0),
+        right_blue,
+    )));
+    world.add(Arc::new(Quad::new(
+        Point3::new(-2.0, 3.0, 1.0),
+        Vector3::new(4.0, 0.0, 0.0),
+        Vector3::new(0.0, 0.0, 4.0),
+        upper_orange,
+    )));
+    world.add(Arc::new(Quad::new(
+        Point3::new(-2.0, -3.0, 5.0),
+        Vector3::new(4.0, 0.0, 0.0),
+        Vector3::new(0.0, 0.0, -4.0),
+        lower_teal,
+    )));
+
     world
 }
 

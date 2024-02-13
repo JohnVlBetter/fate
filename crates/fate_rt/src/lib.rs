@@ -11,3 +11,4 @@ pub mod sphere;
 pub mod utils;
 pub mod texture;
 pub mod image;
+pub mod quad;

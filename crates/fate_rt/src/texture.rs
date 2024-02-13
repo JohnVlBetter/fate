@@ -84,12 +84,10 @@ impl ImageTexture {
 
 impl Texture for ImageTexture {
     fn value(&self, u: f64, v: f64, _p: Point3<f64>) -> Vector3<f64> {
-        // 如果没有纹理数据，则返回固定的青色作为调试辅助。
         if self.image.height() == 0 {
             return Vector3::new(0.0, 1.0, 1.0);
         }
 
-        // 将输入的纹理坐标限制在 [0,1] x [1,0] 范围内
         let u = u.clamp(0.0, 1.0);
         let v = 1.0 - v.clamp(0.0, 1.0);
 

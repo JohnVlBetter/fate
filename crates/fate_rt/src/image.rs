@@ -52,7 +52,6 @@ impl Image {
     }
 
     pub fn pixel_data(&self, x: usize, y: usize) -> &[u8] {
-        // 返回坐标为 x,y 的像素的三个字节的地址（如果没有数据，则返回品红色）。
         if self.data.is_empty() {
             &MAGENTA
         } else {
