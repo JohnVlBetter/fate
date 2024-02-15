@@ -1,8 +1,8 @@
 use cgmath::{Point3, Vector3};
 
 pub struct Ray {
-    origin: Point3<f64>,
-    direction: Vector3<f64>,
+    pub origin: Point3<f64>,
+    pub direction: Vector3<f64>,
 }
 
 impl Ray {

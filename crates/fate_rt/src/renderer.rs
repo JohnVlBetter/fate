@@ -1,7 +1,7 @@
 use std::{path::Path, sync::Arc};
 
 use anyhow::Result;
-use cgmath::{InnerSpace, Point3, Vector3};
+use cgmath::{Point3, Vector3};
 use rand::Rng;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
@@ -11,16 +11,16 @@ use crate::{
     hit::{Hit, HitRecord},
     hittable_list::HittableList,
     interval::Interval,
-    material::{Dielectric, Lambertian, Metal},
-    quad::Quad,
+    material::{Dielectric, DiffuseLight, Lambertian, Metal, Scatter},
+    quad::{make_box, Quad},
     ray::Ray,
     sphere::Sphere,
     texture::{CheckerTexture, ImageTexture, Texture},
     utils::random,
 };
 
-const SAMPLES_PER_PIXEL: u64 = 5;
-const MAX_DEPTH: u64 = 5;
+const SAMPLES_PER_PIXEL: u64 = 50;
+const MAX_DEPTH: u64 = 10;
 
 #[derive(Copy, Clone, Debug)]
 pub struct Renderer {}
@@ -33,11 +33,11 @@ impl Renderer {
     pub fn render(&self, width: usize, height: usize, path: &Path) -> anyhow::Result<()> {
         let mut bytes: Vec<u8> = Vec::with_capacity(width * height * 3);
 
-        let mut world = quads();
+        let mut world = cornell_box();
         let world = HittableList::new(Arc::new(BvhNode::new(&mut world)));
 
-        let lookfrom = Point3::new(0.0, 0.0, 9.0);
-        let lookat = Point3::new(0.0, 0.0, 0.0);
+        let lookfrom = Point3::new(278.0, 278.0, -800.0);
+        let lookat = Point3::new(278.0, 278.0, 0.0);
         let vup = Vector3::new(0.0, 1.0, 0.0);
         let dist_to_focus = 10.0;
         let aperture = 0.1;
@@ -46,7 +46,7 @@ impl Renderer {
             lookfrom,
             lookat,
             vup,
-            80.0,
+            45.0,
             width as f64 / height as f64,
             aperture,
             dist_to_focus,
@@ -71,7 +71,8 @@ impl Renderer {
                         let v = ((j as f64) + random_v) / ((height - 1) as f64);
 
                         let r = cam.get_ray(u, v);
-                        pixel_color += ray_color(&r, &world, MAX_DEPTH);
+                        pixel_color +=
+                            ray_color(&r, &world, MAX_DEPTH, Vector3::new(0.0, 0.0, 0.0));
                     }
 
                     pixel_color
@@ -215,7 +216,97 @@ fn random_scene() -> HittableList {
     world
 }
 
-fn ray_color(r: &Ray, world: &dyn Hit, depth: u64) -> Vector3<f64> {
+fn simple_light() -> HittableList {
+    let mut world = HittableList::default();
+
+    world.add(Arc::new(
+        Sphere::new(
+            Point3::new(0.0, -1000.0, 0.0),
+            1000.0,
+            Arc::new(Lambertian::new(Vector3::new(0.7, 0.6, 0.2))),
+        )
+        .unwrap(),
+    ));
+    world.add(Arc::new(
+        Sphere::new(
+            Point3::new(0.0, 2.0, 0.0),
+            2.0,
+            Arc::new(Lambertian::new(Vector3::new(0.4, 0.2, 0.7))),
+        )
+        .unwrap(),
+    ));
+
+    let difflight = Arc::new(DiffuseLight::new_with_color(Vector3::new(4.0, 4.0, 4.0)));
+    world.add(Arc::new(Quad::new(
+        Point3::new(3.0, 1.0, -2.0),
+        Vector3::new(2.0, 0.0, 0.0),
+        Vector3::new(0.0, 2.0, 0.0),
+        difflight,
+    )));
+
+    world
+}
+
+fn cornell_box() -> HittableList {
+    let mut world = HittableList::default();
+
+    let red = Arc::new(Lambertian::new(Vector3::new(0.65, 0.05, 0.05)));
+    let white: Arc<dyn Scatter> = Arc::new(Lambertian::new(Vector3::new(0.73, 0.73, 0.73)));
+    let green = Arc::new(Lambertian::new(Vector3::new(0.12, 0.45, 0.15)));
+    let light = Arc::new(DiffuseLight::new_with_color(Vector3::new(15.0, 15.0, 15.0)));
+
+    world.add(Arc::new(Quad::new(
+        Point3::new(555.0, 0.0, 0.0),
+        Vector3::new(0.0, 555.0, 0.0),
+        Vector3::new(0.0, 0.0, 555.0),
+        green,
+    )));
+    world.add(Arc::new(Quad::new(
+        Point3::new(0.0, 0.0, 0.0),
+        Vector3::new(0.0, 555.0, 0.0),
+        Vector3::new(0.0, 0.0, 555.0),
+        red,
+    )));
+    world.add(Arc::new(Quad::new(
+        Point3::new(343.0, 554.0, 332.0),
+        Vector3::new(-130.0, 0.0, 0.0),
+        Vector3::new(0.0, 0.0, -105.0),
+        light,
+    )));
+    world.add(Arc::new(Quad::new(
+        Point3::new(0.0, 0.0, 0.0),
+        Vector3::new(555.0, 0.0, 0.0),
+        Vector3::new(0.0, 0.0, 555.0),
+        Arc::clone(&white),
+    )));
+    world.add(Arc::new(Quad::new(
+        Point3::new(555.0, 555.0, 555.0),
+        Vector3::new(-555.0, 0.0, 0.0),
+        Vector3::new(0.0, 0.0, -555.0),
+        Arc::clone(&white),
+    )));
+    world.add(Arc::new(Quad::new(
+        Point3::new(0.0, 0.0, 555.0),
+        Vector3::new(555.0, 0.0, 0.0),
+        Vector3::new(0.0, 555.0, 0.0),
+        Arc::clone(&white),
+    )));
+
+    world.add(make_box(
+        Point3::new(130.0, 0.0, 65.0),
+        Point3::new(295.0, 165.0, 230.0),
+        Arc::clone(&white),
+    ));
+    world.add(make_box(
+        Point3::new(265.0, 0.0, 295.0),
+        Point3::new(430.0, 330.0, 460.0),
+        white,
+    ));
+
+    world
+}
+
+fn ray_color(r: &Ray, world: &dyn Hit, depth: u64, background: Vector3<f64>) -> Vector3<f64> {
     let mut rec = HitRecord {
         p: Point3::new(0.0, 0.0, 0.0),
         normal: Vector3::new(0.0, 0.0, 0.0),
@@ -231,20 +322,27 @@ fn ray_color(r: &Ray, world: &dyn Hit, depth: u64) -> Vector3<f64> {
     }
 
     if !world.hit(r, &Interval::new(0.001, f64::INFINITY), &mut rec) {
-        let unit_direction = r.direction().normalize();
-        let t = 0.5 * (unit_direction.y + 1.0);
-        return (1.0 - t) * Vector3::new(1.0, 1.0, 1.0) + t * Vector3::new(0.5, 0.7, 1.0);
+        return background;
     }
 
-    if let Some((attenuation, scattered)) = rec.mat.scatter(r, &rec) {
-        let mut ray_col = ray_color(&scattered, world, depth - 1);
-        ray_col.x *= attenuation.x;
-        ray_col.y *= attenuation.y;
-        ray_col.z *= attenuation.z;
-        ray_col
-    } else {
-        Vector3::new(0.0, 0.0, 0.0)
+    let mut scattered = Ray {
+        origin: Point3::new(0.0, 0.0, 0.0),
+        direction: Vector3::new(0.0, 0.0, 0.0),
+    };
+    let mut attenuation = Vector3::new(0.0, 0.0, 0.0);
+    let color_from_emission = rec.mat.emitted(rec.u, rec.v, rec.p);
+    if !rec.mat.scatter(r, &rec, &mut attenuation, &mut scattered) {
+        return color_from_emission;
     }
+
+    let col = ray_color(&scattered, world, depth - 1, background);
+    let color_from_scatter = Vector3::new(
+        attenuation.x * col.x,
+        attenuation.y * col.y,
+        attenuation.z * col.z,
+    );
+
+    color_from_emission + color_from_scatter
 }
 
 pub fn format_color(color: Vector3<f64>, samples_per_pixel: u64) -> Vector3<u64> {

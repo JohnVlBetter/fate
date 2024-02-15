@@ -1,14 +1,27 @@
 use std::sync::Arc;
 
-use cgmath::{InnerSpace, Vector3};
+use cgmath::{InnerSpace, Point3, Vector3};
 use rand::Rng;
 
 use crate::{
-    hit::HitRecord, ray::Ray, texture::{SolidColor, Texture}, utils::{near_zero, random_in_unit_sphere, reflect, refract}
+    hit::HitRecord,
+    ray::Ray,
+    texture::{SolidColor, Texture},
+    utils::{near_zero, random_in_unit_sphere, reflect, refract},
 };
 
 pub trait Scatter: Send + Sync {
-    fn scatter(&self, r_in: &Ray, rec: &HitRecord) -> Option<(Vector3<f64>, Ray)>;
+    fn scatter(
+        &self,
+        r_in: &Ray,
+        rec: &HitRecord,
+        attenuation: &mut Vector3<f64>,
+        scattered: &mut Ray,
+    ) -> bool;
+
+    fn emitted(&self, _u: f64, _v: f64, _p: Point3<f64>) -> Vector3<f64> {
+        Vector3::new(0.0, 0.0, 0.0)
+    }
 }
 pub struct Lambertian {
     pub albedo: Arc<dyn Texture>,
@@ -16,7 +29,9 @@ pub struct Lambertian {
 
 impl Lambertian {
     pub fn new(color: Vector3<f64>) -> Lambertian {
-        Lambertian { albedo: Arc::new(SolidColor::new(color)) }
+        Lambertian {
+            albedo: Arc::new(SolidColor::new(color)),
+        }
     }
 
     pub fn new_with_texture(tex: Arc<dyn Texture>) -> Self {
@@ -25,15 +40,21 @@ impl Lambertian {
 }
 
 impl Scatter for Lambertian {
-    fn scatter(&self, _r_in: &Ray, rec: &HitRecord) -> Option<(Vector3<f64>, Ray)> {
+    fn scatter(
+        &self,
+        r_in: &Ray,
+        rec: &HitRecord,
+        attenuation: &mut Vector3<f64>,
+        scattered: &mut Ray,
+    ) -> bool {
         let mut scatter_direction = rec.normal + random_in_unit_sphere().normalize();
         if near_zero(&scatter_direction) {
             scatter_direction = rec.normal;
         }
 
-        let scattered = Ray::new(rec.p, scatter_direction);
-        let attenuation = self.albedo.value(rec.u, rec.v, rec.p);
-        Some((attenuation, scattered))
+        *scattered = Ray::new(rec.p, scatter_direction);
+        *attenuation = self.albedo.value(rec.u, rec.v, rec.p);
+        true
     }
 }
 
@@ -49,14 +70,21 @@ impl Metal {
 }
 
 impl Scatter for Metal {
-    fn scatter(&self, r_in: &Ray, rec: &HitRecord) -> Option<(Vector3<f64>, Ray)> {
+    fn scatter(
+        &self,
+        r_in: &Ray,
+        rec: &HitRecord,
+        attenuation: &mut Vector3<f64>,
+        scattered: &mut Ray,
+    ) -> bool {
         let reflected = reflect(&r_in.direction(), &rec.normal).normalize();
-        let scattered = Ray::new(rec.p, reflected + self.fuzz * random_in_unit_sphere());
+        *scattered = Ray::new(rec.p, reflected + self.fuzz * random_in_unit_sphere());
 
         if scattered.direction().dot(rec.normal) > 0.0 {
-            Some((self.albedo, scattered))
+            *attenuation = self.albedo;
+            true
         } else {
-            None
+            false
         }
     }
 }
@@ -79,7 +107,13 @@ impl Dielectric {
 }
 
 impl Scatter for Dielectric {
-    fn scatter(&self, r_in: &Ray, rec: &HitRecord) -> Option<(Vector3<f64>, Ray)> {
+    fn scatter(
+        &self,
+        r_in: &Ray,
+        rec: &HitRecord,
+        attenuation: &mut Vector3<f64>,
+        scattered: &mut Ray,
+    ) -> bool {
         let refraction_ratio = if rec.front_face {
             1.0 / self.ir
         } else {
@@ -100,8 +134,40 @@ impl Scatter for Dielectric {
             refract(&unit_direction, &rec.normal, refraction_ratio)
         };
 
-        let scattered = Ray::new(rec.p, direction);
+        *scattered = Ray::new(rec.p, direction);
+        *attenuation = Vector3::new(1.0, 1.0, 1.0);
+        true
+    }
+}
 
-        Some((Vector3::new(1.0, 1.0, 1.0), scattered))
+pub struct DiffuseLight {
+    pub emit: Arc<dyn Texture>,
+}
+
+impl DiffuseLight {
+    pub fn new(a: Arc<dyn Texture>) -> Self {
+        Self { emit: a }
+    }
+
+    pub fn new_with_color(c: Vector3<f64>) -> Self {
+        Self {
+            emit: Arc::new(SolidColor::new(c)),
+        }
+    }
+}
+
+impl Scatter for DiffuseLight {
+    fn scatter(
+        &self,
+        r_in: &Ray,
+        rec: &HitRecord,
+        attenuation: &mut Vector3<f64>,
+        scattered: &mut Ray,
+    ) -> bool {
+        false
+    }
+
+    fn emitted(&self, u: f64, v: f64, p: Point3<f64>) -> Vector3<f64> {
+        self.emit.value(u, v, p)
     }
 }
