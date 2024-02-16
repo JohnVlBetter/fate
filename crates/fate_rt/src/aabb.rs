@@ -1,4 +1,4 @@
-use cgmath::Point3;
+use cgmath::{Point3, Vector3};
 
 use crate::{
     interval::{self, Interval},
@@ -135,3 +135,27 @@ pub const UNIVERSE: Aabb = Aabb {
     y: interval::UNIVERSE,
     z: interval::UNIVERSE,
 };
+
+impl std::ops::Add<Vector3<f64>> for &Aabb {
+    type Output = Aabb;
+
+    fn add(self, rhs: Vector3<f64>) -> Self::Output {
+        Aabb {
+            x: &self.x + rhs.x,
+            y: &self.y + rhs.y,
+            z: &self.z + rhs.z,
+        }
+    }
+}
+
+impl std::ops::Add<&Aabb> for Vector3<f64> {
+    type Output = Aabb;
+
+    fn add(self, rhs: &Aabb) -> Self::Output {
+        Aabb {
+            x: self.x + &rhs.x,
+            y: self.y + &rhs.y,
+            z: self.z + &rhs.z,
+        }
+    }
+}
