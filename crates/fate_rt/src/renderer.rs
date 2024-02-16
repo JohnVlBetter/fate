@@ -8,6 +8,7 @@ use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use crate::{
     bvh::BvhNode,
     camera::Camera,
+    constant_medium::ConstantMedium,
     hit::{Hit, HitRecord, RotateY, Translate},
     hittable_list::HittableList,
     interval::Interval,
@@ -16,11 +17,11 @@ use crate::{
     ray::Ray,
     sphere::Sphere,
     texture::{CheckerTexture, ImageTexture, Texture},
-    utils::random,
+    utils::{random, random_double_range},
 };
 
-const SAMPLES_PER_PIXEL: u64 = 50;
-const MAX_DEPTH: u64 = 10;
+const SAMPLES_PER_PIXEL: u64 = 100;
+const MAX_DEPTH: u64 = 15;
 
 #[derive(Copy, Clone, Debug)]
 pub struct Renderer {}
@@ -33,20 +34,20 @@ impl Renderer {
     pub fn render(&self, width: usize, height: usize, path: &Path) -> anyhow::Result<()> {
         let mut bytes: Vec<u8> = Vec::with_capacity(width * height * 3);
 
-        let mut world = cornell_box();
+        let mut world = final_scene();
         let world = HittableList::new(Arc::new(BvhNode::new(&mut world)));
 
-        let lookfrom = Point3::new(278.0, 278.0, -800.0);
+        let lookfrom = Point3::new(478.0, 278.0, -600.0);
         let lookat = Point3::new(278.0, 278.0, 0.0);
         let vup = Vector3::new(0.0, 1.0, 0.0);
-        let dist_to_focus = 10.0;
+        let dist_to_focus = 0.0;
         let aperture = 0.1;
 
         let cam = Camera::new(
             lookfrom,
             lookat,
             vup,
-            45.0,
+            40.0,
             width as f64 / height as f64,
             aperture,
             dist_to_focus,
@@ -309,6 +310,132 @@ fn cornell_box() -> HittableList {
     let box2 = Arc::new(RotateY::new(box2, -18.0));
     let box2 = Arc::new(Translate::new(box2, Vector3::new(130.0, 0.0, 65.0)));
     world.add(box2);
+
+    world
+}
+
+fn final_scene() -> HittableList {
+    let mut boxes1 = HittableList::default();
+    let ground: Arc<dyn Scatter> = Arc::new(Lambertian::new(Vector3::new(0.48, 0.83, 0.53)));
+
+    let boxes_per_side = 20;
+    (0..boxes_per_side).for_each(|i| {
+        (0..boxes_per_side).for_each(|j| {
+            let w = 100.0;
+            let x0 = -1000.0 + i as f64 * w;
+            let z0 = -1000.0 + j as f64 * w;
+            let y0 = 0.0;
+            let x1 = x0 + w;
+            let y1 = random_double_range(1.0, 101.0);
+            let z1 = z0 + w;
+
+            boxes1.add(make_box(
+                Point3::new(x0, y0, z0),
+                Point3::new(x1, y1, z1),
+                Arc::clone(&ground),
+            ));
+        });
+    });
+
+    let mut world = HittableList::default();
+
+    world.add(Arc::new(BvhNode::new(&mut boxes1)));
+
+    let light: Arc<dyn Scatter> =
+        Arc::new(DiffuseLight::new_with_color(Vector3::new(7.0, 7.0, 7.0)));
+    world.add(Arc::new(Quad::new(
+        Point3::new(123.0, 554.0, 147.0),
+        Vector3::new(412.0, 0.0, 0.0),
+        Vector3::new(0.0, 0.0, 412.0),
+        light,
+    )));
+
+    let center1 = Point3::new(400.0, 400.0, 200.0);
+    let center2 = center1 + Vector3::new(30.0, 0.0, 0.0);
+    let sphere_scatter: Arc<dyn Scatter> = Arc::new(Lambertian::new(Vector3::new(0.7, 0.3, 0.1)));
+    world.add(Arc::new(
+        Sphere::new(center1, 50.0, sphere_scatter).unwrap(),
+    ));
+
+    world.add(Arc::new(
+        Sphere::new(
+            Point3::new(260.0, 150.0, 45.0),
+            50.0,
+            Arc::new(Dielectric::new(1.5)),
+        )
+        .unwrap(),
+    ));
+    world.add(Arc::new(
+        Sphere::new(
+            Point3::new(0.0, 150.0, 145.0),
+            50.0,
+            Arc::new(Metal::new(Vector3::new(0.8, 0.8, 0.9), 1.0)),
+        )
+        .unwrap(),
+    ));
+
+    let boundary: Arc<dyn Hit> = Arc::new(
+        Sphere::new(
+            Point3::new(360.0, 150.0, 145.0),
+            70.0,
+            Arc::new(Dielectric::new(1.5)),
+        )
+        .unwrap(),
+    );
+    world.add(Arc::clone(&boundary));
+    world.add(Arc::new(ConstantMedium::new_with_Vector3(
+        Arc::clone(&boundary),
+        0.2,
+        Vector3::new(0.2, 0.4, 0.9),
+    )));
+    let boundary: Arc<dyn Hit> = Arc::new(
+        Sphere::new(
+            Point3::new(0.0, 0.0, 0.0),
+            5000.0,
+            Arc::new(Dielectric::new(1.5)),
+        )
+        .unwrap(),
+    );
+    world.add(Arc::new(ConstantMedium::new_with_Vector3(
+        Arc::clone(&boundary),
+        0.0001,
+        Vector3::new(1.0, 1.0, 1.0),
+    )));
+
+    let emat: Arc<dyn Scatter> = Arc::new(Lambertian::new_with_texture(Arc::new(
+        ImageTexture::new("earthmap.jpg"),
+    )));
+    world.add(Arc::new(
+        Sphere::new(Point3::new(400.0, 200.0, 400.0), 100.0, emat).unwrap(),
+    ));
+    let pertext = Arc::new(Lambertian::new(Vector3::new(0.2, 0.4, 0.6)));
+    world.add(Arc::new(
+        Sphere::new(Point3::new(220.0, 280.0, 300.0), 80.0, pertext).unwrap(),
+    ));
+
+    let mut boxes2 = HittableList::default();
+    let white: Arc<dyn Scatter> = Arc::new(Lambertian::new(Vector3::new(0.73, 0.73, 0.73)));
+    let ns = 1000;
+    let mut rng = rand::thread_rng();
+    (0..ns).for_each(|_| {
+        boxes2.add(Arc::new(
+            Sphere::new(
+                Point3 {
+                    x: rng.gen_range(0.0..165.0),
+                    y: rng.gen_range(0.0..165.0),
+                    z: rng.gen_range(0.0..165.0),
+                },
+                10.0,
+                Arc::clone(&white),
+            )
+            .unwrap(),
+        ));
+    });
+
+    world.add(Arc::new(Translate::new(
+        Arc::new(RotateY::new(Arc::new(BvhNode::new(&mut boxes2)), 15.0)),
+        Vector3::new(-100.0, 270.0, 395.0),
+    )));
 
     world
 }

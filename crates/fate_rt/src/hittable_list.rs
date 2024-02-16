@@ -3,11 +3,7 @@ use std::sync::Arc;
 use cgmath::{Point3, Vector3};
 
 use crate::{
-    aabb::Aabb,
-    hit::{Hit, HitRecord},
-    interval::Interval,
-    material::Metal,
-    ray::Ray,
+    aabb::Aabb, hit::{self, Hit, HitRecord}, interval::Interval, material::Metal, ray::Ray
 };
 
 #[derive(Default)]
