@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{f64::consts::PI, sync::Arc};
 
 use cgmath::{InnerSpace, Point3, Vector3};
 use rand::Rng;
@@ -7,7 +7,7 @@ use crate::{
     hit::HitRecord,
     ray::Ray,
     texture::{SolidColor, Texture},
-    utils::{near_zero, random_in_unit_sphere, reflect, refract},
+    utils::{near_zero, random_in_hemisphere, random_in_unit_sphere, reflect, refract},
 };
 
 pub trait Scatter: Send + Sync {
@@ -21,6 +21,10 @@ pub trait Scatter: Send + Sync {
 
     fn emitted(&self, _u: f64, _v: f64, _p: Point3<f64>) -> Vector3<f64> {
         Vector3::new(0.0, 0.0, 0.0)
+    }
+
+    fn scattering_pdf(&self, _r_in: &Ray, _rec: &HitRecord, _scattered: &Ray) -> f64 {
+        0.0
     }
 }
 pub struct Lambertian {
@@ -47,7 +51,7 @@ impl Scatter for Lambertian {
         attenuation: &mut Vector3<f64>,
         scattered: &mut Ray,
     ) -> bool {
-        let mut scatter_direction = rec.normal + random_in_unit_sphere().normalize();
+        let mut scatter_direction = random_in_hemisphere(rec.normal);
         if near_zero(&scatter_direction) {
             scatter_direction = rec.normal;
         }
@@ -55,6 +59,10 @@ impl Scatter for Lambertian {
         *scattered = Ray::new(rec.p, scatter_direction);
         *attenuation = self.albedo.value(rec.u, rec.v, rec.p);
         true
+    }
+
+    fn scattering_pdf(&self, _r_in: &Ray, rec: &HitRecord, scattered: &Ray) -> f64 {
+        1.0 / (2.0 * PI)
     }
 }
 

@@ -21,7 +21,7 @@ use crate::{
 };
 
 const SAMPLES_PER_PIXEL: u64 = 100;
-const MAX_DEPTH: u64 = 15;
+const MAX_DEPTH: u64 = 20;
 
 #[derive(Copy, Clone, Debug)]
 pub struct Renderer {}
@@ -34,13 +34,13 @@ impl Renderer {
     pub fn render(&self, width: usize, height: usize, path: &Path) -> anyhow::Result<()> {
         let mut bytes: Vec<u8> = Vec::with_capacity(width * height * 3);
 
-        let mut world = final_scene();
+        let mut world = cornell_box();
         let world = HittableList::new(Arc::new(BvhNode::new(&mut world)));
 
-        let lookfrom = Point3::new(478.0, 278.0, -600.0);
+        let lookfrom = Point3::new(278.0, 278.0, -800.0);
         let lookat = Point3::new(278.0, 278.0, 0.0);
         let vup = Vector3::new(0.0, 1.0, 0.0);
-        let dist_to_focus = 0.0;
+        let dist_to_focus = 10.0;
         let aperture = 0.1;
 
         let cam = Camera::new(
@@ -469,12 +469,15 @@ fn ray_color(r: &Ray, world: &dyn Hit, depth: u64, background: Vector3<f64>) -> 
         return color_from_emission;
     }
 
+    let scattering_pdf = rec.mat.scattering_pdf(r, &rec, &scattered);
+    let pdf = scattering_pdf;
     let col = ray_color(&scattered, world, depth - 1, background);
     let color_from_scatter = Vector3::new(
         attenuation.x * col.x,
         attenuation.y * col.y,
         attenuation.z * col.z,
-    );
+    ) * scattering_pdf
+        / pdf;
 
     color_from_emission + color_from_scatter
 }
