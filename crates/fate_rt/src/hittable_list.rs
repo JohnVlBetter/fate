@@ -3,7 +3,11 @@ use std::sync::Arc;
 use cgmath::{Point3, Vector3};
 
 use crate::{
-    aabb::Aabb, hit::{self, Hit, HitRecord}, interval::Interval, material::Metal, ray::Ray
+    aabb::Aabb,
+    hit::{self, Hit, HitRecord},
+    interval::Interval,
+    material::Metal,
+    ray::Ray, utils::random_int,
 };
 
 #[derive(Default)]
@@ -57,5 +61,21 @@ impl Hit for HittableList {
         }
 
         hit_anything
+    }
+
+    fn pdf_value(&self, origin: Point3<f64>, direction: Vector3<f64>) -> f64 {
+        let weight = 1.0 / self.objects.len() as f64;
+        let mut sum = 0.0;
+
+        for object in self.objects.iter() {
+            sum += weight * object.pdf_value(origin, direction);
+        }
+
+        sum
+    }
+
+    fn random(&self, origin: Point3<f64>) -> Vector3<f64> {
+        let int_size = self.objects.len() as i32;
+        self.objects[random_int(0, int_size - 1) as usize].random(origin)
     }
 }

@@ -1,7 +1,7 @@
 use std::{path::Path, sync::Arc};
 
 use anyhow::Result;
-use cgmath::{Point3, Vector3};
+use cgmath::{InnerSpace, Point3, Vector3};
 use rand::Rng;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
@@ -13,6 +13,7 @@ use crate::{
     hittable_list::HittableList,
     interval::Interval,
     material::{Dielectric, DiffuseLight, Lambertian, Metal, Scatter},
+    pdf::{CosinePdf, HittablePdf, Pdf},
     quad::{make_box, Quad},
     ray::Ray,
     sphere::Sphere,
@@ -20,7 +21,7 @@ use crate::{
     utils::{random, random_double_range},
 };
 
-const SAMPLES_PER_PIXEL: u64 = 100;
+const SAMPLES_PER_PIXEL: u64 = 10;
 const MAX_DEPTH: u64 = 20;
 
 #[derive(Copy, Clone, Debug)]
@@ -36,6 +37,16 @@ impl Renderer {
 
         let mut world = cornell_box();
         let world = HittableList::new(Arc::new(BvhNode::new(&mut world)));
+
+        // Light Sources.
+        let light: Arc<dyn Scatter> = Arc::new(DiffuseLight::new_with_color(Vector3::new(15.0, 15.0, 15.0)));
+        let mut lights = HittableList::default();
+        lights.add(Arc::new(Quad::new(
+            Point3::new(343.0, 554.0, 332.0),
+            Vector3::new(-130.0, 0.0, 0.0),
+            Vector3::new(0.0, 0.0, -105.0),
+            Arc::clone(&light),
+        )));
 
         let lookfrom = Point3::new(278.0, 278.0, -800.0);
         let lookat = Point3::new(278.0, 278.0, 0.0);
@@ -73,7 +84,7 @@ impl Renderer {
 
                         let r = cam.get_ray(u, v);
                         pixel_color +=
-                            ray_color(&r, &world, MAX_DEPTH, Vector3::new(0.0, 0.0, 0.0));
+                            ray_color(&r, &world, &lights, MAX_DEPTH, Vector3::new(0.0, 0.0, 0.0));
                     }
 
                     pixel_color
@@ -440,7 +451,13 @@ fn final_scene() -> HittableList {
     world
 }
 
-fn ray_color(r: &Ray, world: &dyn Hit, depth: u64, background: Vector3<f64>) -> Vector3<f64> {
+fn ray_color(
+    r: &Ray,
+    world: &dyn Hit,
+    lights: &dyn Hit,
+    depth: u64,
+    background: Vector3<f64>,
+) -> Vector3<f64> {
     let mut rec = HitRecord {
         p: Point3::new(0.0, 0.0, 0.0),
         normal: Vector3::new(0.0, 0.0, 0.0),
@@ -464,8 +481,8 @@ fn ray_color(r: &Ray, world: &dyn Hit, depth: u64, background: Vector3<f64>) -> 
         direction: Vector3::new(0.0, 0.0, 0.0),
     };
     let mut attenuation = Vector3::new(0.0, 0.0, 0.0);
-    let color_from_emission = rec.mat.emitted(rec.u, rec.v, rec.p);
     let mut pdf = 0.0;
+    let color_from_emission = rec.mat.emitted(r, &rec, rec.u, rec.v, rec.p);
     if !rec
         .mat
         .scatter(r, &rec, &mut attenuation, &mut scattered, &mut pdf)
@@ -473,8 +490,12 @@ fn ray_color(r: &Ray, world: &dyn Hit, depth: u64, background: Vector3<f64>) -> 
         return color_from_emission;
     }
 
+    let light_pdf = HittablePdf::new(lights, rec.p);
+    let scattered = Ray::new(rec.p, light_pdf.generate());
+    let pdf = light_pdf.value(scattered.direction());
+
     let scattering_pdf = rec.mat.scattering_pdf(r, &rec, &scattered);
-    let col = ray_color(&scattered, world, depth - 1, background);
+    let col = ray_color(&scattered, world, lights, depth - 1, background);
     let color_from_scatter = Vector3::new(
         attenuation.x * col.x,
         attenuation.y * col.y,

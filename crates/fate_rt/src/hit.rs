@@ -29,6 +29,13 @@ impl HitRecord {
 pub trait Hit: Send + Sync {
     fn hit(&self, r: &Ray, ray_t: &Interval, hit_record: &mut HitRecord) -> bool;
     fn bounding_box(&self) -> &Aabb;
+
+    fn pdf_value(&self, _origin: Point3<f64>, _direction: Vector3<f64>) -> f64 {
+        0.0
+    }
+    fn random(&self, _origin: Point3<f64>) -> Vector3<f64> {
+        Vector3::new(1.0, 0.0, 0.0)
+    }
 }
 
 pub struct Translate {

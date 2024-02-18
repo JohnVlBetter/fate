@@ -8,6 +8,7 @@ use crate::hittable_list::HittableList;
 use crate::interval::Interval;
 use crate::material::*;
 use crate::ray::Ray;
+use crate::utils::random_double;
 
 pub struct Quad {
     q: Point3<f64>,
@@ -18,6 +19,7 @@ pub struct Quad {
     d: f64,
     mat: Arc<dyn Scatter>,
     bbox: Aabb,
+    area: f64,
 }
 
 impl Quad {
@@ -33,6 +35,7 @@ impl Quad {
             d: Vector3::dot(normal, q.to_vec()),
             mat,
             bbox: Aabb::new_with_point(&q, &(q + u + v)),
+            area: n.magnitude(),
         }
     }
 
@@ -80,6 +83,35 @@ impl Hit for Quad {
 
     fn bounding_box(&self) -> &Aabb {
         &self.bbox
+    }
+
+    fn pdf_value(&self, origin: Point3<f64>, direction: Vector3<f64>) -> f64 {
+        let mut rec = HitRecord {
+            p: Point3::new(0.0, 0.0, 0.0),
+            normal: Vector3::new(0.0, 0.0, 0.0),
+            mat: Arc::new(Metal::new(Vector3::new(0.0, 0.0, 0.0), 0.0)),
+            t: 0.0,
+            u: 0.0,
+            v: 0.0,
+            front_face: true,
+        };
+        if !self.hit(
+            &Ray::new(origin, direction),
+            &Interval::new(0.0001, f64::INFINITY),
+            &mut rec,
+        ) {
+            return 0.0;
+        }
+
+        let distance_squared = rec.t * rec.t * direction.magnitude2();
+        let cosine = (Vector3::dot(direction, rec.normal) / direction.magnitude()).abs();
+
+        distance_squared / (cosine * self.area)
+    }
+
+    fn random(&self, origin: Point3<f64>) -> Vector3<f64> {
+        let p = self.q + (random_double() * self.u) + (random_double() * self.v);
+        return p - origin;
     }
 }
 

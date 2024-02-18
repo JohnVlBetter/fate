@@ -8,6 +8,7 @@ pub mod image;
 pub mod interval;
 pub mod material;
 pub mod onb;
+pub mod pdf;
 pub mod quad;
 pub mod ray;
 pub mod renderer;
