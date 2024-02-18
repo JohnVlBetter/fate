@@ -465,12 +465,15 @@ fn ray_color(r: &Ray, world: &dyn Hit, depth: u64, background: Vector3<f64>) -> 
     };
     let mut attenuation = Vector3::new(0.0, 0.0, 0.0);
     let color_from_emission = rec.mat.emitted(rec.u, rec.v, rec.p);
-    if !rec.mat.scatter(r, &rec, &mut attenuation, &mut scattered) {
+    let mut pdf = 0.0;
+    if !rec
+        .mat
+        .scatter(r, &rec, &mut attenuation, &mut scattered, &mut pdf)
+    {
         return color_from_emission;
     }
 
     let scattering_pdf = rec.mat.scattering_pdf(r, &rec, &scattered);
-    let pdf = scattering_pdf;
     let col = ray_color(&scattered, world, depth - 1, background);
     let color_from_scatter = Vector3::new(
         attenuation.x * col.x,
