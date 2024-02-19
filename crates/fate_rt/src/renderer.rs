@@ -1,7 +1,7 @@
 use std::{path::Path, sync::Arc};
 
 use anyhow::Result;
-use cgmath::{InnerSpace, Point3, Vector3};
+use cgmath::{Point3, Vector3};
 use rand::Rng;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
@@ -12,8 +12,8 @@ use crate::{
     hit::{Hit, HitRecord, RotateY, Translate},
     hittable_list::HittableList,
     interval::Interval,
-    material::{Dielectric, DiffuseLight, Lambertian, Metal, Scatter},
-    pdf::{CosinePdf, HittablePdf, Pdf},
+    material::{Dielectric, DiffuseLight, Lambertian, Metal, Scatter, ScatterRecord},
+    pdf::{HittablePdf, MixturePdf, Pdf},
     quad::{make_box, Quad},
     ray::Ray,
     sphere::Sphere,
@@ -21,8 +21,8 @@ use crate::{
     utils::{random, random_double_range},
 };
 
-const SAMPLES_PER_PIXEL: u64 = 10;
-const MAX_DEPTH: u64 = 20;
+const SAMPLES_PER_PIXEL: u64 = 100;
+const MAX_DEPTH: u64 = 15;
 
 #[derive(Copy, Clone, Debug)]
 pub struct Renderer {}
@@ -39,7 +39,8 @@ impl Renderer {
         let world = HittableList::new(Arc::new(BvhNode::new(&mut world)));
 
         // Light Sources.
-        let light: Arc<dyn Scatter> = Arc::new(DiffuseLight::new_with_color(Vector3::new(15.0, 15.0, 15.0)));
+        let light: Arc<dyn Scatter> =
+            Arc::new(DiffuseLight::new_with_color(Vector3::new(15.0, 15.0, 15.0)));
         let mut lights = HittableList::default();
         lights.add(Arc::new(Quad::new(
             Point3::new(343.0, 554.0, 332.0),
@@ -304,10 +305,11 @@ fn cornell_box() -> HittableList {
         Arc::clone(&white),
     )));
 
+    let aluminum: Arc<dyn Scatter> = Arc::new(Metal::new(Vector3::new(0.8, 0.85, 0.88), 0.0));
     let box1 = make_box(
         Point3::new(0.0, 0.0, 0.0),
         Point3::new(165.0, 330.0, 165.0),
-        Arc::clone(&white),
+        Arc::clone(&aluminum),
     );
     let box1 = Arc::new(RotateY::new(box1, 15.0));
     let box1 = Arc::new(Translate::new(box1, Vector3::new(265.0, 0.0, 295.0)));
@@ -476,32 +478,35 @@ fn ray_color(
         return background;
     }
 
-    let mut scattered = Ray {
-        origin: Point3::new(0.0, 0.0, 0.0),
-        direction: Vector3::new(0.0, 0.0, 0.0),
-    };
-    let mut attenuation = Vector3::new(0.0, 0.0, 0.0);
-    let mut pdf = 0.0;
+    let mut srec = ScatterRecord::default();
     let color_from_emission = rec.mat.emitted(r, &rec, rec.u, rec.v, rec.p);
-    if !rec
-        .mat
-        .scatter(r, &rec, &mut attenuation, &mut scattered, &mut pdf)
-    {
+    if !rec.mat.scatter(r, &rec, &mut srec) {
         return color_from_emission;
     }
 
+    if srec.skip_pdf {
+        let skip_pdf_ray_color =
+            ray_color(&srec.skip_pdf_ray, world, lights, depth - 1, background);
+        return Vector3::new(
+            srec.attenuation.x * skip_pdf_ray_color.x,
+            srec.attenuation.y * skip_pdf_ray_color.y,
+            srec.attenuation.z * skip_pdf_ray_color.z,
+        );
+    }
+
     let light_pdf = HittablePdf::new(lights, rec.p);
-    let scattered = Ray::new(rec.p, light_pdf.generate());
-    let pdf = light_pdf.value(scattered.direction());
+    let mixed_pdf = MixturePdf::new(&light_pdf, &*srec.pdf);
+
+    let scattered = Ray::new(rec.p, mixed_pdf.generate());
+    let pdf = mixed_pdf.value(scattered.direction());
 
     let scattering_pdf = rec.mat.scattering_pdf(r, &rec, &scattered);
     let col = ray_color(&scattered, world, lights, depth - 1, background);
     let color_from_scatter = Vector3::new(
-        attenuation.x * col.x,
-        attenuation.y * col.y,
-        attenuation.z * col.z,
-    ) * scattering_pdf
-        / pdf;
+        srec.attenuation.x * col.x * scattering_pdf,
+        srec.attenuation.y * col.y * scattering_pdf,
+        srec.attenuation.z * col.z * scattering_pdf,
+    ) / pdf;
 
     color_from_emission + color_from_scatter
 }

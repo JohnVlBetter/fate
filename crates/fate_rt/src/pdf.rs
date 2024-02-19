@@ -3,7 +3,9 @@ use std::f64::consts::PI;
 use cgmath::{InnerSpace, Point3, Vector3};
 
 use crate::{
-    hit::Hit, onb::Onb, utils::{random_cosine_direction, random_in_unit_sphere}
+    hit::Hit,
+    onb::Onb,
+    utils::{random_cosine_direction, random_double_range, random_in_unit_sphere},
 };
 
 pub trait Pdf {
@@ -64,5 +66,40 @@ impl Pdf for HittablePdf<'_> {
 
     fn generate(&self) -> Vector3<f64> {
         self.objects.random(self.origin)
+    }
+}
+
+pub struct MixturePdf<'a> {
+    pub p: [&'a dyn Pdf; 2],
+}
+
+impl<'a> MixturePdf<'a> {
+    pub fn new(p0: &'a dyn Pdf, p1: &'a dyn Pdf) -> Self {
+        Self { p: [p0, p1] }
+    }
+}
+
+impl Pdf for MixturePdf<'_> {
+    fn value(&self, direction: Vector3<f64>) -> f64 {
+        0.5 * self.p[0].value(direction) + 0.5 * self.p[1].value(direction)
+    }
+
+    fn generate(&self) -> Vector3<f64> {
+        if random_double_range(0.0, 1.0) < 0.5 {
+            self.p[0].generate()
+        } else {
+            self.p[1].generate()
+        }
+    }
+}
+
+pub struct NonePdf;
+
+impl Pdf for NonePdf {
+    fn value(&self, _direction: Vector3<f64>) -> f64 {
+        0.0
+    }
+    fn generate(&self) -> Vector3<f64> {
+        Vector3::new(1.0, 0.0, 0.0)
     }
 }

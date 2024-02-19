@@ -6,20 +6,32 @@ use rand::Rng;
 use crate::{
     hit::HitRecord,
     onb::Onb,
+    pdf::{CosinePdf, NonePdf, Pdf, SpherePdf},
     ray::Ray,
     texture::{SolidColor, Texture},
     utils::{near_zero, random_cosine_direction, random_in_unit_sphere, reflect, refract},
 };
 
+pub struct ScatterRecord {
+    pub attenuation: Vector3<f64>,
+    pub pdf: Box<dyn Pdf>,
+    pub skip_pdf: bool,
+    pub skip_pdf_ray: Ray,
+}
+
+impl Default for ScatterRecord {
+    fn default() -> Self {
+        Self {
+            attenuation: Vector3::new(0.0, 0.0, 0.0),
+            pdf: Box::new(NonePdf {}),
+            skip_pdf: false,
+            skip_pdf_ray: Ray::new(Point3::new(0.0, 0.0, 0.0), Vector3::new(0.0, 0.0, 0.0)),
+        }
+    }
+}
+
 pub trait Scatter: Send + Sync {
-    fn scatter(
-        &self,
-        r_in: &Ray,
-        rec: &HitRecord,
-        attenuation: &mut Vector3<f64>,
-        scattered: &mut Ray,
-        pdf: &mut f64,
-    ) -> bool;
+    fn scatter(&self, r_in: &Ray, rec: &HitRecord, srec: &mut ScatterRecord) -> bool;
 
     fn emitted(
         &self,
@@ -53,29 +65,20 @@ impl Lambertian {
 }
 
 impl Scatter for Lambertian {
-    fn scatter(
-        &self,
-        _r_in: &Ray,
-        rec: &HitRecord,
-        attenuation: &mut Vector3<f64>,
-        scattered: &mut Ray,
-        pdf: &mut f64,
-    ) -> bool {
-        let uvw = Onb::new_from_w(rec.normal);
-        let mut scatter_direction = uvw.local_v(random_cosine_direction());
-
-        if near_zero(&scatter_direction) {
-            scatter_direction = rec.normal;
-        }
-
-        *scattered = Ray::new(rec.p, scatter_direction);
-        *attenuation = self.albedo.value(rec.u, rec.v, rec.p);
-        *pdf = Vector3::dot(uvw.w(), scattered.direction()) / PI;
+    fn scatter(&self, _r_in: &Ray, rec: &HitRecord, srec: &mut ScatterRecord) -> bool {
+        srec.attenuation = self.albedo.value(rec.u, rec.v, rec.p);
+        srec.pdf = Box::new(CosinePdf::new(rec.normal));
+        srec.skip_pdf = false;
         true
     }
 
-    fn scattering_pdf(&self, _r_in: &Ray, _rec: &HitRecord, _scattered: &Ray) -> f64 {
-        1.0 / (2.0 * PI)
+    fn scattering_pdf(&self, _r_in: &Ray, rec: &HitRecord, scattered: &Ray) -> f64 {
+        let cosine = Vector3::dot(rec.normal, scattered.direction().normalize());
+        if cosine < 0.0 {
+            0.0
+        } else {
+            cosine / PI
+        }
     }
 }
 
@@ -91,23 +94,12 @@ impl Metal {
 }
 
 impl Scatter for Metal {
-    fn scatter(
-        &self,
-        r_in: &Ray,
-        rec: &HitRecord,
-        attenuation: &mut Vector3<f64>,
-        scattered: &mut Ray,
-        _pdf: &mut f64,
-    ) -> bool {
-        let reflected = reflect(&r_in.direction(), &rec.normal).normalize();
-        *scattered = Ray::new(rec.p, reflected + self.fuzz * random_in_unit_sphere());
-
-        if scattered.direction().dot(rec.normal) > 0.0 {
-            *attenuation = self.albedo;
-            true
-        } else {
-            false
-        }
+    fn scatter(&self, r_in: &Ray, rec: &HitRecord, srec: &mut ScatterRecord) -> bool {
+        srec.attenuation = self.albedo;
+        srec.skip_pdf = true;
+        let reflected = reflect(&r_in.direction().normalize(), &rec.normal);
+        srec.skip_pdf_ray = Ray::new(rec.p, reflected + self.fuzz * random_in_unit_sphere());
+        true
     }
 }
 
@@ -129,14 +121,10 @@ impl Dielectric {
 }
 
 impl Scatter for Dielectric {
-    fn scatter(
-        &self,
-        r_in: &Ray,
-        rec: &HitRecord,
-        attenuation: &mut Vector3<f64>,
-        scattered: &mut Ray,
-        _pdf: &mut f64,
-    ) -> bool {
+    fn scatter(&self, r_in: &Ray, rec: &HitRecord, srec: &mut ScatterRecord) -> bool {
+        srec.attenuation = Vector3::new(1.0, 1.0, 1.0);
+        srec.skip_pdf = true;
+
         let refraction_ratio = if rec.front_face {
             1.0 / self.ir
         } else {
@@ -157,8 +145,7 @@ impl Scatter for Dielectric {
             refract(&unit_direction, &rec.normal, refraction_ratio)
         };
 
-        *scattered = Ray::new(rec.p, direction);
-        *attenuation = Vector3::new(1.0, 1.0, 1.0);
+        srec.skip_pdf_ray = Ray::new(rec.p, direction);
         true
     }
 }
@@ -180,14 +167,7 @@ impl DiffuseLight {
 }
 
 impl Scatter for DiffuseLight {
-    fn scatter(
-        &self,
-        _r_in: &Ray,
-        _rec: &HitRecord,
-        _attenuation: &mut Vector3<f64>,
-        _scattered: &mut Ray,
-        _pdf: &mut f64,
-    ) -> bool {
+    fn scatter(&self, _r_in: &Ray, _rec: &HitRecord, _srec: &mut ScatterRecord) -> bool {
         false
     }
 
@@ -224,17 +204,10 @@ impl Isotropic {
 }
 
 impl Scatter for Isotropic {
-    fn scatter(
-        &self,
-        _r_in: &Ray,
-        rec: &HitRecord,
-        attenuation: &mut Vector3<f64>,
-        scattered: &mut Ray,
-        pdf: &mut f64,
-    ) -> bool {
-        *scattered = Ray::new(rec.p, random_in_unit_sphere().normalize());
-        *attenuation = self.albedo.value(rec.u, rec.v, rec.p);
-        *pdf = 1.0 / (4.0 * PI);
+    fn scatter(&self, _r_in: &Ray, rec: &HitRecord, srec: &mut ScatterRecord) -> bool {
+        srec.attenuation = self.albedo.value(rec.u, rec.v, rec.p);
+        srec.pdf = Box::new(SpherePdf {});
+        srec.skip_pdf = false;
         true
     }
 
