@@ -3,6 +3,10 @@ use std::{f64::consts::PI, ops::Range};
 use cgmath::{InnerSpace, Vector3};
 use rand::Rng;
 
+pub fn degrees_to_radians(degrees: f64) -> f64 {
+    degrees * PI / 180.0
+}
+
 pub fn random(r: Range<f64>) -> Vector3<f64> {
     let mut rng = rand::thread_rng();
 

@@ -7,8 +7,10 @@ use crate::{
     aabb::Aabb,
     hit::{Hit, HitRecord},
     interval::Interval,
-    material::Scatter,
+    material::{Metal, Scatter},
+    onb::Onb,
     ray::Ray,
+    utils::random_double,
 };
 
 pub struct Sphere {
@@ -32,8 +34,20 @@ impl Sphere {
     fn get_sphere_uv(p: Vector3<f64>) -> (f64, f64) {
         let theta = (-p.y).acos();
         let phi = (-p.z).atan2(p.x) + PI;
-    
+
         (phi / (2.0 * PI), theta / PI)
+    }
+
+    fn random_to_sphere(radius: f64, distance_squared: f64) -> Vector3<f64> {
+        let r1 = random_double();
+        let r2 = random_double();
+        let z = 1.0 + r2 * ((1.0 - radius * radius / distance_squared).sqrt() - 1.0);
+
+        let phi = 2.0 * PI * r1;
+        let x = phi.cos() * (1.0 - z * z).sqrt();
+        let y = phi.sin() * (1.0 - z * z).sqrt();
+
+        Vector3::new(x, y, z)
     }
 }
 
@@ -72,5 +86,37 @@ impl Hit for Sphere {
 
     fn bounding_box(&self) -> &Aabb {
         &self.bbox
+    }
+
+    fn pdf_value(&self, origin: Point3<f64>, direction: Vector3<f64>) -> f64 {
+        let mut rec = HitRecord {
+            p: Point3::new(0.0, 0.0, 0.0),
+            normal: Vector3::new(0.0, 0.0, 0.0),
+            mat: Arc::new(Metal::new(Vector3::new(0.0, 0.0, 0.0), 0.0)),
+            t: 0.0,
+            u: 0.0,
+            v: 0.0,
+            front_face: true,
+        };
+        if !self.hit(
+            &Ray::new(origin, direction),
+            &Interval::new(0.001, f64::INFINITY),
+            &mut rec,
+        ) {
+            return 0.0;
+        }
+
+        let cos_theta_max =
+            (1.0 - self.radius * self.radius / (self.center - origin).magnitude2()).sqrt();
+        let solid_angle = 2.0 * PI * (1.0 - cos_theta_max);
+
+        1.0 / solid_angle
+    }
+
+    fn random(&self, origin: Point3<f64>) -> Vector3<f64> {
+        let direction = self.center - origin;
+        let distance_squared = direction.magnitude2();
+        let uvw = Onb::new_from_w(direction);
+        uvw.local_v(Self::random_to_sphere(self.radius, distance_squared))
     }
 }
