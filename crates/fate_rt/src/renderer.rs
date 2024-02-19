@@ -364,7 +364,6 @@ fn final_scene() -> HittableList {
     )));
 
     let center1 = Point3::new(400.0, 400.0, 200.0);
-    let center2 = center1 + Vector3::new(30.0, 0.0, 0.0);
     let sphere_scatter: Arc<dyn Scatter> = Arc::new(Lambertian::new(Vector3::new(0.7, 0.3, 0.1)));
     world.add(Arc::new(
         Sphere::new(center1, 50.0, sphere_scatter).unwrap(),
@@ -396,7 +395,7 @@ fn final_scene() -> HittableList {
         .unwrap(),
     );
     world.add(Arc::clone(&boundary));
-    world.add(Arc::new(ConstantMedium::new_with_Vector3(
+    world.add(Arc::new(ConstantMedium::new_with_vector3(
         Arc::clone(&boundary),
         0.2,
         Vector3::new(0.2, 0.4, 0.9),
@@ -409,7 +408,7 @@ fn final_scene() -> HittableList {
         )
         .unwrap(),
     );
-    world.add(Arc::new(ConstantMedium::new_with_Vector3(
+    world.add(Arc::new(ConstantMedium::new_with_vector3(
         Arc::clone(&boundary),
         0.0001,
         Vector3::new(1.0, 1.0, 1.0),

@@ -4,7 +4,7 @@ use cgmath::{InnerSpace, Point3, Vector3};
 
 use crate::{
     aabb::Aabb,
-    hit::{self, Hit, HitRecord},
+    hit::{Hit, HitRecord},
     interval::{self, Interval},
     material::{Isotropic, Metal, Scatter},
     ray::Ray,
@@ -26,7 +26,7 @@ impl ConstantMedium {
             phase_function: Arc::new(Isotropic::new(a)),
         }
     }
-    pub fn new_with_Vector3(b: Arc<dyn Hit>, d: f64, c: Vector3<f64>) -> Self {
+    pub fn new_with_vector3(b: Arc<dyn Hit>, d: f64, c: Vector3<f64>) -> Self {
         Self {
             boundary: b,
             neg_inv_density: -1.0 / d,

@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use cgmath::{InnerSpace, Point3, Vector3};
 
-use crate::{aabb::Aabb, interval::Interval, material::{Metal, Scatter}, ray::Ray};
+use crate::{aabb::Aabb, interval::Interval, material::Scatter, ray::Ray};
 
 #[derive(Clone)]
 pub struct HitRecord {

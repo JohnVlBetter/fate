@@ -5,11 +5,10 @@ use rand::Rng;
 
 use crate::{
     hit::HitRecord,
-    onb::Onb,
     pdf::{CosinePdf, NonePdf, Pdf, SpherePdf},
     ray::Ray,
     texture::{SolidColor, Texture},
-    utils::{near_zero, random_cosine_direction, random_in_unit_sphere, reflect, refract},
+    utils::{random_in_unit_sphere, reflect, refract},
 };
 
 pub struct ScatterRecord {

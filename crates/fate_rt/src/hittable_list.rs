@@ -4,7 +4,7 @@ use cgmath::{Point3, Vector3};
 
 use crate::{
     aabb::Aabb,
-    hit::{self, Hit, HitRecord},
+    hit::{Hit, HitRecord},
     interval::Interval,
     material::Metal,
     ray::Ray, utils::random_int,
