@@ -30,82 +30,39 @@ impl Triangle {
             normal,
             mat,
             bbox: Aabb::new_with_points(&a, &b, &c),
-            area: normal.magnitude(),
+            area: normal.magnitude() * 0.5,
         }
-    }
-
-    pub fn is_interior(&self, a: f64, b: f64, rec: &mut HitRecord) -> bool {
-        if !(0.0..=1.0).contains(&a) || !(0.0..=1.0).contains(&b) {
-            return false;
-        }
-
-        rec.u = a;
-        rec.v = b;
-
-        true
     }
 }
 
 impl Hit for Triangle {
     fn hit(&self, r: &Ray, ray_t: &Interval, rec: &mut HitRecord) -> bool {
-        let denom = Vector3::dot(self.normal, r.direction());
-
-        if denom.abs() < 1e-8 {
+        let mut u: f64 = 0.0;
+        let mut v: f64 = 0.0;
+        let e1 = self.b - self.a;
+        let e2 = self.c - self.a;
+        let s = r.origin - self.a;
+        let s1 = Vector3::cross(r.direction, e2);
+        let s2 = Vector3::cross(s, e1);
+        let coeff = 1.0 / Vector3::dot(s1, e1);
+        let t = coeff * Vector3::dot(s2, e2);
+        let b1 = coeff * Vector3::dot(s1, s);
+        let b2 = coeff * Vector3::dot(s2, r.direction);
+        if t >= 0.0 && b1 >= 0.0 && b2 >= 0.0 && (1.0 - b1 - b2) >= 0.0 {
+            u = b1;
+            v = b2;
+        } else {
             return false;
         }
-
-        let t = (self.d - Vector3::dot(self.normal, r.origin().to_vec())) / denom;
-        if !ray_t.contains(t) {
-            return false;
-        }
-
-        let intersection = r.at(t);
-        let planar_hitpt_vector = intersection - self.q;
-        let alpha = Vector3::dot(self.w, Vector3::cross(planar_hitpt_vector, self.v));
-        let beta = Vector3::dot(self.w, Vector3::cross(self.u, planar_hitpt_vector));
-
-        if !self.is_interior(alpha, beta, rec) {
-            return false;
-        }
-
         rec.t = t;
-        rec.p = intersection;
+        rec.p = r.at(t);
+        rec.normal = self.normal;
         rec.mat = Some(Arc::clone(&self.mat)).unwrap();
-        rec.set_face_normal(r, self.normal);
-
-        true
+        rec.set_face_normal(r, rec.normal);
+        return true;
     }
 
     fn bounding_box(&self) -> &Aabb {
         &self.bbox
-    }
-
-    fn pdf_value(&self, origin: Point3<f64>, direction: Vector3<f64>) -> f64 {
-        let mut rec = HitRecord {
-            p: Point3::new(0.0, 0.0, 0.0),
-            normal: Vector3::new(0.0, 0.0, 0.0),
-            mat: Arc::new(Metal::new(Vector3::new(0.0, 0.0, 0.0), 0.0)),
-            t: 0.0,
-            u: 0.0,
-            v: 0.0,
-            front_face: true,
-        };
-        if !self.hit(
-            &Ray::new(origin, direction),
-            &Interval::new(0.0001, f64::INFINITY),
-            &mut rec,
-        ) {
-            return 0.0;
-        }
-
-        let distance_squared = rec.t * rec.t * direction.magnitude2();
-        let cosine = (Vector3::dot(direction, rec.normal) / direction.magnitude()).abs();
-
-        distance_squared / (cosine * self.area)
-    }
-
-    fn random(&self, origin: Point3<f64>) -> Vector3<f64> {
-        let p = self.q + (random_double() * self.u) + (random_double() * self.v);
-        return p - origin;
     }
 }

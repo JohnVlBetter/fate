@@ -10,6 +10,7 @@ use crate::{
     material::{Dielectric, DiffuseLight, Lambertian, Metal, Scatter},
     quad::{make_box, Quad},
     sphere::Sphere,
+    triangle::Triangle,
 };
 
 #[derive(Copy, Clone, Debug)]
@@ -82,9 +83,18 @@ fn cornell_box(path: &Path) {
     let box1 = Arc::new(Translate::new(box1, Vector3::new(265.0, 0.0, 295.0)));
     world.add(box1);
 
-    let glass: Arc<dyn Scatter> = Arc::new(Dielectric::new(1.5));
+    /*let glass: Arc<dyn Scatter> = Arc::new(Dielectric::new(1.5));
     world.add(Arc::new(
         Sphere::new(Point3::new(190.0, 90.0, 190.0), 90.0, Arc::clone(&glass)).unwrap(),
+    ));*/
+
+    world.add(Arc::new(
+        Triangle::new(
+            Point3::new(190.0, 250.0, 500.0),
+            Point3::new(100.0, 90.0, 470.0),
+            Point3::new(250.0, 90.0, 470.0),
+            Arc::clone(&white),
+        )
     ));
 
     // Light SouArces.
@@ -95,9 +105,9 @@ fn cornell_box(path: &Path) {
         Vector3::new(0.0, 0.0, -105.0),
         Arc::clone(&light),
     )));
-    lights.add(Arc::new(
+    /*lights.add(Arc::new(
         Sphere::new(Point3::new(190.0, 90.0, 190.0), 90.0, Arc::clone(&glass)).unwrap(),
-    ));
+    ));*/
 
     let mut cam = Camera::default();
 
