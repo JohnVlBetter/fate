@@ -15,3 +15,4 @@ pub mod renderer;
 pub mod sphere;
 pub mod texture;
 pub mod utils;
+pub mod triangle;

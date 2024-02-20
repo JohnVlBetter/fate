@@ -7,7 +7,7 @@ use crate::{
     camera::Camera,
     hit::{RotateY, Translate},
     hittable_list::HittableList,
-    material::{Dielectric, DiffuseLight, Lambertian, Scatter},
+    material::{Dielectric, DiffuseLight, Lambertian, Metal, Scatter},
     quad::{make_box, Quad},
     sphere::Sphere,
 };
@@ -72,10 +72,11 @@ fn cornell_box(path: &Path) {
         Arc::clone(&white),
     )));
 
+    let metal_mat: Arc<dyn Scatter> = Arc::new(Metal::new(Vector3::new(0.23, 0.23, 0.23), 0.0));
     let box1 = make_box(
         Point3::new(0.0, 0.0, 0.0),
         Point3::new(165.0, 330.0, 165.0),
-        Arc::clone(&white),
+        Arc::clone(&metal_mat),
     );
     let box1 = Arc::new(RotateY::new(box1, 15.0));
     let box1 = Arc::new(Translate::new(box1, Vector3::new(265.0, 0.0, 295.0)));
@@ -102,7 +103,7 @@ fn cornell_box(path: &Path) {
 
     cam.aspect_ratio = 1.0;
     cam.image_width = 400;
-    cam.samples_per_pixel = 200;
+    cam.samples_per_pixel = 100;
     cam.max_depth = 20;
     cam.background = Vector3::new(0.0, 0.0, 0.0);
 

@@ -31,6 +31,16 @@ impl Aabb {
         _self
     }
 
+    pub fn new_with_points(a: &Point3<f64>, b: &Point3<f64>, c: &Point3<f64>) -> Self {
+        let mut _self = Self {
+            x: Interval::new(((a[0]).min(b[0])).min(c[0]), ((a[0]).max(b[0])).max(c[0])),
+            y: Interval::new(((a[1]).min(b[1])).min(c[1]), ((a[1]).max(b[1])).max(c[1])),
+            z: Interval::new(((a[2]).min(b[2])).min(c[2]), ((a[2]).max(b[2])).max(c[2])),
+        };
+        _self.pad_to_minimums();
+        _self
+    }
+
     pub fn new_with_box(box0: &Aabb, box1: &Aabb) -> Self {
         Self {
             x: Interval::new_with_interval(&box0.x, &box1.x),
