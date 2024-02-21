@@ -1,7 +1,7 @@
 use std::{path::Path, sync::Arc};
 
 use anyhow::Result;
-use cgmath::{Point3, Vector3};
+use cgmath::{Point3, Vector2, Vector3};
 
 use crate::{
     camera::Camera,
@@ -11,7 +11,7 @@ use crate::{
     model::Model,
     quad::{make_box, Quad},
     sphere::Sphere,
-    triangle::Triangle,
+    triangle::{Triangle, Vertex},
 };
 
 #[derive(Copy, Clone, Debug)]
@@ -35,7 +35,7 @@ fn cornell_box(path: &Path) {
     let white: Arc<dyn Scatter> = Arc::new(Lambertian::new(Vector3::new(0.73, 0.73, 0.73)));
     let green: Arc<dyn Scatter> = Arc::new(Lambertian::new(Vector3::new(0.12, 0.45, 0.15)));
     let light: Arc<dyn Scatter> =
-        Arc::new(DiffuseLight::new_with_color(Vector3::new(15.0, 15.0, 15.0)));
+        Arc::new(DiffuseLight::new_with_color(Vector3::new(50.0, 50.0, 50.0)));
 
     /*world.add(Arc::new(Quad::new(
         Point3::new(555.0, 0.0, 0.0),
@@ -88,6 +88,27 @@ fn cornell_box(path: &Path) {
     world.add(Arc::new(
         Sphere::new(Point3::new(190.0, 90.0, 190.0), 90.0, Arc::clone(&glass)).unwrap(),
     ));*/
+    let v1 = Vertex::new(
+        Point3::new(0.0, 300.0, 10.0),
+        Vector3::new(50.0, 200.0, 190.0),
+        Vector3::new(300.0, 200.0, 190.0),
+        Vector2::new(0.0, 0.0),
+    );
+    let v2 = Vertex::new(
+        Point3::new(50.0, 300.0, 190.0),
+        Vector3::new(190.0, 90.0, 190.0),
+        Vector3::new(300.0, 200.0, 190.0),
+        Vector2::new(0.0, 0.0),
+    );
+    let v3 = Vertex::new(
+        Point3::new(300.0, 300.0, 190.0),
+        Vector3::new(190.0, 90.0, 190.0),
+        Vector3::new(50.0, 200.0, 190.0),
+        Vector2::new(0.0, 0.0),
+    );
+    world.add(Arc::new(
+        Triangle::new(v1, v2, v3, Arc::clone(&light))
+    ));
     world.add(Arc::new(
         Model::new("res/model/viking_room/viking_room.obj", Arc::clone(&white)).unwrap(),
     ));
@@ -100,9 +121,9 @@ fn cornell_box(path: &Path) {
         Vector3::new(0.0, 0.0, -105.0),
         Arc::clone(&light),
     )));
-    /*lights.add(Arc::new(
-        Sphere::new(Point3::new(190.0, 90.0, 190.0), 90.0, Arc::clone(&glass)).unwrap(),
-    ));*/
+    lights.add(Arc::new(
+        Triangle::new(v1, v2, v3, Arc::clone(&light))
+    ));
 
     let mut cam = Camera::default();
 
@@ -114,7 +135,7 @@ fn cornell_box(path: &Path) {
 
     cam.vfov = 40.0;
     cam.lookfrom = Point3::new(278.0, 278.0, -800.0);
-    cam.lookat = Point3::new(278.0, 278.0, 0.0);
+    cam.lookat = Point3::new(0.0, 0.0, 0.0);
     cam.vup = Vector3::new(0.0, 1.0, 0.0);
 
     cam.defocus_angle = 0.0;

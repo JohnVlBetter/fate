@@ -52,9 +52,9 @@ impl Model {
 
                     let vertex = Vertex {
                         pos: Point3::new(
-                            model.mesh.positions[pos_offset] as f64,
-                            model.mesh.positions[pos_offset + 1] as f64,
-                            model.mesh.positions[pos_offset + 2] as f64,
+                            (model.mesh.positions[pos_offset] * 300.0) as f64,
+                            (model.mesh.positions[pos_offset + 1] * 300.0) as f64,
+                            (model.mesh.positions[pos_offset + 2] * 300.0) as f64,
                         ),
                         color: Vector3::new(1.0, 1.0, 1.0),
                         normal: Vector3::new(
