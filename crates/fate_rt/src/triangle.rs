@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use cgmath::{EuclideanSpace, InnerSpace, Point3, Vector3};
+use cgmath::{InnerSpace, Point3, Vector3};
 
 use crate::aabb::Aabb;
 use crate::hit::{Hit, HitRecord};
@@ -30,7 +30,7 @@ impl Triangle {
             normal,
             mat,
             bbox: Aabb::new_with_points(&a, &b, &c),
-            area: normal.magnitude() * 0.5,
+            area: n.magnitude() * 0.5,
         }
     }
 }
@@ -59,10 +59,48 @@ impl Hit for Triangle {
         rec.normal = self.normal;
         rec.mat = Some(Arc::clone(&self.mat)).unwrap();
         rec.set_face_normal(r, rec.normal);
-        return true;
+
+        true
     }
 
     fn bounding_box(&self) -> &Aabb {
         &self.bbox
+    }
+
+    fn pdf_value(&self, origin: Point3<f64>, direction: Vector3<f64>) -> f64 {
+        let mut rec = HitRecord {
+            p: Point3::new(0.0, 0.0, 0.0),
+            normal: Vector3::new(0.0, 0.0, 0.0),
+            mat: Arc::new(Metal::new(Vector3::new(0.0, 0.0, 0.0), 0.0)),
+            t: 0.0,
+            u: 0.0,
+            v: 0.0,
+            front_face: true,
+        };
+        if !self.hit(
+            &Ray::new(origin, direction),
+            &Interval::new(0.0001, f64::INFINITY),
+            &mut rec,
+        ) {
+            return 0.0;
+        }
+
+        let distance_squared = rec.t * rec.t * direction.magnitude2();
+        let cosine = (Vector3::dot(direction, rec.normal) / direction.magnitude()).abs();
+
+        distance_squared / (cosine * self.area)
+    }
+
+    fn random(&self, origin: Point3<f64>) -> Vector3<f64> {
+        let mut x = random_double();
+        let mut y = random_double();
+        if x + y > 1.0 {
+            x = 1.0 - x;
+            y = 1.0 - y;
+        }
+        let ab = self.b - self.a;
+        let ac = self.c - self.a;
+        let p = self.a + x * ab + y * ac;
+        return p - origin;
     }
 }

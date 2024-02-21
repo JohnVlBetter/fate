@@ -48,10 +48,10 @@ fn cornell_box(path: &Path) {
         Vector3::new(0.0, 0.0, 555.0),
         red,
     )));
-    world.add(Arc::new(Quad::new(
-        Point3::new(343.0, 554.0, 332.0),
-        Vector3::new(-130.0, 0.0, 0.0),
-        Vector3::new(0.0, 0.0, -105.0),
+    world.add(Arc::new(Triangle::new(
+        Point3::new(343.0, 554.0, 200.0),
+        Point3::new(243.0, 554.0, 400.0),
+        Point3::new(443.0, 554.0, 400.0),
         Arc::clone(&light),
     )));
     world.add(Arc::new(Quad::new(
@@ -83,31 +83,22 @@ fn cornell_box(path: &Path) {
     let box1 = Arc::new(Translate::new(box1, Vector3::new(265.0, 0.0, 295.0)));
     world.add(box1);
 
-    /*let glass: Arc<dyn Scatter> = Arc::new(Dielectric::new(1.5));
+    let glass: Arc<dyn Scatter> = Arc::new(Dielectric::new(1.5));
     world.add(Arc::new(
         Sphere::new(Point3::new(190.0, 90.0, 190.0), 90.0, Arc::clone(&glass)).unwrap(),
-    ));*/
-
-    world.add(Arc::new(
-        Triangle::new(
-            Point3::new(190.0, 250.0, 500.0),
-            Point3::new(100.0, 90.0, 470.0),
-            Point3::new(250.0, 90.0, 470.0),
-            Arc::clone(&white),
-        )
     ));
 
     // Light SouArces.
     let mut lights = HittableList::default();
-    lights.add(Arc::new(Quad::new(
-        Point3::new(343.0, 554.0, 332.0),
-        Vector3::new(-130.0, 0.0, 0.0),
-        Vector3::new(0.0, 0.0, -105.0),
+    lights.add(Arc::new(Triangle::new(
+        Point3::new(343.0, 554.0, 200.0),
+        Point3::new(243.0, 554.0, 400.0),
+        Point3::new(443.0, 554.0, 400.0),
         Arc::clone(&light),
     )));
-    /*lights.add(Arc::new(
+    lights.add(Arc::new(
         Sphere::new(Point3::new(190.0, 90.0, 190.0), 90.0, Arc::clone(&glass)).unwrap(),
-    ));*/
+    ));
 
     let mut cam = Camera::default();
 
