@@ -8,6 +8,7 @@ use crate::{
     hit::{RotateY, Translate},
     hittable_list::HittableList,
     material::{Dielectric, DiffuseLight, Lambertian, Metal, Scatter},
+    model::Model,
     quad::{make_box, Quad},
     sphere::Sphere,
     triangle::Triangle,
@@ -36,7 +37,7 @@ fn cornell_box(path: &Path) {
     let light: Arc<dyn Scatter> =
         Arc::new(DiffuseLight::new_with_color(Vector3::new(15.0, 15.0, 15.0)));
 
-    world.add(Arc::new(Quad::new(
+    /*world.add(Arc::new(Quad::new(
         Point3::new(555.0, 0.0, 0.0),
         Vector3::new(0.0, 555.0, 0.0),
         Vector3::new(0.0, 0.0, 555.0),
@@ -47,14 +48,14 @@ fn cornell_box(path: &Path) {
         Vector3::new(0.0, 555.0, 0.0),
         Vector3::new(0.0, 0.0, 555.0),
         red,
-    )));
-    world.add(Arc::new(Triangle::new(
-        Point3::new(343.0, 554.0, 200.0),
-        Point3::new(243.0, 554.0, 400.0),
-        Point3::new(443.0, 554.0, 400.0),
+    )));*/
+    world.add(Arc::new(Quad::new(
+        Point3::new(343.0, 554.0, 332.0),
+        Vector3::new(-130.0, 0.0, 0.0),
+        Vector3::new(0.0, 0.0, -105.0),
         Arc::clone(&light),
     )));
-    world.add(Arc::new(Quad::new(
+    /*world.add(Arc::new(Quad::new(
         Point3::new(0.0, 0.0, 0.0),
         Vector3::new(555.0, 0.0, 0.0),
         Vector3::new(0.0, 0.0, 555.0),
@@ -71,34 +72,37 @@ fn cornell_box(path: &Path) {
         Vector3::new(555.0, 0.0, 0.0),
         Vector3::new(0.0, 555.0, 0.0),
         Arc::clone(&white),
-    )));
+    )));*/
 
     let metal_mat: Arc<dyn Scatter> = Arc::new(Metal::new(Vector3::new(0.23, 0.23, 0.23), 0.0));
-    let box1 = make_box(
+    /*let box1 = make_box(
         Point3::new(0.0, 0.0, 0.0),
         Point3::new(165.0, 330.0, 165.0),
         Arc::clone(&metal_mat),
     );
     let box1 = Arc::new(RotateY::new(box1, 15.0));
     let box1 = Arc::new(Translate::new(box1, Vector3::new(265.0, 0.0, 295.0)));
-    world.add(box1);
+    world.add(box1);*/
 
-    let glass: Arc<dyn Scatter> = Arc::new(Dielectric::new(1.5));
+    /*let glass: Arc<dyn Scatter> = Arc::new(Dielectric::new(1.5));
     world.add(Arc::new(
         Sphere::new(Point3::new(190.0, 90.0, 190.0), 90.0, Arc::clone(&glass)).unwrap(),
+    ));*/
+    world.add(Arc::new(
+        Model::new("res/model/viking_room/viking_room.obj", Arc::clone(&white)).unwrap(),
     ));
 
     // Light SouArces.
     let mut lights = HittableList::default();
-    lights.add(Arc::new(Triangle::new(
-        Point3::new(343.0, 554.0, 200.0),
-        Point3::new(243.0, 554.0, 400.0),
-        Point3::new(443.0, 554.0, 400.0),
+    lights.add(Arc::new(Quad::new(
+        Point3::new(343.0, 554.0, 332.0),
+        Vector3::new(-130.0, 0.0, 0.0),
+        Vector3::new(0.0, 0.0, -105.0),
         Arc::clone(&light),
     )));
-    lights.add(Arc::new(
+    /*lights.add(Arc::new(
         Sphere::new(Point3::new(190.0, 90.0, 190.0), 90.0, Arc::clone(&glass)).unwrap(),
-    ));
+    ));*/
 
     let mut cam = Camera::default();
 

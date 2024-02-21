@@ -472,6 +472,7 @@ dependencies = [
  "rand",
  "rayon",
  "stb_image",
+ "tobj",
 ]
 
 [[package]]

@@ -21,6 +21,16 @@ impl Aabb {
         }
     }
 
+    pub fn append(&mut self, p: &Point3<f64>) {
+        self.x.min = self.x.min.min(p.x);
+        self.x.max = self.x.max.max(p.x);
+        self.y.min = self.y.min.min(p.x);
+        self.y.max = self.y.max.max(p.x);
+        self.z.min = self.z.min.min(p.x);
+        self.z.max = self.z.max.max(p.x);
+        self.pad_to_minimums();
+    }
+
     pub fn new_with_point(a: &Point3<f64>, b: &Point3<f64>) -> Self {
         let mut _self = Self {
             x: Interval::new((a[0]).min(b[0]), (a[0]).max(b[0])),

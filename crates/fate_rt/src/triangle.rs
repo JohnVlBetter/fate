@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use cgmath::{InnerSpace, Point3, Vector3};
+use cgmath::{InnerSpace, Point3, Vector2, Vector3};
 
 use crate::aabb::Aabb;
 use crate::hit::{Hit, HitRecord};
@@ -8,11 +8,61 @@ use crate::interval::Interval;
 use crate::material::*;
 use crate::ray::Ray;
 use crate::utils::random_double;
+use std::hash::{Hash, Hasher};
+
+#[repr(C)]
+#[derive(Copy, Clone, Debug)]
+pub struct Vertex {
+    pub(crate) pos: Point3<f64>,
+    pub(crate) color: Vector3<f64>,
+    pub(crate) normal: Vector3<f64>,
+    pub(crate) tex_coord: Vector2<f64>,
+}
+
+impl Vertex {
+    pub fn new(
+        pos: Point3<f64>,
+        color: Vector3<f64>,
+        normal: Vector3<f64>,
+        tex_coord: Vector2<f64>,
+    ) -> Self {
+        Self {
+            pos,
+            color,
+            normal,
+            tex_coord,
+        }
+    }
+}
+
+impl PartialEq for Vertex {
+    fn eq(&self, other: &Self) -> bool {
+        self.pos == other.pos
+            && self.color == other.color
+            && self.normal == other.normal
+            && self.tex_coord == other.tex_coord
+    }
+}
+
+impl Eq for Vertex {}
+
+impl Hash for Vertex {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.pos[0].to_bits().hash(state);
+        self.pos[1].to_bits().hash(state);
+        self.pos[2].to_bits().hash(state);
+        self.color[0].to_bits().hash(state);
+        self.color[1].to_bits().hash(state);
+        self.color[2].to_bits().hash(state);
+        self.tex_coord[0].to_bits().hash(state);
+        self.tex_coord[1].to_bits().hash(state);
+    }
+}
 
 pub struct Triangle {
-    a: Point3<f64>,
-    b: Point3<f64>,
-    c: Point3<f64>,
+    a: Vertex,
+    b: Vertex,
+    c: Vertex,
     normal: Vector3<f64>,
     mat: Arc<dyn Scatter>,
     bbox: Aabb,
@@ -20,8 +70,8 @@ pub struct Triangle {
 }
 
 impl Triangle {
-    pub fn new(a: Point3<f64>, b: Point3<f64>, c: Point3<f64>, mat: Arc<dyn Scatter>) -> Self {
-        let n = (a - c).cross(a - b);
+    pub fn new(a: Vertex, b: Vertex, c: Vertex, mat: Arc<dyn Scatter>) -> Self {
+        let n = (a.pos - c.pos).cross(a.pos - b.pos);
         let normal = n.normalize();
         Self {
             a,
@@ -29,7 +79,7 @@ impl Triangle {
             c,
             normal,
             mat,
-            bbox: Aabb::new_with_points(&a, &b, &c),
+            bbox: Aabb::new_with_points(&a.pos, &b.pos, &c.pos),
             area: n.magnitude() * 0.5,
         }
     }
@@ -39,9 +89,9 @@ impl Hit for Triangle {
     fn hit(&self, r: &Ray, ray_t: &Interval, rec: &mut HitRecord) -> bool {
         let mut u: f64 = 0.0;
         let mut v: f64 = 0.0;
-        let e1 = self.b - self.a;
-        let e2 = self.c - self.a;
-        let s = r.origin - self.a;
+        let e1 = self.b.pos - self.a.pos;
+        let e2 = self.c.pos - self.a.pos;
+        let s = r.origin - self.a.pos;
         let s1 = Vector3::cross(r.direction, e2);
         let s2 = Vector3::cross(s, e1);
         let coeff = 1.0 / Vector3::dot(s1, e1);
@@ -98,9 +148,9 @@ impl Hit for Triangle {
             x = 1.0 - x;
             y = 1.0 - y;
         }
-        let ab = self.b - self.a;
-        let ac = self.c - self.a;
-        let p = self.a + x * ab + y * ac;
+        let ab = self.b.pos - self.a.pos;
+        let ac = self.c.pos - self.a.pos;
+        let p = self.a.pos + x * ab + y * ac;
         return p - origin;
     }
 }
