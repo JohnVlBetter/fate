@@ -22,7 +22,7 @@ pub struct Model {
 }
 
 impl Model {
-    pub fn new(path: &str, mat: Arc<dyn Scatter>) -> Result<Self> {
+    pub fn new(path: &str, mat: Arc<dyn Scatter>, scale: f32) -> Result<Self> {
         let mut unique_vertices = HashMap::new();
         let mut indices: Vec<u32> = Vec::new();
         let mut vertices: Vec<Vertex> = Vec::new();
@@ -52,9 +52,9 @@ impl Model {
 
                     let vertex = Vertex {
                         pos: Point3::new(
-                            (model.mesh.positions[pos_offset] * 300.0) as f64,
-                            (model.mesh.positions[pos_offset + 1] * 300.0) as f64,
-                            (model.mesh.positions[pos_offset + 2] * 300.0) as f64,
+                            (model.mesh.positions[pos_offset] * scale) as f64,
+                            (model.mesh.positions[pos_offset + 1] * scale) as f64,
+                            (model.mesh.positions[pos_offset + 2] * scale) as f64,
                         ),
                         color: Vector3::new(1.0, 1.0, 1.0),
                         normal: Vector3::new(
@@ -63,8 +63,8 @@ impl Model {
                             model.mesh.normals[normal_index * 3 + 2] as f64,
                         ),
                         tex_coord: Vector2::new(
-                            model.mesh.texcoords[tex_coord_offset] as f64,
-                            1.0 - model.mesh.texcoords[tex_coord_offset + 1] as f64,
+                            0.0,//model.mesh.texcoords[tex_coord_offset] as f64,
+                            1.0,// - model.mesh.texcoords[tex_coord_offset + 1] as f64,
                         ),
                     };
 
