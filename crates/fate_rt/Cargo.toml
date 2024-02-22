@@ -12,3 +12,6 @@ rand = "*"
 rayon = "1.8.1"
 stb_image = "0.2"
 tobj = { version = "3", features = ["log"] }
+
+[dependencies.gltf]
+version = "1.2"

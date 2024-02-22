@@ -63,8 +63,8 @@ impl Model {
                             model.mesh.normals[normal_index * 3 + 2] as f64,
                         ),
                         tex_coord: Vector2::new(
-                            0.0,//model.mesh.texcoords[tex_coord_offset] as f64,
-                            1.0,// - model.mesh.texcoords[tex_coord_offset + 1] as f64,
+                            0.0, //model.mesh.texcoords[tex_coord_offset] as f64,
+                            1.0, // - model.mesh.texcoords[tex_coord_offset + 1] as f64,
                         ),
                     };
 
@@ -79,8 +79,63 @@ impl Model {
                     }
                 }
             }
-        }
+        } else if path.ends_with(".gltf") || path.ends_with(".glb") {
+            let (gltf, buffers, _) = gltf::import(path)?;
+            for mesh in gltf.meshes() {
+                for primitive in mesh.primitives() {
+                    let r = primitive.reader(|buffer| Some(&buffers[buffer.index()]));
+                    if let Some(iter) = r.read_indices() {
+                        for v in iter.into_u32() {
+                            indices.push(v);
+                        }
+                    }
+                    let mut positions = Vec::new();
+                    if let Some(iter) = r.read_positions() {
+                        for v in iter {
+                            positions.push(v);
+                        }
+                    }
+                    let mut uvs = Vec::new();
+                    if let Some(gltf::mesh::util::ReadTexCoords::F32(
+                        gltf::accessor::Iter::Standard(iter),
+                    )) = r.read_tex_coords(0)
+                    {
+                        for v in iter {
+                            uvs.push(v);
+                        }
+                    }
+                    let mut normals = Vec::new();
+                    if let Some(iter) = r.read_normals() {
+                        for v in iter {
+                            normals.push(v);
+                        }
+                    }
 
+                    let size = positions.len();
+                    for idx in 0..size {
+                        let pos = positions[idx];
+                        let normal = normals[idx];
+                        let uv = uvs[idx];
+                        let vertex = Vertex {
+                            pos: Point3::new(
+                                (pos[0] * scale) as f64,
+                                (pos[1] * scale) as f64,
+                                (pos[2] * scale) as f64,
+                            ),
+                            color: Vector3::new(1.0, 1.0, 1.0),
+                            normal: Vector3::new(
+                                normal[0] as f64,
+                                normal[2] as f64,
+                                normal[1] as f64,
+                            ),
+                            tex_coord: Vector2::new(uv[0] as f64, (1.0 - uv[1]) as f64),
+                        };
+                        vertices.push(vertex);
+                        bbox.append(&vertex.pos);
+                    }
+                }
+            }
+        }
         let num = indices.len() / 3;
         for idx in 0..num {
             triangles.add(Arc::new(Triangle::new(

@@ -84,12 +84,20 @@ fn cornell_box(path: &Path) {
     let box1 = Arc::new(Translate::new(box1, Vector3::new(265.0, 0.0, 295.0)));
     world.add(box1);
 
-    let bunny = Arc::new(Model::new("res/model/viking_room/bunny.obj", Arc::clone(&white), 100.0).unwrap());
+    let bunny =
+        Arc::new(Model::new("res/model/viking_room/bunny.obj", Arc::clone(&white), 100.0).unwrap());
     let bunny = Arc::new(RotateY::new(bunny, 180.0));
     let bunny = Arc::new(Translate::new(bunny, Vector3::new(100.0, 40.0, 300.0)));
     world.add(bunny);
-    
-    let dragon = Arc::new(Model::new("res/model/viking_room/dragon.obj", Arc::clone(&white), 200.0).unwrap());
+
+    let dragon = Arc::new(
+        Model::new(
+            "res/model/DamagedHelmet/glTF/DamagedHelmet.gltf",
+            Arc::clone(&white),
+            100.0,
+        )
+        .unwrap(),
+    );
     let dragon = Arc::new(RotateY::new(dragon, 90.0));
     let dragon = Arc::new(Translate::new(dragon, Vector3::new(400.0, 100.0, 100.0)));
     world.add(dragon);
@@ -106,7 +114,7 @@ fn cornell_box(path: &Path) {
 
     cam.aspect_ratio = 1.0;
     cam.image_width = 400;
-    cam.samples_per_pixel = 1000;
+    cam.samples_per_pixel = 100;
     cam.max_depth = 30;
     cam.background = Vector3::new(0.0, 0.0, 0.0);
 
