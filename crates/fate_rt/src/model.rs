@@ -119,8 +119,8 @@ impl Model {
                         let vertex = Vertex {
                             pos: Point3::new(
                                 (pos[0] * scale) as f64,
-                                (pos[1] * scale) as f64,
                                 (pos[2] * scale) as f64,
+                                (pos[1] * scale) as f64,
                             ),
                             color: Vector3::new(1.0, 1.0, 1.0),
                             normal: Vector3::new(

@@ -1,17 +1,15 @@
 use std::{path::Path, sync::Arc};
 
 use anyhow::Result;
-use cgmath::{Point3, Vector2, Vector3};
+use cgmath::{Point3, Vector3};
 
 use crate::{
     camera::Camera,
     hit::{RotateY, Translate},
     hittable_list::HittableList,
-    material::{Dielectric, DiffuseLight, Lambertian, Metal, Scatter},
+    material::{DiffuseLight, Lambertian, Metal, Scatter},
     model::Model,
     quad::{make_box, Quad},
-    sphere::Sphere,
-    triangle::{Triangle, Vertex},
 };
 
 #[derive(Copy, Clone, Debug)]
@@ -85,7 +83,7 @@ fn cornell_box(path: &Path) {
     world.add(box1);
 
     let bunny =
-        Arc::new(Model::new("res/model/viking_room/bunny.obj", Arc::clone(&white), 100.0).unwrap());
+        Arc::new(Model::new("res/model/Duck/glTF/Duck.gltf", Arc::clone(&white), 1.0).unwrap());
     let bunny = Arc::new(RotateY::new(bunny, 180.0));
     let bunny = Arc::new(Translate::new(bunny, Vector3::new(100.0, 40.0, 300.0)));
     world.add(bunny);
@@ -98,7 +96,7 @@ fn cornell_box(path: &Path) {
         )
         .unwrap(),
     );
-    let dragon = Arc::new(RotateY::new(dragon, 90.0));
+    let dragon = Arc::new(RotateY::new(dragon, 0.0));
     let dragon = Arc::new(Translate::new(dragon, Vector3::new(400.0, 100.0, 100.0)));
     world.add(dragon);
 
