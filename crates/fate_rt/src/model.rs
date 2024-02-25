@@ -13,16 +13,18 @@ use crate::hittable_list::HittableList;
 use crate::interval::Interval;
 use crate::material::Scatter;
 use crate::ray::Ray;
+use crate::transform::Transform;
 use crate::triangle::{Triangle, Vertex};
 
 pub struct Model {
     pub bbox: Aabb,
     pub triangles: HittableList,
     pub mat: Arc<dyn Scatter>,
+    pub transform: Transform,
 }
 
 impl Model {
-    pub fn new(path: &str, mat: Arc<dyn Scatter>, scale: f32) -> Result<Self> {
+    pub fn new(path: &str, mat: Arc<dyn Scatter>, scale: f32, transform: Transform) -> Result<Self> {
         let mut unique_vertices = HashMap::new();
         let mut indices: Vec<u32> = Vec::new();
         let mut vertices: Vec<Vertex> = Vec::new();
@@ -153,6 +155,7 @@ impl Model {
             bbox,
             triangles,
             mat,
+            transform,
         })
     }
 }
@@ -160,11 +163,14 @@ impl Model {
 impl Hit for Model {
     fn hit(&self, r: &Ray, ray_t: &Interval, rec: &mut HitRecord) -> bool {
         let mut ray_t = ray_t.clone();
-        /*if !self.bbox.hit(r, &mut ray_t) {
+        let r = self.transform.transform_ray(r);
+        if !self.bbox.hit(&r, &mut ray_t) {
             return false;
-        }*/
+        }
 
-        self.triangles.hit(r, &ray_t, rec)
+        let res = self.triangles.hit(&r, &ray_t, rec);
+        self.transform.transform_rec(rec);
+        res
     }
 
     fn bounding_box(&self) -> &Aabb {

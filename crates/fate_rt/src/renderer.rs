@@ -10,6 +10,7 @@ use crate::{
     material::{DiffuseLight, Lambertian, Metal, Scatter},
     model::Model,
     quad::{make_box, Quad},
+    transform::Transform,
 };
 
 #[derive(Copy, Clone, Debug)]
@@ -82,22 +83,40 @@ fn cornell_box(path: &Path) {
     let box1 = Arc::new(Translate::new(box1, Vector3::new(265.0, 0.0, 295.0)));
     world.add(box1);
 
-    let bunny =
-        Arc::new(Model::new("res/model/Duck/glTF/Duck.gltf", Arc::clone(&white), 1.0).unwrap());
-    let bunny = Arc::new(RotateY::new(bunny, 180.0));
-    let bunny = Arc::new(Translate::new(bunny, Vector3::new(100.0, 40.0, 300.0)));
+    let mut b_transform = Transform::new(
+        Vector3::new(100.0, 40.0, 300.0),
+        Vector3::new(0.0, 180.0, 0.0),
+        Vector3::new(1.0, 1.0, 1.0),
+    )
+    .unwrap();
+    b_transform.update_matrix();
+    let bunny = Arc::new(
+        Model::new(
+            "res/model/Duck/glTF/Duck.gltf",
+            Arc::clone(&white),
+            1.0,
+            b_transform,
+        )
+        .unwrap(),
+    );
     world.add(bunny);
 
+    let mut d_transform = Transform::new(
+        Vector3::new(400.0, 100.0, 100.0),
+        Vector3::new(0.0, 0.0, 0.0),
+        Vector3::new(1.0, 1.0, 1.0),
+    )
+    .unwrap();
+    d_transform.update_matrix();
     let dragon = Arc::new(
         Model::new(
             "res/model/DamagedHelmet/glTF/DamagedHelmet.gltf",
             Arc::clone(&white),
             100.0,
+            d_transform,
         )
         .unwrap(),
     );
-    let dragon = Arc::new(RotateY::new(dragon, 0.0));
-    let dragon = Arc::new(Translate::new(dragon, Vector3::new(400.0, 100.0, 100.0)));
     world.add(dragon);
 
     let mut lights = HittableList::default();
