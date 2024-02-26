@@ -1,9 +1,13 @@
-use std::fs::File;
-use std::io::BufReader;
+use std::fs::{self, File};
+use std::io::{self, BufReader};
+use std::path::Path;
 use std::sync::Arc;
 
 use anyhow::Result;
 use cgmath::{Point3, Vector2, Vector3};
+use gltf::image::Source;
+use image::GenericImageView;
+use image::ImageFormat::{Jpeg, Png};
 use std::collections::HashMap;
 
 use crate::aabb::{Aabb, EMPTY};
@@ -24,7 +28,12 @@ pub struct Model {
 }
 
 impl Model {
-    pub fn new(path: &str, mat: Arc<dyn Scatter>, scale: f32, transform: Transform) -> Result<Self> {
+    pub fn new(
+        path: &str,
+        mat: Arc<dyn Scatter>,
+        scale: f32,
+        transform: Transform,
+    ) -> Result<Self> {
         let mut unique_vertices = HashMap::new();
         let mut indices: Vec<u32> = Vec::new();
         let mut vertices: Vec<Vertex> = Vec::new();
@@ -82,7 +91,7 @@ impl Model {
                 }
             }
         } else if path.ends_with(".gltf") || path.ends_with(".glb") {
-            let (gltf, buffers, _) = gltf::import(path)?;
+            let (gltf, buffers, _images) = gltf::import(path)?;
             for mesh in gltf.meshes() {
                 for primitive in mesh.primitives() {
                     let r = primitive.reader(|buffer| Some(&buffers[buffer.index()]));
@@ -136,6 +145,90 @@ impl Model {
                         bbox.append(&vertex.pos);
                     }
                 }
+            }
+            for image in gltf.images() {
+                let img = match image.source() {
+                    Source::View { view, mime_type } => {
+                        let parent_buffer_data = &buffers[view.buffer().index()].0;
+                        let begin = view.offset();
+                        let end = begin + view.length();
+                        let data = &parent_buffer_data[begin..end];
+                        match mime_type {
+                            "image/jpeg" => image::load_from_memory_with_format(data, Jpeg),
+                            "image/png" => image::load_from_memory_with_format(data, Png),
+                            _ => panic!(
+                                "{}",
+                                format!(
+                                    "unsupported image type (image: {}, mime_type: {})",
+                                    image.index(),
+                                    mime_type
+                                )
+                            ),
+                        }
+                    }
+                    Source::Uri { uri, mime_type } => {
+                        if uri.starts_with("data:") {
+                            let encoded = uri.split(',').nth(1).unwrap();
+                            let data = base64::decode(&encoded).unwrap();
+                            let mime_type = if let Some(ty) = mime_type {
+                                ty
+                            } else {
+                                uri.split(',')
+                                    .nth(0)
+                                    .unwrap()
+                                    .split(':')
+                                    .nth(1)
+                                    .unwrap()
+                                    .split(';')
+                                    .nth(0)
+                                    .unwrap()
+                            };
+
+                            match mime_type {
+                                "image/jpeg" => image::load_from_memory_with_format(&data, Jpeg),
+                                "image/png" => image::load_from_memory_with_format(&data, Png),
+                                _ => panic!(
+                                    "{}",
+                                    format!(
+                                        "unsupported image type (image: {}, mime_type: {})",
+                                        image.index(),
+                                        mime_type
+                                    )
+                                ),
+                            }
+                        } else if let Some(mime_type) = mime_type {
+                            let path = Path::new(path)
+                                .parent()
+                                .unwrap_or_else(|| Path::new("./"))
+                                .join(uri);
+                            let file = fs::File::open(path).unwrap();
+                            let reader = io::BufReader::new(file);
+                            match mime_type {
+                                "image/jpeg" => image::load(reader, Jpeg),
+                                "image/png" => image::load(reader, Png),
+                                _ => panic!(
+                                    "{}",
+                                    format!(
+                                        "unsupported image type (image: {}, mime_type: {})",
+                                        image.index(),
+                                        mime_type
+                                    )
+                                ),
+                            }
+                        } else {
+                            let image_path = Path::new(path)
+                                .parent()
+                                .unwrap_or_else(|| Path::new("./"))
+                                .join(uri);
+                            println!("Loading {}", image_path.to_str().unwrap());
+                            image::open(image_path)
+                        }
+                    }
+                };
+                let dyn_img = img.expect("Image loading failed.");
+
+                let (_data, _width, _height) =
+                    (dyn_img.pixels(), dyn_img.width(), dyn_img.height());
             }
         }
         let num = indices.len() / 3;

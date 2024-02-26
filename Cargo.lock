@@ -466,6 +466,7 @@ name = "fate_rt"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "base64 0.11.0",
  "cgmath",
  "fate_graphic",
  "gltf",
