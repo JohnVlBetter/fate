@@ -21,6 +21,20 @@ impl Image {
         panic!("ERROR: Could not load image file \"{}\".", filename);
     }
 
+    pub fn new_with_data(
+        width: usize,
+        height: usize,
+        data: Vec<u8>,
+        bytes_per_scanline: usize,
+    ) -> Self {
+        Self {
+            data,
+            image_width: width,
+            image_height: height,
+            bytes_per_scanline,
+        }
+    }
+
     pub fn load(&mut self, filename: &str) -> bool {
         let load_result = image::load_with_depth(filename, BYTES_PER_PIXEL, false);
         match load_result {

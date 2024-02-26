@@ -14,6 +14,7 @@ use crate::aabb::{Aabb, EMPTY};
 use crate::bvh::BvhNode;
 use crate::hit::{Hit, HitRecord};
 use crate::hittable_list::HittableList;
+use crate::image::Image;
 use crate::interval::Interval;
 use crate::material::Scatter;
 use crate::ray::Ray;
@@ -25,6 +26,7 @@ pub struct Model {
     pub triangles: HittableList,
     pub mat: Arc<dyn Scatter>,
     pub transform: Transform,
+    pub images: Vec<Image>,
 }
 
 impl Model {
@@ -41,6 +43,7 @@ impl Model {
         let mut bbox: Aabb = EMPTY;
         let mut triangles = HittableList::default();
 
+        let mut model_images: Vec<Image> = Vec::new();
         if path.ends_with(".obj") {
             let mut reader = BufReader::new(File::open(path)?);
 
@@ -225,10 +228,13 @@ impl Model {
                         }
                     }
                 };
-                let dyn_img = img.expect("Image loading failed.");
+                let dyn_img: image::DynamicImage = img.expect("Image loading failed.");
 
-                let (_data, _width, _height) =
-                    (dyn_img.pixels(), dyn_img.width(), dyn_img.height());
+                let (width, height) = (dyn_img.width(), dyn_img.height());
+                let image_data = dyn_img.to_rgb8().into_vec();
+                let new_image =
+                    Image::new_with_data(width as usize, height as usize, image_data, 3);
+                model_images.push(new_image);
             }
         }
         let num = indices.len() / 3;
@@ -249,6 +255,7 @@ impl Model {
             triangles,
             mat,
             transform,
+            images: model_images,
         })
     }
 }
