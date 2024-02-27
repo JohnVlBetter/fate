@@ -6,6 +6,7 @@ use std::sync::Arc;
 use anyhow::Result;
 use cgmath::{Point3, Vector2, Vector3};
 use gltf::image::Source;
+use gltf::json::extensions::material;
 use image::GenericImageView;
 use image::ImageFormat::{Jpeg, Png};
 use std::collections::HashMap;
@@ -16,26 +17,22 @@ use crate::hit::{Hit, HitRecord};
 use crate::hittable_list::HittableList;
 use crate::image::Image;
 use crate::interval::Interval;
-use crate::material::Scatter;
+use crate::material::{Scatter, PBR};
 use crate::ray::Ray;
+use crate::texture::ImageTexture;
 use crate::transform::Transform;
 use crate::triangle::{Triangle, Vertex};
 
 pub struct Model {
     pub bbox: Aabb,
     pub triangles: HittableList,
-    pub mat: Arc<dyn Scatter>,
+    pub material: Arc<dyn Scatter>,
     pub transform: Transform,
     pub images: Vec<Image>,
 }
 
 impl Model {
-    pub fn new(
-        path: &str,
-        mat: Arc<dyn Scatter>,
-        scale: f32,
-        transform: Transform,
-    ) -> Result<Self> {
+    pub fn new(path: &str, scale: f32, transform: Transform) -> Result<Self> {
         let mut unique_vertices = HashMap::new();
         let mut indices: Vec<u32> = Vec::new();
         let mut vertices: Vec<Vertex> = Vec::new();
@@ -44,6 +41,7 @@ impl Model {
         let mut triangles = HittableList::default();
 
         let mut model_images: Vec<Image> = Vec::new();
+        let mut material_image_index: Vec<i32> = vec![-1; 5];
         if path.ends_with(".obj") {
             let mut reader = BufReader::new(File::open(path)?);
 
@@ -236,14 +234,31 @@ impl Model {
                     Image::new_with_data(width as usize, height as usize, image_data, 3);
                 model_images.push(new_image);
             }
+            for material in gltf.materials() {
+                let cur_tex = material
+                    .pbr_metallic_roughness()
+                    .base_color_texture()
+                    .unwrap()
+                    .texture();
+                material_image_index[0] = cur_tex.index() as i32;
+            }
         }
+        let material: Arc<dyn Scatter> = Arc::new(PBR::new(
+            Arc::new(ImageTexture::new_with_image(
+                model_images[material_image_index[0] as usize].clone(),
+            )),
+            Arc::new(ImageTexture::new_with_image(
+                model_images[material_image_index[0] as usize].clone(),
+            )),
+        ));
+
         let num = indices.len() / 3;
         for idx in 0..num {
             triangles.add(Arc::new(Triangle::new(
                 vertices[indices[idx * 3] as usize].clone(),
                 vertices[indices[idx * 3 + 1] as usize].clone(),
                 vertices[indices[idx * 3 + 2] as usize].clone(),
-                Arc::clone(&mat),
+                Arc::clone(&material),
             )));
         }
         let triangles = HittableList::new(Arc::new(BvhNode::new(&mut triangles)));
@@ -253,7 +268,7 @@ impl Model {
         Ok(Self {
             bbox,
             triangles,
-            mat,
+            material,
             transform,
             images: model_images,
         })

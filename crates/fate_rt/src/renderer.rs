@@ -84,8 +84,8 @@ fn cornell_box(path: &Path) {
     world.add(box1);
 
     let mut b_transform = Transform::new(
-        Vector3::new(100.0, 40.0, 300.0),
-        Vector3::new(0.0, 180.0, 0.0),
+        Vector3::new(100.0, 140.0, 300.0),
+        Vector3::new(180.0, 0.0, 0.0),
         Vector3::new(1.0, 1.0, 1.0),
     )
     .unwrap();
@@ -93,7 +93,6 @@ fn cornell_box(path: &Path) {
     let bunny = Arc::new(
         Model::new(
             "res/model/Duck/glTF/Duck.gltf",
-            Arc::clone(&white),
             1.0,
             b_transform,
         )
@@ -103,7 +102,7 @@ fn cornell_box(path: &Path) {
 
     let mut d_transform = Transform::new(
         Vector3::new(400.0, 100.0, 100.0),
-        Vector3::new(0.0, 0.0, 0.0),
+        Vector3::new(0.0, 180.0, 0.0),
         Vector3::new(1.0, 1.0, 1.0),
     )
     .unwrap();
@@ -111,7 +110,6 @@ fn cornell_box(path: &Path) {
     let dragon = Arc::new(
         Model::new(
             "res/model/DamagedHelmet/glTF/DamagedHelmet.gltf",
-            Arc::clone(&white),
             100.0,
             d_transform,
         )
