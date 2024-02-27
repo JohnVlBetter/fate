@@ -26,8 +26,8 @@ pub struct Model {
     pub triangles: HittableList,
     pub material: Arc<dyn Scatter>,
     pub transform: Transform,
-    pub normal_image: Arc<Image>,
-    pub metallic_roughness_image: Arc<Image>,
+    pub normal_image: Image,
+    pub metallic_roughness_image: Image,
 }
 
 impl Model {
@@ -106,15 +106,27 @@ impl Model {
                             positions.push(v);
                         }
                     }
+
                     let mut uvs = Vec::new();
-                    if let Some(gltf::mesh::util::ReadTexCoords::F32(
-                        gltf::accessor::Iter::Standard(iter),
-                    )) = r.read_tex_coords(0)
-                    {
-                        for v in iter {
-                            uvs.push(v);
+                    let mut tex_coord_set = 0;
+                    while let Some(tex_coords) = r.read_tex_coords(tex_coord_set) {
+                        if tex_coord_set > 1 {
+                            println!("忽略槽位{},只支持两套uv", tex_coord_set);
+                            tex_coord_set += 1;
+                            continue;
                         }
+                        for (i, tex_coord) in tex_coords.into_f32().enumerate() {
+                            match tex_coord_set {
+                                0 => {
+                                    uvs.push(Vector2::new(tex_coord[0] as f64, tex_coord[1] as f64))
+                                }
+                                //1 => vertices[i].tex_coord_1 = Vector2::from(tex_coord),
+                                _ => unreachable!(),
+                            }
+                        }
+                        tex_coord_set += 1;
                     }
+
                     let mut normals = Vec::new();
                     if let Some(iter) = r.read_normals() {
                         for v in iter {
@@ -139,7 +151,7 @@ impl Model {
                                 normal[2] as f64,
                                 normal[1] as f64,
                             ),
-                            tex_coord: Vector2::new(uv[0] as f64, (1.0 - uv[1]) as f64),
+                            tex_coord: Vector2::new(uv[0] as f64, (uv[1] - 1.0) as f64),
                         };
                         vertices.push(vertex);
                         bbox.append(&vertex.pos);
@@ -278,10 +290,10 @@ impl Model {
         }
         let material: Arc<dyn Scatter> = Arc::new(PBR::new(
             Arc::new(ImageTexture::new_with_image(
-                model_images[material_image_index[0] as usize].clone(),
+                model_images[material_image_index[1] as usize].clone(),
             )),
             Arc::new(ImageTexture::new_with_image(
-                model_images[material_image_index[0] as usize].clone(),
+                model_images[material_image_index[1] as usize].clone(),
             )),
         ));
 
@@ -296,9 +308,8 @@ impl Model {
         }
         let triangles = HittableList::new(Arc::new(BvhNode::new(&mut triangles)));
 
-        let normal_image = Arc::new(model_images[material_image_index[0] as usize].clone());
-        let metallic_roughness_image =
-            Arc::new(model_images[material_image_index[0] as usize].clone());
+        let normal_image = model_images[material_image_index[1] as usize].clone();
+        let metallic_roughness_image = model_images[material_image_index[2] as usize].clone();
 
         indices.clear();
         vertices.clear();

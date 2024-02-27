@@ -110,6 +110,16 @@ impl Hit for Triangle {
         rec.mat = Some(Arc::clone(&self.mat)).unwrap();
         rec.set_face_normal(r, rec.normal);
 
+        let f1 = self.a.pos - rec.p;
+        let f2 = self.b.pos - rec.p;
+        let f3 = self.c.pos - rec.p;
+        let a = Vector3::cross(self.a.pos - self.b.pos, self.a.pos - self.c.pos).magnitude(); // main triangle area a
+        let a1 = Vector3::cross(f2, f3).magnitude() / a;
+        let a2 = Vector3::cross(f3, f1).magnitude() / a;
+        let a3 = Vector3::cross(f1, f2).magnitude() / a;
+        rec.u = a1 * self.a.tex_coord.x + a2 * self.b.tex_coord.x + a3 * self.c.tex_coord.x;
+        rec.v = a1 * self.a.tex_coord.y + a2 * self.b.tex_coord.y + a3 * self.c.tex_coord.y;
+
         true
     }
 

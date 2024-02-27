@@ -10,6 +10,7 @@ use crate::{
     material::{DiffuseLight, Lambertian, Metal, Scatter},
     model::Model,
     quad::{make_box, Quad},
+    texture::ImageTexture,
     transform::Transform,
 };
 
@@ -32,16 +33,9 @@ fn cornell_box(path: &Path) {
 
     let red: Arc<dyn Scatter> = Arc::new(Lambertian::new(Vector3::new(0.65, 0.05, 0.05)));
     let white: Arc<dyn Scatter> = Arc::new(Lambertian::new(Vector3::new(0.73, 0.73, 0.73)));
-    let green: Arc<dyn Scatter> = Arc::new(Lambertian::new(Vector3::new(0.12, 0.45, 0.15)));
     let light: Arc<dyn Scatter> =
         Arc::new(DiffuseLight::new_with_color(Vector3::new(50.0, 50.0, 50.0)));
 
-    world.add(Arc::new(Quad::new(
-        Point3::new(555.0, 0.0, 0.0),
-        Vector3::new(0.0, 555.0, 0.0),
-        Vector3::new(0.0, 0.0, 555.0),
-        Arc::clone(&green),
-    )));
     world.add(Arc::new(Quad::new(
         Point3::new(0.0, 0.0, 0.0),
         Vector3::new(0.0, 555.0, 0.0),
@@ -83,7 +77,7 @@ fn cornell_box(path: &Path) {
     let box1 = Arc::new(Translate::new(box1, Vector3::new(265.0, 0.0, 295.0)));
     world.add(box1);
 
-    let mut b_transform = Transform::new(
+    /*let mut b_transform = Transform::new(
         Vector3::new(100.0, 140.0, 300.0),
         Vector3::new(180.0, 0.0, 0.0),
         Vector3::new(1.0, 1.0, 1.0),
@@ -98,10 +92,10 @@ fn cornell_box(path: &Path) {
         )
         .unwrap(),
     );
-    world.add(bunny);
+    world.add(bunny);*/
 
     let mut d_transform = Transform::new(
-        Vector3::new(400.0, 100.0, 100.0),
+        Vector3::new(200.0, 100.0, 100.0),
         Vector3::new(0.0, 180.0, 0.0),
         Vector3::new(1.0, 1.0, 1.0),
     )
@@ -110,11 +104,22 @@ fn cornell_box(path: &Path) {
     let dragon = Arc::new(
         Model::new(
             "res/model/DamagedHelmet/glTF/DamagedHelmet.gltf",
-            100.0,
+            10.0,
             d_transform,
         )
         .unwrap(),
     );
+
+    let green: Arc<dyn Scatter> = Arc::new(Lambertian::new_with_texture(Arc::new(
+        ImageTexture::new_with_image(dragon.normal_image.clone()),
+    )));
+    world.add(Arc::new(Quad::new(
+        Point3::new(555.0, 0.0, 0.0),
+        Vector3::new(0.0, 555.0, 0.0),
+        Vector3::new(0.0, 0.0, 555.0),
+        Arc::clone(&green),
+    )));
+
     world.add(dragon);
 
     let mut lights = HittableList::default();
