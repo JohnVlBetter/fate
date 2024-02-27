@@ -6,8 +6,6 @@ use std::sync::Arc;
 use anyhow::Result;
 use cgmath::{Point3, Vector2, Vector3};
 use gltf::image::Source;
-use gltf::json::extensions::material;
-use image::GenericImageView;
 use image::ImageFormat::{Jpeg, Png};
 use std::collections::HashMap;
 
@@ -28,7 +26,8 @@ pub struct Model {
     pub triangles: HittableList,
     pub material: Arc<dyn Scatter>,
     pub transform: Transform,
-    pub images: Vec<Image>,
+    pub normal_image: Arc<Image>,
+    pub metallic_roughness_image: Arc<Image>,
 }
 
 impl Model {
@@ -235,12 +234,46 @@ impl Model {
                 model_images.push(new_image);
             }
             for material in gltf.materials() {
-                let cur_tex = material
+                //albedo
+                let color_texture_idx = match material.pbr_metallic_roughness().base_color_texture()
+                {
+                    Some(color_texture) => color_texture.texture().index() as i32,
+                    None => -1,
+                };
+                material_image_index[0] = color_texture_idx;
+
+                //normal
+                let normal_texture_idx = match material.normal_texture() {
+                    Some(normal_texture) => normal_texture.texture().index() as i32,
+                    None => -1,
+                };
+                material_image_index[1] = normal_texture_idx;
+
+                //metallic_roughness
+                let metallic_roughness_texture_idx = match material
                     .pbr_metallic_roughness()
-                    .base_color_texture()
-                    .unwrap()
-                    .texture();
-                material_image_index[0] = cur_tex.index() as i32;
+                    .metallic_roughness_texture()
+                {
+                    Some(metallic_roughness_texture) => {
+                        metallic_roughness_texture.texture().index() as i32
+                    }
+                    None => -1,
+                };
+                material_image_index[2] = metallic_roughness_texture_idx;
+
+                //ao
+                let occlusion_texture_idx = match material.occlusion_texture() {
+                    Some(occlusion_texture) => occlusion_texture.texture().index() as i32,
+                    None => -1,
+                };
+                material_image_index[3] = occlusion_texture_idx;
+
+                //emissive
+                let emissive_texture_idx = match material.emissive_texture() {
+                    Some(emissive_texture) => emissive_texture.texture().index() as i32,
+                    None => -1,
+                };
+                material_image_index[4] = emissive_texture_idx;
             }
         }
         let material: Arc<dyn Scatter> = Arc::new(PBR::new(
@@ -263,6 +296,10 @@ impl Model {
         }
         let triangles = HittableList::new(Arc::new(BvhNode::new(&mut triangles)));
 
+        let normal_image = Arc::new(model_images[material_image_index[0] as usize].clone());
+        let metallic_roughness_image =
+            Arc::new(model_images[material_image_index[0] as usize].clone());
+
         indices.clear();
         vertices.clear();
         Ok(Self {
@@ -270,7 +307,8 @@ impl Model {
             triangles,
             material,
             transform,
-            images: model_images,
+            normal_image,
+            metallic_roughness_image,
         })
     }
 }
