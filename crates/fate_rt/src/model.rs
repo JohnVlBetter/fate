@@ -238,11 +238,7 @@ impl Model {
                     }
                 };
                 let dyn_img: image::DynamicImage = img.expect("Image loading failed.");
-
-                let (width, height) = (dyn_img.width(), dyn_img.height());
-                let image_data = dyn_img.to_rgb8().into_vec();
-                let new_image =
-                    Image::new_with_data(width as usize, height as usize, image_data, 3);
+                let new_image = Image::new_with_dyn_img(dyn_img);
                 model_images.push(new_image);
             }
             for material in gltf.materials() {

@@ -1,80 +1,52 @@
-use stb_image::image;
+use image::{GenericImageView, Pixel};
 
 pub const BYTES_PER_PIXEL: usize = 3;
 static MAGENTA: [u8; BYTES_PER_PIXEL] = [255, 0, 255];
 
 #[derive(Default, Clone)]
 pub struct Image {
-    data: Vec<u8>,
+    image: image::DynamicImage,
     image_width: usize,
     image_height: usize,
-    bytes_per_scanline: usize,
+    //bytes_per_scanline: usize,
 }
 
 impl Image {
     pub fn new(image_filename: &str) -> Self {
         let filename = image_filename;
         let mut _self = Self::default();
-        if _self.load(&format!("res/texture/{}", filename)) {
-            return _self;
-        }
-        panic!("ERROR: Could not load image file \"{}\".", filename);
+        let img = image::open(&format!("res/texture/{}", filename));
+        let dyn_img: image::DynamicImage = img.expect("Image loading failed.");
+        let (width, height) = (dyn_img.width(), dyn_img.height());
+        _self.image = dyn_img;
+        _self.image_width = width as usize;
+        _self.image_height = height as usize;
+        //_self.bytes_per_scanline = BYTES_PER_PIXEL;
+        return _self;
     }
 
-    pub fn new_with_data(
-        width: usize,
-        height: usize,
-        data: Vec<u8>,
-        bytes_per_scanline: usize,
-    ) -> Self {
-        Self {
-            data,
-            image_width: width,
-            image_height: height,
-            bytes_per_scanline,
-        }
+    pub fn new_with_dyn_img(dyn_img: image::DynamicImage) -> Self {
+        let mut _self = Self::default();
+        let (width, height) = (dyn_img.width(), dyn_img.height());
+        _self.image = dyn_img;
+        _self.image_width = width as usize;
+        _self.image_height = height as usize;
+        return _self;
     }
 
-    pub fn load(&mut self, filename: &str) -> bool {
-        let load_result = image::load_with_depth(filename, BYTES_PER_PIXEL, false);
-        match load_result {
-            image::LoadResult::Error(_) => false,
-            image::LoadResult::ImageU8(image) => {
-                assert_eq!(image.depth, BYTES_PER_PIXEL);
-                self.data = image.data;
-                self.image_width = image.width;
-                self.image_height = image.height;
-                self.bytes_per_scanline = image.depth * image.width;
-                true
-            }
-            image::LoadResult::ImageF32(_) => false,
-        }
-    }
     pub fn width(&self) -> usize {
-        if self.data.is_empty() {
-            0
-        } else {
-            self.image_width
-        }
+        self.image.width() as usize
     }
     pub fn height(&self) -> usize {
-        if self.data.is_empty() {
-            0
-        } else {
-            self.image_height
-        }
+        self.image.height() as usize
     }
 
-    pub fn pixel_data(&self, x: usize, y: usize) -> &[u8] {
-        if self.data.is_empty() {
-            &MAGENTA
-        } else {
-            let x = Self::clamp(x, 0, self.image_width);
-            let y = Self::clamp(y, 0, self.image_height);
+    pub fn pixel_data(&self, x: usize, y: usize) -> [u8;3] {
+        let x = Self::clamp(x, 0, self.image_width);
+        let y = Self::clamp(y, 0, self.image_height);
 
-            &self.data[(y * self.bytes_per_scanline) + (x * BYTES_PER_PIXEL)
-                ..(y * self.bytes_per_scanline) + (x * BYTES_PER_PIXEL) + BYTES_PER_PIXEL]
-        }
+        let pixel = self.image.get_pixel(x as u32, y as u32);
+        pixel.to_rgb().0
     }
 
     fn clamp(x: usize, low: usize, high: usize) -> usize {

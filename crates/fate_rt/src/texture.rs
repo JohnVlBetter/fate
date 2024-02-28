@@ -81,17 +81,6 @@ impl ImageTexture {
         }
     }
 
-    pub fn new_with_data(
-        width: usize,
-        height: usize,
-        data: Vec<u8>,
-        bytes_per_scanline: usize,
-    ) -> Self {
-        Self {
-            image: Image::new_with_data(width, height, data, bytes_per_scanline),
-        }
-    }
-
     pub fn new_with_image(image: Image) -> Self {
         Self { image }
     }
