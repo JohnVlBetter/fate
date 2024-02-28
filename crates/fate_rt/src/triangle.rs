@@ -4,6 +4,7 @@ use cgmath::{InnerSpace, Point3, Vector2, Vector3};
 
 use crate::aabb::Aabb;
 use crate::hit::{Hit, HitRecord};
+use crate::image::Image;
 use crate::interval::Interval;
 use crate::material::*;
 use crate::ray::Ray;
@@ -65,12 +66,19 @@ pub struct Triangle {
     c: Vertex,
     normal: Vector3<f64>,
     mat: Arc<dyn Scatter>,
+    normal_texture: Arc<Image>,
     bbox: Aabb,
     area: f64,
 }
 
 impl Triangle {
-    pub fn new(a: Vertex, b: Vertex, c: Vertex, mat: Arc<dyn Scatter>) -> Self {
+    pub fn new(
+        a: Vertex,
+        b: Vertex,
+        c: Vertex,
+        mat: Arc<dyn Scatter>,
+        normal_texture: Arc<Image>,
+    ) -> Self {
         let n = (a.pos - c.pos).cross(a.pos - b.pos);
         let normal = n.normalize();
         Self {
@@ -79,6 +87,7 @@ impl Triangle {
             c,
             normal,
             mat,
+            normal_texture,
             bbox: Aabb::new_with_points(&a.pos, &b.pos, &c.pos),
             area: n.magnitude() * 0.5,
         }
@@ -106,9 +115,6 @@ impl Hit for Triangle {
         }
         rec.t = t;
         rec.p = r.at(t);
-        rec.normal = self.normal;
-        rec.mat = Some(Arc::clone(&self.mat)).unwrap();
-        rec.set_face_normal(r, rec.normal);
 
         let f1 = self.a.pos - rec.p;
         let f2 = self.b.pos - rec.p;
@@ -119,6 +125,18 @@ impl Hit for Triangle {
         let a3 = Vector3::cross(f1, f2).magnitude() / a;
         rec.u = a1 * self.a.tex_coord.x + a2 * self.b.tex_coord.x + a3 * self.c.tex_coord.x;
         rec.v = a1 * self.a.tex_coord.y + a2 * self.b.tex_coord.y + a3 * self.c.tex_coord.y;
+
+        let i = (u * self.normal_texture.width() as f64) as usize;
+        let j = (v * self.normal_texture.height() as f64) as usize;
+        let pixel = self.normal_texture.pixel_data(i, j);
+        rec.normal = Vector3::new(
+            pixel[0] as f64 * 2.0 - 1.0,
+            pixel[1] as f64 * 2.0 - 1.0,
+            pixel[2] as f64 * 2.0 - 1.0,
+        );
+        rec.normal = self.normal;
+        rec.mat = Some(Arc::clone(&self.mat)).unwrap();
+        rec.set_face_normal(r, rec.normal);
 
         true
     }

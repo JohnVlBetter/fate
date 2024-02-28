@@ -73,8 +73,8 @@ fn cornell_box(path: &Path) {
         Point3::new(165.0, 330.0, 165.0),
         Arc::clone(&metal_mat),
     );
-    let box1 = Arc::new(RotateY::new(box1, 15.0));
-    let box1 = Arc::new(Translate::new(box1, Vector3::new(265.0, 0.0, 295.0)));
+    let box1 = Arc::new(RotateY::new(box1, 30.0));
+    let box1 = Arc::new(Translate::new(box1, Vector3::new(320.0, 0.0, 295.0)));
     world.add(box1);
 
     /*let mut b_transform = Transform::new(
@@ -95,8 +95,8 @@ fn cornell_box(path: &Path) {
     world.add(bunny);*/
 
     let mut d_transform = Transform::new(
-        Vector3::new(200.0, 100.0, 100.0),
-        Vector3::new(0.0, 180.0, 0.0),
+        Vector3::new(200.0, 100.0, 200.0),
+        Vector3::new(0.0, 0.0, 180.0),
         Vector3::new(1.0, 1.0, 1.0),
     )
     .unwrap();
@@ -104,14 +104,14 @@ fn cornell_box(path: &Path) {
     let dragon = Arc::new(
         Model::new(
             "res/model/DamagedHelmet/glTF/DamagedHelmet.gltf",
-            10.0,
+            100.0,
             d_transform,
         )
         .unwrap(),
     );
 
     let green: Arc<dyn Scatter> = Arc::new(Lambertian::new_with_texture(Arc::new(
-        ImageTexture::new_with_image(dragon.normal_image.clone()),
+        ImageTexture::new("Default_albedo.jpg"),
     )));
     world.add(Arc::new(Quad::new(
         Point3::new(555.0, 0.0, 0.0),

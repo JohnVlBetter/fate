@@ -85,13 +85,13 @@ pub struct PBR {
     pub albedo: Arc<dyn Texture>,
     //pub ao: Arc<dyn Texture>,
     //pub emissive: Arc<dyn Texture>,
-    pub normal: Arc<dyn Texture>,
-    //pub metal_roughness: Arc<dyn Texture>,
+    //pub normal: Arc<dyn Texture>,
+    pub metal_roughness: Arc<dyn Texture>,
 }
 
 impl PBR {
-    pub fn new(albedo: Arc<dyn Texture>, normal: Arc<dyn Texture>) -> Self {
-        Self { albedo, normal }
+    pub fn new(albedo: Arc<dyn Texture>, metal_roughness: Arc<dyn Texture>) -> Self {
+        Self { albedo, metal_roughness }
     }
 }
 

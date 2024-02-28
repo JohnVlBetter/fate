@@ -26,8 +26,6 @@ pub struct Model {
     pub triangles: HittableList,
     pub material: Arc<dyn Scatter>,
     pub transform: Transform,
-    pub normal_image: Image,
-    pub metallic_roughness_image: Image,
 }
 
 impl Model {
@@ -286,12 +284,13 @@ impl Model {
         }
         let material: Arc<dyn Scatter> = Arc::new(PBR::new(
             Arc::new(ImageTexture::new_with_image(
-                model_images[material_image_index[1] as usize].clone(),
+                model_images[material_image_index[0] as usize].clone(),
             )),
             Arc::new(ImageTexture::new_with_image(
-                model_images[material_image_index[1] as usize].clone(),
+                model_images[material_image_index[2] as usize].clone(),
             )),
         ));
+        let normal_image = Arc::new(model_images[material_image_index[1] as usize].clone());
 
         let num = indices.len() / 3;
         for idx in 0..num {
@@ -300,12 +299,12 @@ impl Model {
                 vertices[indices[idx * 3 + 1] as usize].clone(),
                 vertices[indices[idx * 3 + 2] as usize].clone(),
                 Arc::clone(&material),
+                Arc::clone(&normal_image),
             )));
         }
         let triangles = HittableList::new(Arc::new(BvhNode::new(&mut triangles)));
 
-        let normal_image = model_images[material_image_index[1] as usize].clone();
-        let metallic_roughness_image = model_images[material_image_index[2] as usize].clone();
+        //let metallic_roughness_image = model_images[material_image_index[2] as usize].clone();
 
         indices.clear();
         vertices.clear();
@@ -314,8 +313,6 @@ impl Model {
             triangles,
             material,
             transform,
-            normal_image,
-            metallic_roughness_image,
         })
     }
 }
