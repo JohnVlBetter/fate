@@ -2,6 +2,7 @@ use std::fs::{self, File};
 use std::io::{self, BufReader};
 use std::path::Path;
 
+use crate::texture::Texture;
 use anyhow::Result;
 use cgmath::{vec2, vec3};
 use gltf::image::Source;
@@ -111,6 +112,8 @@ pub struct Model {
 
     //现在没接ecs transform先放这
     pub transform: Transform,
+
+    pub albedo: Texture,
 }
 
 impl Model {
@@ -119,6 +122,8 @@ impl Model {
         let mut indices: Vec<u32> = Vec::new();
         let mut vertices: Vec<Vertex> = Vec::new();
 
+        let mut textures: Vec<Texture> = Vec::new();
+        let mut material_image_index: Vec<i32> = vec![-1; 5];
         if path.ends_with(".obj") {
             let mut reader = BufReader::new(File::open(path)?);
 
@@ -214,6 +219,7 @@ impl Model {
                     }
                 }
             }
+
             for image in gltf.images() {
                 let img = match image.source() {
                     Source::View { view, mime_type } => {
@@ -302,8 +308,96 @@ impl Model {
                     ImageBgr8(_) => gl::BGR,
                     ImageBgra8(_) => gl::BGRA,
                 };*/
-                let (_data, _width, _height) =
-                    (dyn_img.raw_pixels(), dyn_img.width(), dyn_img.height());
+                let (data, width, height) =
+                    (dyn_img.to_rgba().into_raw(), dyn_img.width(), dyn_img.height());
+                    
+                let new_texture = Texture::new(data, width, height, instance, device).unwrap();
+                textures.push(new_texture);
+            }
+
+            for material in gltf.materials() {
+                //albedo
+                let color_texture_idx = match material.pbr_metallic_roughness().base_color_texture()
+                {
+                    Some(color_texture) => color_texture.texture().index() as i32,
+                    None => -1,
+                };
+                material_image_index[0] = color_texture_idx;
+
+                //normal
+                let normal_texture_idx = match material.normal_texture() {
+                    Some(normal_texture) => normal_texture.texture().index() as i32,
+                    None => -1,
+                };
+                material_image_index[1] = normal_texture_idx;
+
+                //metallic_roughness
+                let metallic_roughness_texture_idx = match material
+                    .pbr_metallic_roughness()
+                    .metallic_roughness_texture()
+                {
+                    Some(metallic_roughness_texture) => {
+                        metallic_roughness_texture.texture().index() as i32
+                    }
+                    None => -1,
+                };
+                material_image_index[2] = metallic_roughness_texture_idx;
+
+                //ao
+                let occlusion_texture_idx = match material.occlusion_texture() {
+                    Some(occlusion_texture) => occlusion_texture.texture().index() as i32,
+                    None => -1,
+                };
+                material_image_index[3] = occlusion_texture_idx;
+
+                //emissive
+                let emissive_texture_idx = match material.emissive_texture() {
+                    Some(emissive_texture) => emissive_texture.texture().index() as i32,
+                    None => -1,
+                };
+                material_image_index[4] = emissive_texture_idx;
+            }
+            for material in gltf.materials() {
+                //albedo
+                let color_texture_idx = match material.pbr_metallic_roughness().base_color_texture()
+                {
+                    Some(color_texture) => color_texture.texture().index() as i32,
+                    None => -1,
+                };
+                material_image_index[0] = color_texture_idx;
+
+                //normal
+                let normal_texture_idx = match material.normal_texture() {
+                    Some(normal_texture) => normal_texture.texture().index() as i32,
+                    None => -1,
+                };
+                material_image_index[1] = normal_texture_idx;
+
+                //metallic_roughness
+                let metallic_roughness_texture_idx = match material
+                    .pbr_metallic_roughness()
+                    .metallic_roughness_texture()
+                {
+                    Some(metallic_roughness_texture) => {
+                        metallic_roughness_texture.texture().index() as i32
+                    }
+                    None => -1,
+                };
+                material_image_index[2] = metallic_roughness_texture_idx;
+
+                //ao
+                let occlusion_texture_idx = match material.occlusion_texture() {
+                    Some(occlusion_texture) => occlusion_texture.texture().index() as i32,
+                    None => -1,
+                };
+                material_image_index[3] = occlusion_texture_idx;
+
+                //emissive
+                let emissive_texture_idx = match material.emissive_texture() {
+                    Some(emissive_texture) => emissive_texture.texture().index() as i32,
+                    None => -1,
+                };
+                material_image_index[4] = emissive_texture_idx;
             }
         }
 
@@ -322,6 +416,7 @@ impl Model {
             vertex_buffer,
             index_buffer,
             transform,
+            albedo: textures[material_image_index[0] as usize],
         })
     }
 

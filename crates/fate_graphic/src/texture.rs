@@ -1,5 +1,4 @@
 use crate::{buffer::*, tools::*};
-use std::fs::File;
 use std::ptr::copy_nonoverlapping as memcpy;
 
 use anyhow::{anyhow, Result};
@@ -18,22 +17,15 @@ pub struct Texture {
 }
 
 impl Texture {
-    pub unsafe fn new(path: &str, instance: &Instance, device: &VkDevice) -> Result<Self> {
-        let image = File::open(path)?;
-
-        let decoder = png::Decoder::new(image);
-        let mut reader = decoder.read_info()?;
-
-        let mut pixels = vec![0; reader.info().raw_bytes()];
-        reader.next_frame(&mut pixels)?;
-
-        let size = reader.info().raw_bytes() as u64;
-        let (width, height) = reader.info().size();
+    pub unsafe fn new(
+        pixels: Vec<u8>,
+        width: u32,
+        height: u32,
+        instance: &Instance,
+        device: &VkDevice,
+    ) -> Result<Self> {
+        let size = pixels.len() as u64;
         let mip_levels = (width.max(height) as f32).log2().floor() as u32 + 1;
-
-        if width != 1024 || height != 1024 || reader.info().color_type != png::ColorType::Rgba {
-            panic!("Invalid texture image.");
-        }
 
         // Create (staging)
         let (staging_buffer, staging_buffer_memory) = create_buffer(

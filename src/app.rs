@@ -94,8 +94,8 @@ impl App {
         data.color_attachment = ColorAttachment::new(&instance, &device, &data.swapchain)?;
         data.depth_attachment = DepthAttachment::new(&instance, &device, &data.swapchain)?;
         create_framebuffers(&device.device, &mut data)?;
-        data.texture = Texture::new("res/model/viking_room/viking_room.png", &instance, &device)?;
         let model = Model::new("res/model/DamagedHelmet/glTF/DamagedHelmet.gltf", &instance, &device)?;
+        data.texture = model.albedo.clone();
         create_uniform_buffers(&instance, &device, &mut data)?;
         create_descriptor_pool(&device.device, &mut data)?;
         create_descriptor_sets(&device.device, &mut data)?;
