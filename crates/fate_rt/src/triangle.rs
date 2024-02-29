@@ -64,7 +64,6 @@ pub struct Triangle {
     a: Vertex,
     b: Vertex,
     c: Vertex,
-    normal: Vector3<f64>,
     mat: Arc<dyn Scatter>,
     normal_texture: Arc<Image>,
     bbox: Aabb,
@@ -79,64 +78,68 @@ impl Triangle {
         mat: Arc<dyn Scatter>,
         normal_texture: Arc<Image>,
     ) -> Self {
-        let n = (a.pos - c.pos).cross(a.pos - b.pos);
-        let normal = n.normalize();
         Self {
             a,
             b,
             c,
-            normal,
             mat,
             normal_texture,
             bbox: Aabb::new_with_points(&a.pos, &b.pos, &c.pos),
-            area: n.magnitude() * 0.5,
+            area: (a.pos - c.pos).cross(a.pos - b.pos).magnitude() * 0.5,
         }
     }
 }
 
 impl Hit for Triangle {
     fn hit(&self, r: &Ray, ray_t: &Interval, rec: &mut HitRecord) -> bool {
-        let mut u: f64 = 0.0;
-        let mut v: f64 = 0.0;
         let e1 = self.b.pos - self.a.pos;
         let e2 = self.c.pos - self.a.pos;
-        let s = r.origin - self.a.pos;
-        let s1 = Vector3::cross(r.direction, e2);
-        let s2 = Vector3::cross(s, e1);
-        let coeff = 1.0 / Vector3::dot(s1, e1);
-        let t = coeff * Vector3::dot(s2, e2);
-        let b1 = coeff * Vector3::dot(s1, s);
-        let b2 = coeff * Vector3::dot(s2, r.direction);
-        if t >= 0.0 && b1 >= 0.0 && b2 >= 0.0 && (1.0 - b1 - b2) >= 0.0 {
-            u = b1;
-            v = b2;
-        } else {
+        let p = r.direction.cross(e2);
+        let det = e1.dot(p);
+
+        if det > -::std::f64::EPSILON && det < ::std::f64::EPSILON {
             return false;
         }
-        rec.t = t;
-        rec.p = r.at(t);
 
-        let f1 = self.a.pos - rec.p;
-        let f2 = self.b.pos - rec.p;
-        let f3 = self.c.pos - rec.p;
-        let a = Vector3::cross(self.a.pos - self.b.pos, self.a.pos - self.c.pos).magnitude(); // main triangle area a
-        let a1 = Vector3::cross(f2, f3).magnitude() / a;
-        let a2 = Vector3::cross(f3, f1).magnitude() / a;
-        let a3 = Vector3::cross(f1, f2).magnitude() / a;
-        rec.u = a1 * self.a.tex_coord.x + a2 * self.b.tex_coord.x + a3 * self.c.tex_coord.x;
-        rec.v = a1 * self.a.tex_coord.y + a2 * self.b.tex_coord.y + a3 * self.c.tex_coord.y;
+        let inv_det = 1.0 / det;
+        let s = r.origin - self.a.pos;
+        let beta = inv_det * s.dot(p);
+        if beta < 0.0 || beta > 1.0 {
+            return false;
+        }
 
-        let i = (u * self.normal_texture.width() as f64) as usize;
-        let j = (v * self.normal_texture.height() as f64) as usize;
-        let pixel = self.normal_texture.pixel_data(i, j);
-        rec.normal = Vector3::new(
-            pixel[0] as f64 * 2.0 - 1.0,
-            pixel[1] as f64 * 2.0 - 1.0,
-            pixel[2] as f64 * 2.0 - 1.0,
-        );
-        rec.normal = self.normal;
-        rec.mat = Some(Arc::clone(&self.mat)).unwrap();
-        rec.set_face_normal(r, rec.normal);
+        let q = s.cross(e1);
+        let gamma = inv_det * r.direction.dot(q);
+        if gamma < 0.0 || beta + gamma > 1.0 {
+            return false;
+        }
+
+        let t = inv_det * e2.dot(q);
+
+        if t < ray_t.min || t > ray_t.max {
+            return false;
+        } else {
+            let intersection_point = r.at(t);
+
+            let alpha = 1.0 - beta - gamma;
+
+            let normal = self.a.normal * alpha + self.b.normal * beta + self.c.normal * gamma;
+
+            let u = self.a.tex_coord[0] * alpha
+                + self.b.tex_coord[0] * beta
+                + self.c.tex_coord[0] * gamma;
+            let v = self.a.tex_coord[1] * alpha
+                + self.b.tex_coord[1] * beta
+                + self.c.tex_coord[1] * gamma;
+
+            rec.t = t;
+            rec.p = intersection_point;
+            rec.u = u;
+            rec.v = v;
+            rec.normal = normal;
+            rec.mat = Arc::clone(&self.mat);
+            rec.set_face_normal(r, rec.normal);
+        }
 
         true
     }

@@ -149,7 +149,7 @@ impl Model {
                                 normal[2] as f64,
                                 normal[1] as f64,
                             ),
-                            tex_coord: Vector2::new(uv[0] as f64, (uv[1] - 1.0) as f64),
+                            tex_coord: Vector2::new(uv[0] % 1.0, uv[1] % 1.0),
                         };
                         vertices.push(vertex);
                         bbox.append(&vertex.pos);

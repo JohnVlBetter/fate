@@ -86,6 +86,11 @@ impl ImageTexture {
     }
 }
 
+pub fn min_operations(nums: Vec<i32>, k: i32) -> i32 {
+    let res = nums.into_iter().fold(k, |acc, num| acc ^ num);
+    res.count_ones() as i32
+}
+
 impl Texture for ImageTexture {
     fn value(&self, u: f64, v: f64, _p: Point3<f64>) -> Vector3<f64> {
         if self.image.height() == 0 {
