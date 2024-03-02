@@ -1,13 +1,13 @@
-use std::fs::{self, File};
-use std::io::{self, BufReader};
-use std::path::Path;
+use std::fs::File;
+use std::io::BufReader;
 
 use crate::texture::Texture;
 use anyhow::Result;
 use cgmath::{vec2, vec3};
-use gltf::image::Source;
-use image::GenericImageView;
-use image::ImageFormat::{JPEG, PNG};
+use gltf::{
+    buffer::Buffer as GltfBuffer,
+    mesh::{Reader, Semantic},
+};
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use std::mem::size_of;
@@ -173,191 +173,60 @@ impl Model {
                 }
             }
         } else if path.ends_with(".gltf") || path.ends_with(".glb") {
-            let (gltf, buffers, _images) = gltf::import(path)?;
-            for mesh in gltf.meshes() {
+            let (document, buffers, images) = gltf::import(path)?;
+            for mesh in document.meshes() {
                 for primitive in mesh.primitives() {
-                    let r = primitive.reader(|buffer| Some(&buffers[buffer.index()]));
-                    if let Some(iter) = r.read_indices() {
-                        for v in iter.into_u32() {
-                            indices.push(v);
-                        }
-                    }
-                    let mut positions = Vec::new();
-                    if let Some(iter) = r.read_positions() {
-                        for v in iter {
-                            positions.push(v);
-                        }
-                    }
-                    let mut uvs = Vec::new();
-                    if let Some(gltf::mesh::util::ReadTexCoords::F32(
-                        gltf::accessor::Iter::Standard(iter),
-                    )) = r.read_tex_coords(0)
-                    {
-                        for v in iter {
-                            uvs.push(v);
-                        }
-                    }
-                    let mut normals = Vec::new();
-                    if let Some(iter) = r.read_normals() {
-                        for v in iter {
-                            normals.push(v);
-                        }
-                    }
+                    let reader = primitive.reader(|buffer| Some(&buffers[buffer.index()]));
 
-                    let size = positions.len();
-                    for idx in 0..size {
-                        let pos = positions[idx];
-                        let normal = normals[idx];
-                        let uv = uvs[idx];
-                        let vertex = Vertex {
-                            pos: vec3(pos[0], pos[2], pos[1]),
-                            color: vec3(1.0, 1.0, 1.0),
-                            normal: vec3(normal[0], normal[2], normal[1]),
-                            tex_coord: vec2(uv[0], 1.0 - uv[1]),
-                        };
-                        vertices.push(vertex);
+                    if let Some(_accessor) = primitive.get(&Semantic::Positions) {
+                        let positions = read_positions(&reader);
+                        let normals = read_normals(&reader);
+                        let tex_coords_0 = read_tex_coords(&reader, 0);
+                        let tex_coords_1 = read_tex_coords(&reader, 1);
+                        let colors = read_colors(&reader);
+
+                        vertices = positions
+                            .iter()
+                            .enumerate()
+                            .map(|(index, position)| {
+                                let position = *position;
+                                let normal = *normals.get(index).unwrap_or(&[1.0, 1.0, 1.0]);
+                                let tex_coords_0 = *tex_coords_0.get(index).unwrap_or(&[0.0, 0.0]);
+                                let _tex_coords_1 = *tex_coords_1.get(index).unwrap_or(&[0.0, 0.0]);
+                                let colors = *colors.get(index).unwrap_or(&[1.0, 1.0, 1.0, 1.0]);
+
+                                Vertex {
+                                    pos: vec3(position[0], position[2], position[1]),
+                                    color: vec3(colors[0], colors[1], colors[2]),
+                                    normal: vec3(normal[0], normal[2], normal[1]),
+                                    tex_coord: vec2(tex_coords_0[0], tex_coords_0[1]),
+                                }
+                            })
+                            .collect::<Vec<_>>();
+
+                        indices = read_indices(&reader).unwrap();
                     }
                 }
             }
 
-            for image in gltf.images() {
-                let img = match image.source() {
-                    Source::View { view, mime_type } => {
-                        let parent_buffer_data = &buffers[view.buffer().index()].0;
-                        let begin = view.offset();
-                        let end = begin + view.length();
-                        let data = &parent_buffer_data[begin..end];
-                        match mime_type {
-                            "image/jpeg" => image::load_from_memory_with_format(data, JPEG),
-                            "image/png" => image::load_from_memory_with_format(data, PNG),
-                            _ => panic!(
-                                "{}",
-                                format!(
-                                    "unsupported image type (image: {}, mime_type: {})",
-                                    image.index(),
-                                    mime_type
-                                )
-                            ),
-                        }
-                    }
-                    Source::Uri { uri, mime_type } => {
-                        if uri.starts_with("data:") {
-                            let encoded = uri.split(',').nth(1).unwrap();
-                            let data = base64::decode(&encoded).unwrap();
-                            let mime_type = if let Some(ty) = mime_type {
-                                ty
-                            } else {
-                                uri.split(',')
-                                    .nth(0)
-                                    .unwrap()
-                                    .split(':')
-                                    .nth(1)
-                                    .unwrap()
-                                    .split(';')
-                                    .nth(0)
-                                    .unwrap()
-                            };
-
-                            match mime_type {
-                                "image/jpeg" => image::load_from_memory_with_format(&data, JPEG),
-                                "image/png" => image::load_from_memory_with_format(&data, PNG),
-                                _ => panic!(
-                                    "{}",
-                                    format!(
-                                        "unsupported image type (image: {}, mime_type: {})",
-                                        image.index(),
-                                        mime_type
-                                    )
-                                ),
-                            }
-                        } else if let Some(mime_type) = mime_type {
-                            let path = Path::new(path)
-                                .parent()
-                                .unwrap_or_else(|| Path::new("./"))
-                                .join(uri);
-                            let file = fs::File::open(path).unwrap();
-                            let reader = io::BufReader::new(file);
-                            match mime_type {
-                                "image/jpeg" => image::load(reader, JPEG),
-                                "image/png" => image::load(reader, PNG),
-                                _ => panic!(
-                                    "{}",
-                                    format!(
-                                        "unsupported image type (image: {}, mime_type: {})",
-                                        image.index(),
-                                        mime_type
-                                    )
-                                ),
-                            }
-                        } else {
-                            let path = Path::new(path)
-                                .parent()
-                                .unwrap_or_else(|| Path::new("./"))
-                                .join(uri);
-                            image::open(path)
-                        }
-                    }
-                };
-                let dyn_img = img.expect("Image loading failed.");
-
-                /*let format = match dyn_img {
-                    ImageLuma8(_) => vk::RED,
-                    ImageLumaA8(_) => gl::RG,
-                    ImageRgb8(_) => gl::RGB,
-                    ImageRgba8(_) => gl::RGBA,
-                    ImageBgr8(_) => gl::BGR,
-                    ImageBgra8(_) => gl::BGRA,
-                };*/
-                let (data, width, height) =
-                    (dyn_img.to_rgba().into_raw(), dyn_img.width(), dyn_img.height());
-                    
-                let new_texture = Texture::new(data, width, height, instance, device).unwrap();
+            images.iter().enumerate().for_each(|(_index, image)| {
+                let mut pixels = Vec::new();
+                let size = image.width * image.height;
+                for index in 0..size {
+                    let rgba = [
+                        image.pixels[index as usize * 3],
+                        image.pixels[index as usize * 3 + 1],
+                        image.pixels[index as usize * 3 + 2],
+                        255,
+                    ];
+                    pixels.extend_from_slice(&rgba);
+                }
+                let new_texture =
+                    Texture::new(pixels, image.width, image.height, instance, device).unwrap();
                 textures.push(new_texture);
-            }
+            });
 
-            for material in gltf.materials() {
-                //albedo
-                let color_texture_idx = match material.pbr_metallic_roughness().base_color_texture()
-                {
-                    Some(color_texture) => color_texture.texture().index() as i32,
-                    None => -1,
-                };
-                material_image_index[0] = color_texture_idx;
-
-                //normal
-                let normal_texture_idx = match material.normal_texture() {
-                    Some(normal_texture) => normal_texture.texture().index() as i32,
-                    None => -1,
-                };
-                material_image_index[1] = normal_texture_idx;
-
-                //metallic_roughness
-                let metallic_roughness_texture_idx = match material
-                    .pbr_metallic_roughness()
-                    .metallic_roughness_texture()
-                {
-                    Some(metallic_roughness_texture) => {
-                        metallic_roughness_texture.texture().index() as i32
-                    }
-                    None => -1,
-                };
-                material_image_index[2] = metallic_roughness_texture_idx;
-
-                //ao
-                let occlusion_texture_idx = match material.occlusion_texture() {
-                    Some(occlusion_texture) => occlusion_texture.texture().index() as i32,
-                    None => -1,
-                };
-                material_image_index[3] = occlusion_texture_idx;
-
-                //emissive
-                let emissive_texture_idx = match material.emissive_texture() {
-                    Some(emissive_texture) => emissive_texture.texture().index() as i32,
-                    None => -1,
-                };
-                material_image_index[4] = emissive_texture_idx;
-            }
-            for material in gltf.materials() {
+            for material in document.materials() {
                 //albedo
                 let color_texture_idx = match material.pbr_metallic_roughness().base_color_texture()
                 {
@@ -534,4 +403,50 @@ unsafe fn create_index_buffer(
     device.device.free_memory(staging_buffer_memory, None);
 
     Ok(buffer)
+}
+
+fn read_indices<'a, 's, F>(reader: &Reader<'a, 's, F>) -> Option<Vec<u32>>
+where
+    F: Clone + Fn(GltfBuffer<'a>) -> Option<&'s [u8]>,
+{
+    reader
+        .read_indices()
+        .map(|indices| indices.into_u32().collect::<Vec<_>>())
+}
+
+fn read_positions<'a, 's, F>(reader: &Reader<'a, 's, F>) -> Vec<[f32; 3]>
+where
+    F: Clone + Fn(GltfBuffer<'a>) -> Option<&'s [u8]>,
+{
+    reader
+        .read_positions()
+        .expect("Position primitives should be present")
+        .collect()
+}
+
+fn read_normals<'a, 's, F>(reader: &Reader<'a, 's, F>) -> Vec<[f32; 3]>
+where
+    F: Clone + Fn(GltfBuffer<'a>) -> Option<&'s [u8]>,
+{
+    reader
+        .read_normals()
+        .map_or(vec![], |normals| normals.collect())
+}
+
+fn read_tex_coords<'a, 's, F>(reader: &Reader<'a, 's, F>, channel: u32) -> Vec<[f32; 2]>
+where
+    F: Clone + Fn(GltfBuffer<'a>) -> Option<&'s [u8]>,
+{
+    reader
+        .read_tex_coords(channel)
+        .map_or(vec![], |coords| coords.into_f32().collect())
+}
+
+fn read_colors<'a, 's, F>(reader: &Reader<'a, 's, F>) -> Vec<[f32; 4]>
+where
+    F: Clone + Fn(GltfBuffer<'a>) -> Option<&'s [u8]>,
+{
+    reader
+        .read_colors(0)
+        .map_or(vec![], |colors| colors.into_rgba_f32().collect())
 }
