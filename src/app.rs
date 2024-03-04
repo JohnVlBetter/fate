@@ -94,11 +94,14 @@ impl App {
         data.color_attachment = ColorAttachment::new(&instance, &device, &data.swapchain)?;
         data.depth_attachment = DepthAttachment::new(&instance, &device, &data.swapchain)?;
         create_framebuffers(&device.device, &mut data)?;
-        let model = Model::new("res/model/DamagedHelmet/glTF/DamagedHelmet.gltf", &instance, &device)?;
-        data.texture = model.albedo.clone();
+        let model = Model::new(
+            "res/model/DamagedHelmet/glTF/DamagedHelmet.gltf",
+            &instance,
+            &device,
+        )?;
         create_uniform_buffers(&instance, &device, &mut data)?;
         create_descriptor_pool(&device.device, &mut data)?;
-        create_descriptor_sets(&device.device, &mut data)?;
+        create_descriptor_sets(&device.device, &mut data, &model)?;
         create_command_buffers(&mut device, &mut data)?;
         create_sync_objects(&device.device, &mut data)?;
         let camera = Camera::new(
@@ -384,7 +387,7 @@ impl App {
         create_framebuffers(&self.device.device, &mut self.data)?;
         create_uniform_buffers(&self.instance, &self.device, &mut self.data)?;
         create_descriptor_pool(&self.device.device, &mut self.data)?;
-        create_descriptor_sets(&self.device.device, &mut self.data)?;
+        create_descriptor_sets(&self.device.device, &mut self.data, &self.model)?;
         create_command_buffers(&mut self.device, &mut self.data)?;
         self.data.images_in_flight.resize(self.data.swapchain.swapchain_images.len(), vk::Fence::null());
         Ok(())
@@ -400,7 +403,6 @@ impl App {
         self.data.render_finished_semaphores.iter().for_each(|s| self.device.device.destroy_semaphore(*s, None));
         self.data.image_available_semaphores.iter().for_each(|s| self.device.device.destroy_semaphore(*s, None));
         self.model.destory(&mut self.device);
-        self.data.texture.destory(&self.device);
         self.device.device.destroy_descriptor_set_layout(self.data.descriptor_set_layout, None);
         self.device.destory();
         self.instance.destroy_surface_khr(self.data.surface, None);
@@ -444,8 +446,6 @@ pub struct AppData {
     pub color_attachment: ColorAttachment,
     // Depth
     pub depth_attachment: DepthAttachment,
-    //Texture
-    pub texture: Texture,
     //Buffer
     uniform_buffers: Vec<UniformBuffer>,
     //Swapchain
@@ -571,7 +571,7 @@ unsafe fn create_descriptor_set_layout(device: &Device, data: &mut AppData) -> R
         .stage_flags(vk::ShaderStageFlags::VERTEX);
 
     let sampler_binding = vk::DescriptorSetLayoutBinding::builder()
-        .binding(1)
+        .binding(5)
         .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
         .descriptor_count(1)
         .stage_flags(vk::ShaderStageFlags::FRAGMENT);
@@ -772,7 +772,7 @@ unsafe fn create_descriptor_pool(device: &Device, data: &mut AppData) -> Result<
     Ok(())
 }
 
-unsafe fn create_descriptor_sets(device: &Device, data: &mut AppData) -> Result<()> {
+unsafe fn create_descriptor_sets(device: &Device, data: &mut AppData, model: &Model) -> Result<()> {
     // Allocate
 
     let layouts = vec![data.descriptor_set_layout; data.swapchain.swapchain_images.len()];
@@ -798,23 +798,69 @@ unsafe fn create_descriptor_sets(device: &Device, data: &mut AppData) -> Result<
             .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
             .buffer_info(buffer_info);
 
-        let info = vk::DescriptorImageInfo::builder()
-            .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
-            .image_view(data.texture.texture_image_view)
-            .sampler(data.texture.texture_sampler);
+        let albedo_info = create_descriptor_image_info(&model.albedo_texture);
+        let normal_info = create_descriptor_image_info(&model.normal_texture);
+        let material_info = create_descriptor_image_info(&model.material_texture);
+        let ao_info = create_descriptor_image_info(&model.ao_texture);
+        let emissive_info = create_descriptor_image_info(&model.emissive_texture);
 
-        let image_info = &[info];
-        let sampler_write = vk::WriteDescriptorSet::builder()
+        /*let sampler_write = vk::WriteDescriptorSet::builder()
+        .dst_set(data.descriptor_sets[i])
+        .dst_binding(2)
+        .dst_array_element(0)
+        .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
+        .image_info(&material_info);*/
+
+        //let sampler_writes = [
+        let albedo_sampler_write = vk::WriteDescriptorSet::builder()
+            .dst_set(data.descriptor_sets[i])
+            .dst_binding(0)
+            .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
+            .image_info(&albedo_info);
+        let normal_sampler_write = vk::WriteDescriptorSet::builder()
             .dst_set(data.descriptor_sets[i])
             .dst_binding(1)
-            .dst_array_element(0)
             .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
-            .image_info(image_info);
+            .image_info(&normal_info);
+        let material_sampler_write = vk::WriteDescriptorSet::builder()
+            .dst_set(data.descriptor_sets[i])
+            .dst_binding(2)
+            .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
+            .image_info(&material_info);
+        let ao_sampler_write = vk::WriteDescriptorSet::builder()
+            .dst_set(data.descriptor_sets[i])
+            .dst_binding(3)
+            .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
+            .image_info(&ao_info);
+        let emissive_sampler_write = vk::WriteDescriptorSet::builder()
+            .dst_set(data.descriptor_sets[i])
+            .dst_binding(4)
+            .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
+            .image_info(&emissive_info);
+        //];
 
-        device.update_descriptor_sets(&[ubo_write, sampler_write], &[] as &[vk::CopyDescriptorSet]);
+        device.update_descriptor_sets(
+            &[
+                ubo_write,
+                albedo_sampler_write,
+                normal_sampler_write,
+                material_sampler_write,
+                ao_sampler_write,
+                emissive_sampler_write,
+            ],
+            &[] as &[vk::CopyDescriptorSet],
+        );
     }
 
     Ok(())
+}
+
+fn create_descriptor_image_info(textures: &Texture) -> [vk::DescriptorImageInfo; 1] {
+    [vk::DescriptorImageInfo::builder()
+        .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
+        .image_view(textures.texture_image_view)
+        .sampler(textures.texture_sampler)
+        .build()]
 }
 
 unsafe fn create_command_buffers(device: &mut VkDevice, data: &mut AppData) -> Result<()> {

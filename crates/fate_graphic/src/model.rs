@@ -113,7 +113,11 @@ pub struct Model {
     //现在没接ecs transform先放这
     pub transform: Transform,
 
-    pub albedo: Texture,
+    pub albedo_texture: Texture,
+    pub normal_texture: Texture,
+    pub material_texture: Texture,
+    pub emissive_texture: Texture,
+    pub ao_texture: Texture,
 }
 
 impl Model {
@@ -285,13 +289,22 @@ impl Model {
             vertex_buffer,
             index_buffer,
             transform,
-            albedo: textures[material_image_index[0] as usize],
+            albedo_texture: textures[material_image_index[0] as usize],
+            normal_texture: textures[material_image_index[1] as usize],
+            material_texture: textures[material_image_index[2] as usize],
+            emissive_texture: textures[material_image_index[4] as usize],
+            ao_texture: textures[material_image_index[3] as usize],
         })
     }
 
     pub unsafe fn destory(&mut self, device: &mut VkDevice) {
         self.vertices.clear();
         self.indices.clear();
+        self.albedo_texture.destory(&device);
+        self.normal_texture.destory(&device);
+        self.material_texture.destory(&device);
+        self.ao_texture.destory(&device);
+        self.emissive_texture.destory(&device);
         device.destory_buffer(&self.index_buffer);
         device.destory_buffer(&self.vertex_buffer);
     }

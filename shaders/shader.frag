@@ -1,6 +1,10 @@
 #version 450
 
-layout(binding = 1) uniform sampler2D texSampler;
+layout(binding = 1) uniform sampler2D albedoSampler;
+layout(binding = 2) uniform sampler2D normalSampler;
+layout(binding = 3) uniform sampler2D materialSampler;
+layout(binding = 4) uniform sampler2D aoSampler;
+layout(binding = 5) uniform sampler2D emissiveSampler;
 
 layout(push_constant) uniform PushConstants {
     layout(offset = 64) float opacity;
@@ -19,7 +23,7 @@ layout(location = 0) out vec4 outColor;
 void main() {
     vec3 nor_normalWS = normalize(normalWS);
     vec3 lightDir = normalize(-main_light_direction.rgb);
-    vec4 albedo = vec4(texture(texSampler, fragTexCoord).rgb, 1.0);
+    vec4 albedo = vec4(texture(aoSampler, fragTexCoord).rgb, 1.0);
     vec3 viewDir = normalize(camera_pos.xyz - posWS.xyz);
     vec3 h = normalize(viewDir + lightDir);
 
