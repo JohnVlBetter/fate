@@ -3,6 +3,7 @@ pub mod camera;
 pub mod device;
 pub mod frame_buffer;
 pub mod light;
+pub mod mikktspace;
 pub mod model;
 pub mod render_pass;
 pub mod shader;

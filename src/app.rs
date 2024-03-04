@@ -564,22 +564,48 @@ extern "system" fn debug_callback(
 }
 
 unsafe fn create_descriptor_set_layout(device: &Device, data: &mut AppData) -> Result<()> {
-    let ubo_binding = vk::DescriptorSetLayoutBinding::builder()
-        .binding(0)
-        .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
-        .descriptor_count(1)
-        .stage_flags(vk::ShaderStageFlags::VERTEX);
+    let bindings = [
+        vk::DescriptorSetLayoutBinding::builder()
+            .binding(0)
+            .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
+            .descriptor_count(1)
+            .stage_flags(vk::ShaderStageFlags::VERTEX)
+            .build(),
+        vk::DescriptorSetLayoutBinding::builder()
+            .binding(1)
+            .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
+            .descriptor_count(1)
+            .stage_flags(vk::ShaderStageFlags::FRAGMENT)
+            .build(),
+        vk::DescriptorSetLayoutBinding::builder()
+            .binding(2)
+            .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
+            .descriptor_count(1)
+            .stage_flags(vk::ShaderStageFlags::FRAGMENT)
+            .build(),
+        vk::DescriptorSetLayoutBinding::builder()
+            .binding(3)
+            .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
+            .descriptor_count(1)
+            .stage_flags(vk::ShaderStageFlags::FRAGMENT)
+            .build(),
+        vk::DescriptorSetLayoutBinding::builder()
+            .binding(4)
+            .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
+            .descriptor_count(1)
+            .stage_flags(vk::ShaderStageFlags::FRAGMENT)
+            .build(),
+        vk::DescriptorSetLayoutBinding::builder()
+            .binding(5)
+            .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
+            .descriptor_count(1)
+            .stage_flags(vk::ShaderStageFlags::FRAGMENT)
+            .build(),
+    ];
 
-    let sampler_binding = vk::DescriptorSetLayoutBinding::builder()
-        .binding(5)
-        .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
-        .descriptor_count(1)
-        .stage_flags(vk::ShaderStageFlags::FRAGMENT);
+    let layout_info = vk::DescriptorSetLayoutCreateInfo::builder().bindings(&bindings);
 
-    let bindings = &[ubo_binding, sampler_binding];
-    let info = vk::DescriptorSetLayoutCreateInfo::builder().bindings(bindings);
-
-    data.descriptor_set_layout = device.create_descriptor_set_layout(&info, None)?;
+    data.descriptor_set_layout = device.create_descriptor_set_layout(&layout_info, None)?;
 
     Ok(())
 }
@@ -760,7 +786,7 @@ unsafe fn create_descriptor_pool(device: &Device, data: &mut AppData) -> Result<
 
     let sampler_size = vk::DescriptorPoolSize::builder()
         .type_(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
-        .descriptor_count(data.swapchain.swapchain_images.len() as u32);
+        .descriptor_count(data.swapchain.swapchain_images.len() as u32 * 5);
 
     let pool_sizes = &[ubo_size, sampler_size];
     let info = vk::DescriptorPoolCreateInfo::builder()
@@ -814,27 +840,27 @@ unsafe fn create_descriptor_sets(device: &Device, data: &mut AppData, model: &Mo
         //let sampler_writes = [
         let albedo_sampler_write = vk::WriteDescriptorSet::builder()
             .dst_set(data.descriptor_sets[i])
-            .dst_binding(0)
+            .dst_binding(1)
             .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
             .image_info(&albedo_info);
         let normal_sampler_write = vk::WriteDescriptorSet::builder()
             .dst_set(data.descriptor_sets[i])
-            .dst_binding(1)
+            .dst_binding(2)
             .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
             .image_info(&normal_info);
         let material_sampler_write = vk::WriteDescriptorSet::builder()
             .dst_set(data.descriptor_sets[i])
-            .dst_binding(2)
+            .dst_binding(3)
             .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
             .image_info(&material_info);
         let ao_sampler_write = vk::WriteDescriptorSet::builder()
             .dst_set(data.descriptor_sets[i])
-            .dst_binding(3)
+            .dst_binding(4)
             .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
             .image_info(&ao_info);
         let emissive_sampler_write = vk::WriteDescriptorSet::builder()
             .dst_set(data.descriptor_sets[i])
-            .dst_binding(4)
+            .dst_binding(5)
             .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
             .image_info(&emissive_info);
         //];

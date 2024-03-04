@@ -23,12 +23,12 @@ layout(location = 0) out vec4 outColor;
 void main() {
     vec3 nor_normalWS = normalize(normalWS);
     vec3 lightDir = normalize(-main_light_direction.rgb);
-    vec4 albedo = vec4(texture(aoSampler, fragTexCoord).rgb, 1.0);
+    vec4 albedo = vec4(texture(materialSampler, fragTexCoord).rgb, 1.0);
     vec3 viewDir = normalize(camera_pos.xyz - posWS.xyz);
     vec3 h = normalize(viewDir + lightDir);
 
     vec3 diffuse = clamp(dot(lightDir,nor_normalWS),0.0,1.0) * main_light_color.rgb * albedo.rgb;
     vec3 specular = pow(clamp(dot(h, nor_normalWS),0.0,1.0), 32.0) * main_light_color.rgb;
 
-    outColor = vec4(diffuse + specular, 1.0);
+    outColor = vec4(fragColor, 1.0);
 }

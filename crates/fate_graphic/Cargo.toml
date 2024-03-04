@@ -19,6 +19,7 @@ vulkanalia = { version = "=0.22.0", features = [
     "window",
 ] }
 winit = "0.28"
+mikktspace = "0.3.0"
 
 [dependencies.gltf]
 version = "1.2"

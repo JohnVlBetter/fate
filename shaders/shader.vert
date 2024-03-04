@@ -17,6 +17,7 @@ layout(location = 0) in vec3 inPosition;
 layout(location = 1) in vec3 inColor;
 layout(location = 2) in vec3 inNormal;
 layout(location = 3) in vec2 inTexCoord;
+layout(location = 4) in vec4 inTangent;
 
 layout(location = 0) out vec3 fragColor;
 layout(location = 1) out vec2 fragTexCoord;
@@ -30,7 +31,7 @@ void main() {
     posWS = pcs.model * vec4(inPosition, 1.0);
     normalWS = (pcs.model * vec4(inNormal, 1.0)).rgb;
     gl_Position = ubo.proj * ubo.view * posWS;
-    fragColor = inColor;
+    fragColor = inTangent.rgb;
     fragTexCoord = inTexCoord;
     main_light_direction = ubo.main_light_direction;
     main_light_color = ubo.main_light_color;
