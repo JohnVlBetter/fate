@@ -11,6 +11,7 @@ use fate_graphic::camera::Camera;
 use fate_graphic::device::*;
 use fate_graphic::frame_buffer::*;
 use fate_graphic::light::Light;
+use fate_graphic::material::PBRWorkflow;
 use fate_graphic::mesh;
 use fate_graphic::mesh::Mat4;
 use fate_graphic::mesh::Vec4;
@@ -827,20 +828,37 @@ unsafe fn create_descriptor_sets(device: &Device, data: &mut AppData, model: &Mo
             .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
             .buffer_info(buffer_info);
 
-        let albedo_info = create_descriptor_image_info(&model.albedo_texture);
-        let normal_info = create_descriptor_image_info(&model.normal_texture);
-        let material_info = create_descriptor_image_info(&model.material_texture);
-        let ao_info = create_descriptor_image_info(&model.ao_texture);
-        let emissive_info = create_descriptor_image_info(&model.emissive_texture);
+        let material = model.meshes[0].primitives()[0].material();
 
-        /*let sampler_write = vk::WriteDescriptorSet::builder()
-        .dst_set(data.descriptor_sets[i])
-        .dst_binding(2)
-        .dst_array_element(0)
-        .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
-        .image_info(&material_info);*/
+        let albedo_info = create_descriptor_image_info(
+            &model.textures,
+            material.albedo_texture_index().unwrap() as usize,
+        );
 
-        //let sampler_writes = [
+        let normal_info = create_descriptor_image_info(
+            &model.textures,
+            material.normal_texture_index().unwrap() as usize,
+        );
+
+        let material_texture = match material.workflow() {
+            PBRWorkflow::MetallicRoughness(workflow) => workflow.metallic_roughness_texture(),
+            PBRWorkflow::SpecularGlossiness(workflow) => workflow.specular_glossiness_texture(),
+        };
+        let material_info = create_descriptor_image_info(
+            &model.textures,
+            material_texture.map(|t| t.index()).unwrap(),
+        );
+
+        let ao_info = create_descriptor_image_info(
+            &model.textures,
+            material.ao_texture_index().unwrap() as usize,
+        );
+
+        let emissive_info = create_descriptor_image_info(
+            &model.textures,
+            material.emissive_texture_index().unwrap() as usize,
+        );
+
         let albedo_sampler_write = vk::WriteDescriptorSet::builder()
             .dst_set(data.descriptor_sets[i])
             .dst_binding(1)
@@ -866,7 +884,6 @@ unsafe fn create_descriptor_sets(device: &Device, data: &mut AppData, model: &Mo
             .dst_binding(5)
             .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
             .image_info(&emissive_info);
-        //];
 
         device.update_descriptor_sets(
             &[
@@ -884,11 +901,14 @@ unsafe fn create_descriptor_sets(device: &Device, data: &mut AppData, model: &Mo
     Ok(())
 }
 
-fn create_descriptor_image_info(textures: &Texture) -> [vk::DescriptorImageInfo; 1] {
+fn create_descriptor_image_info(
+    textures: &[Texture],
+    texture_idx: usize,
+) -> [vk::DescriptorImageInfo; 1] {
     [vk::DescriptorImageInfo::builder()
         .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
-        .image_view(textures.texture_image_view)
-        .sampler(textures.texture_sampler)
+        .image_view(textures[texture_idx].texture_image_view)
+        .sampler(textures[texture_idx].texture_sampler)
         .build()]
 }
 
