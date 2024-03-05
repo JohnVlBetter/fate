@@ -11,7 +11,10 @@ use fate_graphic::camera::Camera;
 use fate_graphic::device::*;
 use fate_graphic::frame_buffer::*;
 use fate_graphic::light::Light;
-use fate_graphic::model;
+use fate_graphic::mesh;
+use fate_graphic::mesh::Mat4;
+use fate_graphic::mesh::Vec4;
+use fate_graphic::mesh::Vertex;
 use fate_graphic::model::*;
 use fate_graphic::render_pass::RenderPass;
 use fate_graphic::shader::Shader;
@@ -113,8 +116,8 @@ impl App {
             10.0,
         )?;
         let main_light = Light::new(
-            model::Vec4::new(1.0, -1.0, -1.0, 1.0),
-            model::Vec4::new(1.0, 1.0, 1.0, 1.0),
+            mesh::Vec4::new(1.0, -1.0, -1.0, 1.0),
+            mesh::Vec4::new(1.0, 1.0, 1.0, 1.0),
         )?;
         Ok(Self {
             entry,
@@ -308,8 +311,8 @@ impl App {
         self.device.device.begin_command_buffer(command_buffer, &info)?;
 
         self.device.device.cmd_bind_pipeline(command_buffer, vk::PipelineBindPoint::GRAPHICS, self.data.pipeline);
-        self.device.device.cmd_bind_vertex_buffers(command_buffer, 0, &[self.model.vertex_buffer.buffer], &[0]);
-        self.device.device.cmd_bind_index_buffer(command_buffer, self.model.index_buffer.buffer, 0, vk::IndexType::UINT32);
+        self.device.device.cmd_bind_vertex_buffers(command_buffer, 0, &[self.model.meshes[0].primitives()[0].vertex_buffer.buffer], &[0]);
+        self.device.device.cmd_bind_index_buffer(command_buffer, self.model.meshes[0].primitives()[0].index_buffer.buffer, 0, vk::IndexType::UINT32);
         self.device.device.cmd_bind_descriptor_sets(
             command_buffer,
             vk::PipelineBindPoint::GRAPHICS,
@@ -332,7 +335,7 @@ impl App {
             64,
             opacity_bytes,
         );
-        self.device.device.cmd_draw_indexed(command_buffer, self.model.indices.len() as u32, 1, 0, 0, 0);
+        self.device.device.cmd_draw_indexed(command_buffer, self.model.meshes[0].primitives()[0].indices.len() as u32, 1, 0, 0, 0);
 
         self.device.device.end_command_buffer(command_buffer)?;
 

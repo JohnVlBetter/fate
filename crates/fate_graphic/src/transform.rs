@@ -1,7 +1,7 @@
 use anyhow::Result;
 use cgmath::{vec3, Deg, SquareMatrix};
 
-use crate::model::{Mat4, Vec3};
+use crate::mesh::{Mat4, Vec3};
 
 #[derive(Copy, Clone, Debug)]
 pub struct Transform {

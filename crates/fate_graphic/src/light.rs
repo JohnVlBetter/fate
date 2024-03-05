@@ -1,6 +1,6 @@
 use anyhow::Result;
 
-use crate::model::Vec4;
+use crate::mesh::Vec4;
 
 #[derive(Copy, Clone, Debug)]
 pub struct Light {

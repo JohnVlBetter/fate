@@ -1,7 +1,7 @@
 use anyhow::Result;
 use cgmath::{Deg, Matrix4, Point3};
 
-use crate::model::Vec3;
+use crate::mesh::Vec3;
 type Mat4 = cgmath::Matrix4<f32>;
 
 #[derive(Copy, Clone, Debug)]

@@ -12,3 +12,5 @@ pub mod texture;
 pub mod tools;
 pub mod transform;
 pub mod uniform_buffer;
+pub mod material;
+pub mod mesh;

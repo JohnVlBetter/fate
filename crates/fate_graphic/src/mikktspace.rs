@@ -1,6 +1,6 @@
 use cgmath::vec4;
 
-use crate::model::Vertex;
+use crate::mesh::Vertex;
 
 const VERTEX_PER_FACE: usize = 3;
 
