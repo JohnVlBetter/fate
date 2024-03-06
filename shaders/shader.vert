@@ -32,7 +32,7 @@ void main() {
     positionWS = pcs.model * vec4(positionOS, 1.0);
     normalWS = normalize((pcs.model * vec4(normalOS, 0.0)).xyz);
     vec3 tangentWS = normalize((pcs.model * vec4(tangentOS.xyz, 0.0)).xyz);
-    //tangentWS = normalize(tangentWS - dot(tangentWS, normalWS) * normalWS);
+    tangentWS = normalize(tangentWS - dot(tangentWS, normalWS) * normalWS);
     vec3 bitangentWS = cross(normalWS, tangentWS) * tangentOS.w;
     TBN = mat3(tangentWS, bitangentWS, normalWS);
 

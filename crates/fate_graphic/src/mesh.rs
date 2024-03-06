@@ -197,9 +197,9 @@ pub unsafe fn create_meshes_from_gltf(
                         let colors = *colors.get(index).unwrap_or(&[1.0, 1.0, 1.0, 1.0]);
 
                         Vertex {
-                            pos: vec3(position[0], position[2], position[1]),
+                            pos: vec3(position[0], position[1], position[2]),
                             color: vec3(colors[0], colors[1], colors[2]),
-                            normal: vec3(normal[0], normal[2], normal[1]),
+                            normal: vec3(normal[0], normal[1], normal[2]),
                             tex_coord: vec2(tex_coords_0[0], tex_coords_0[1]),
                             tangent: vec4(tangent[0], tangent[1], tangent[2], tangent[3]),
                         }
