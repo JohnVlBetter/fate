@@ -1,7 +1,11 @@
 use crate::{buffer::*, tools::*};
-use std::ptr::copy_nonoverlapping as memcpy;
+use std::{collections::HashSet, ptr::copy_nonoverlapping as memcpy};
 
 use anyhow::{anyhow, Result};
+use gltf::{
+    image::{Data, Format},
+    iter::Materials,
+};
 use vulkanalia::prelude::v1_0::*;
 
 use crate::device::VkDevice;
@@ -10,6 +14,7 @@ use crate::device::VkDevice;
 pub struct Texture {
     // Texture
     pub mip_levels: u32,
+    pub is_srgb: bool,
     pub texture_image: vk::Image,
     pub texture_image_memory: vk::DeviceMemory,
     pub texture_image_view: vk::ImageView,
@@ -21,13 +26,13 @@ impl Texture {
         pixels: Vec<u8>,
         width: u32,
         height: u32,
+        is_srgb: bool,
         instance: &Instance,
         device: &VkDevice,
     ) -> Result<Self> {
         let size = pixels.len() as u64;
         let mip_levels = (width.max(height) as f32).log2().floor() as u32 + 1;
 
-        // Create (staging)
         let (staging_buffer, staging_buffer_memory) = create_buffer(
             instance,
             &device.device,
@@ -37,7 +42,6 @@ impl Texture {
             vk::MemoryPropertyFlags::HOST_COHERENT | vk::MemoryPropertyFlags::HOST_VISIBLE,
         )?;
 
-        // Copy (staging)
         let memory = device.device.map_memory(
             staging_buffer_memory,
             0,
@@ -49,7 +53,10 @@ impl Texture {
 
         device.device.unmap_memory(staging_buffer_memory);
 
-        // Create (image)
+        let format = is_srgb
+            .then_some(vk::Format::R8G8B8A8_SRGB)
+            .unwrap_or(vk::Format::R8G8B8A8_UNORM);
+
         let (texture_image, texture_image_memory) = create_image(
             instance,
             &device.device,
@@ -58,7 +65,7 @@ impl Texture {
             height,
             mip_levels,
             vk::SampleCountFlags::_1,
-            vk::Format::R8G8B8A8_SRGB,
+            format,
             vk::ImageTiling::OPTIMAL,
             vk::ImageUsageFlags::SAMPLED
                 | vk::ImageUsageFlags::TRANSFER_DST
@@ -69,13 +76,12 @@ impl Texture {
         let texture_image = texture_image;
         let texture_image_memory = texture_image_memory;
 
-        // Transition + Copy (image)
         transition_image_layout(
             &device.device,
             device.graphics_queue,
             device.command_pool,
             texture_image,
-            vk::Format::R8G8B8A8_SRGB,
+            format,
             vk::ImageLayout::UNDEFINED,
             vk::ImageLayout::TRANSFER_DST_OPTIMAL,
             mip_levels,
@@ -104,7 +110,7 @@ impl Texture {
             device.graphics_queue,
             device.command_pool,
             texture_image,
-            vk::Format::R8G8B8A8_SRGB,
+            format,
             width,
             height,
             mip_levels,
@@ -113,7 +119,7 @@ impl Texture {
         let texture_image_view = create_image_view(
             &device.device,
             texture_image,
-            vk::Format::R8G8B8A8_SRGB,
+            format,
             vk::ImageAspectFlags::COLOR,
             mip_levels,
         )?;
@@ -139,6 +145,7 @@ impl Texture {
 
         Ok(Self {
             mip_levels,
+            is_srgb,
             texture_image,
             texture_image_memory,
             texture_image_view,
@@ -153,6 +160,89 @@ impl Texture {
             .destroy_image_view(self.texture_image_view, None);
         device.device.free_memory(self.texture_image_memory, None);
         device.device.destroy_image(self.texture_image, None);
+    }
+}
+
+pub unsafe fn create_textures_from_gltf(
+    materials: Materials,
+    images: &[Data],
+    instance: &Instance,
+    device: &VkDevice,
+) -> Vec<Texture> {
+    let srgb_indices = {
+        let mut indices = HashSet::new();
+
+        for m in materials {
+            if let Some(t) = m.pbr_metallic_roughness().base_color_texture() {
+                indices.insert(t.texture().source().index());
+            }
+
+            if let Some(pbr_specular_glossiness) = m.pbr_specular_glossiness() {
+                if let Some(t) = pbr_specular_glossiness.diffuse_texture() {
+                    indices.insert(t.texture().source().index());
+                }
+
+                if let Some(t) = pbr_specular_glossiness.specular_glossiness_texture() {
+                    indices.insert(t.texture().source().index());
+                }
+            }
+
+            if let Some(t) = m.emissive_texture() {
+                indices.insert(t.texture().source().index());
+            }
+        }
+
+        indices
+    };
+
+    let textures: Vec<Texture> = images
+        .iter()
+        .enumerate()
+        .map(|(index, image)| {
+            let pixels = get_rgba_pixels(image);
+            let is_srgb = srgb_indices.contains(&index);
+            Texture::new(pixels, image.width, image.height, is_srgb, instance, device).unwrap()
+        })
+        .collect();
+
+    textures
+}
+
+fn get_rgba_pixels(image: &Data) -> Vec<u8> {
+    let mut buffer = Vec::new();
+    let size = image.width * image.height;
+    for index in 0..size {
+        let rgba = next_rgba(&image.pixels, image.format, index as usize);
+        buffer.extend_from_slice(&rgba);
+    }
+    buffer
+}
+
+fn next_rgba(pixels: &[u8], format: Format, index: usize) -> [u8; 4] {
+    use Format::*;
+    match format {
+        R8 => [pixels[index], pixels[index], pixels[index], std::u8::MAX],
+        R8G8 => [
+            pixels[index * 2],
+            pixels[index * 2],
+            pixels[index * 2],
+            pixels[index * 2 + 1],
+        ],
+        R8G8B8 => [
+            pixels[index * 3],
+            pixels[index * 3 + 1],
+            pixels[index * 3 + 2],
+            std::u8::MAX,
+        ],
+        R8G8B8A8 => [
+            pixels[index * 4],
+            pixels[index * 4 + 1],
+            pixels[index * 4 + 2],
+            pixels[index * 4 + 3],
+        ],
+        R16 | R16G16 | R16G16B16 | R16G16B16A16 | R32G32B32FLOAT | R32G32B32A32FLOAT => {
+            panic!("不支持此纹理格式！")
+        }
     }
 }
 

@@ -1,4 +1,5 @@
 use crate::mesh::{create_meshes_from_gltf, Vec3};
+use crate::texture::create_textures_from_gltf;
 use crate::{mesh::Mesh, texture::Texture};
 use anyhow::Result;
 use vulkanalia::prelude::v1_0::*;
@@ -16,26 +17,11 @@ pub struct Model {
 impl Model {
     pub unsafe fn new(path: &str, instance: &Instance, device: &VkDevice) -> Result<Self> {
         let (document, buffers, images) = gltf::import(path)?;
-        
+
         let meshes = create_meshes_from_gltf(&document, &buffers, instance, device);
-        
-        let mut textures: Vec<Texture> = Vec::new();
-        images.iter().enumerate().for_each(|(_index, image)| {
-            let mut pixels = Vec::new();
-            let size = image.width * image.height;
-            for index in 0..size {
-                let rgba = [
-                    image.pixels[index as usize * 3],
-                    image.pixels[index as usize * 3 + 1],
-                    image.pixels[index as usize * 3 + 2],
-                    255,
-                ];
-                pixels.extend_from_slice(&rgba);
-            }
-            let new_texture =
-                Texture::new(pixels, image.width, image.height, instance, device).unwrap();
-            textures.push(new_texture);
-        });
+
+        let textures =
+            create_textures_from_gltf(document.materials(), &images, instance, device);
 
         let transform = Transform::new(
             Vec3::new(0.0, 0.0, 0.0),

@@ -23,7 +23,7 @@ layout(location = 0) out vec4 outColor;
 void main() {
     vec3 nor_normalWS = normalize(normalWS);
     vec3 lightDir = normalize(-main_light_direction.rgb);
-    vec4 albedo = vec4(texture(materialSampler, fragTexCoord).rgb, 1.0);
+    vec4 albedo = vec4(texture(normalSampler, fragTexCoord).rgb, 1.0);
     vec3 viewDir = normalize(camera_pos.xyz - posWS.xyz);
     vec3 h = normalize(viewDir + lightDir);
 
