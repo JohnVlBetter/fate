@@ -96,12 +96,11 @@ pub struct Material {
     is_unlit: bool,
 }
 
-#[derive(Clone, Copy)]
 pub struct MaterialUniform {
-    base_color: Vec4,
-    emissive_and_roughness_glossiness: Vec4,
-    metallic_specular_and_occlusion: Vec4,
-    workflow: u32,
+    pub base_color: Vec4,
+    pub emissive_and_roughness_glossiness: Vec4,
+    pub metallic_specular_and_occlusion: Vec4,
+    pub workflow: u32,
 }
 
 impl From<Material> for MaterialUniform {

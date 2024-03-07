@@ -1,5 +1,5 @@
 use anyhow::Result;
-use cgmath::{vec3, Deg, SquareMatrix};
+use cgmath::{Deg, SquareMatrix};
 
 use crate::mesh::{Mat4, Vec3};
 
@@ -24,8 +24,8 @@ impl Transform {
 
     pub fn local_to_world_matrix(&mut self) -> Mat4 {
         self.local_to_world_matrix = Mat4::from_translation(self.position)
-            * Mat4::from_angle_y(Deg(180.0));
-            /** Mat4::from_nonuniform_scale(self.scale.x, self.scale.y, self.scale.z);*/
+        * Mat4::from_angle_y(Deg(180.0))
+        * Mat4::from_angle_z(Deg(150.0));
         self.local_to_world_matrix
     }
 }

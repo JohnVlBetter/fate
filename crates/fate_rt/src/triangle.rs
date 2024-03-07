@@ -65,7 +65,7 @@ pub struct Triangle {
     b: Vertex,
     c: Vertex,
     mat: Arc<dyn Scatter>,
-    normal_texture: Arc<Image>,
+    _normal_texture: Arc<Image>,
     bbox: Aabb,
     area: f64,
 }
@@ -76,14 +76,14 @@ impl Triangle {
         b: Vertex,
         c: Vertex,
         mat: Arc<dyn Scatter>,
-        normal_texture: Arc<Image>,
+        _normal_texture: Arc<Image>,
     ) -> Self {
         Self {
             a,
             b,
             c,
             mat,
-            normal_texture,
+            _normal_texture,
             bbox: Aabb::new_with_points(&a.pos, &b.pos, &c.pos),
             area: (a.pos - c.pos).cross(a.pos - b.pos).magnitude() * 0.5,
         }

@@ -57,7 +57,6 @@ impl Model {
                     let index = model.mesh.indices[idx];
                     let normal_index = model.mesh.normal_indices[idx] as usize;
                     let pos_offset = (3 * index) as usize;
-                    let tex_coord_offset = (2 * index) as usize;
 
                     let vertex = Vertex {
                         pos: Point3::new(
@@ -113,7 +112,7 @@ impl Model {
                             tex_coord_set += 1;
                             continue;
                         }
-                        for (i, tex_coord) in tex_coords.into_f32().enumerate() {
+                        for tex_coord in tex_coords.into_f32() {
                             match tex_coord_set {
                                 0 => {
                                     uvs.push(Vector2::new(tex_coord[0] as f64, tex_coord[1] as f64))

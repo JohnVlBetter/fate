@@ -1,7 +1,6 @@
 use image::{GenericImageView, Pixel};
 
 pub const BYTES_PER_PIXEL: usize = 3;
-static MAGENTA: [u8; BYTES_PER_PIXEL] = [255, 0, 255];
 
 #[derive(Default, Clone)]
 pub struct Image {
