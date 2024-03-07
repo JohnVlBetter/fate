@@ -23,9 +23,9 @@ impl Transform {
     }
 
     pub fn local_to_world_matrix(&mut self) -> Mat4 {
-        self.local_to_world_matrix = Mat4::from_translation(self.position);/*
-            * Mat4::from_axis_angle(vec3(0.0, 0.0, 1.0), Deg(-120.0))
-            * Mat4::from_nonuniform_scale(self.scale.x, self.scale.y, self.scale.z);*/
+        self.local_to_world_matrix = Mat4::from_translation(self.position)
+            * Mat4::from_angle_y(Deg(180.0));
+            /** Mat4::from_nonuniform_scale(self.scale.x, self.scale.y, self.scale.z);*/
         self.local_to_world_matrix
     }
 }
