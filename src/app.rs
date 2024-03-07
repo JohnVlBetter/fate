@@ -12,6 +12,7 @@ use fate_graphic::device::*;
 use fate_graphic::frame_buffer::*;
 use fate_graphic::light::Light;
 use fate_graphic::material::PBRWorkflow;
+use fate_graphic::material::MaterialUniform;
 use fate_graphic::mesh;
 use fate_graphic::mesh::Mat4;
 use fate_graphic::mesh::Vec4;
@@ -294,10 +295,10 @@ impl App {
             &model as *const Mat4 as *const u8,
             size_of::<Mat4>()
         );
-
-        let opacity = (model_index + 1) as f32 * 0.2;
-        let opacity_bytes = &opacity.to_ne_bytes()[..];
-
+        
+        let mat_uniform = MaterialUniform::from(self.model.meshes[0].primitives()[0].material());
+        let material_bytes = any_as_u8_slice(&mat_uniform);
+        
         // Commands
 
         let inheritance_info = vk::CommandBufferInheritanceInfo::builder()
@@ -333,8 +334,8 @@ impl App {
             command_buffer,
             self.data.pipeline_layout,
             vk::ShaderStageFlags::FRAGMENT,
-            64,
-            opacity_bytes,
+            model_bytes.len() as u32,
+            material_bytes,
         );
         self.device.device.cmd_draw_indexed(command_buffer, self.model.meshes[0].primitives()[0].indices.len() as u32, 1, 0, 0, 0);
 
@@ -707,7 +708,7 @@ unsafe fn create_pipeline(device: &VkDevice, data: &mut AppData) -> Result<()> {
     let frag_push_constant_range = vk::PushConstantRange::builder()
         .stage_flags(vk::ShaderStageFlags::FRAGMENT)
         .offset(64)
-        .size(4);
+        .size(52);
 
     // Layout
 
@@ -951,4 +952,9 @@ unsafe fn create_sync_objects(device: &Device, data: &mut AppData) -> Result<()>
         .collect();
 
     Ok(())
+}
+
+pub unsafe fn any_as_u8_slice<T: Sized>(any: &T) -> &[u8] {
+    let ptr = (any as *const T) as *const u8;
+    std::slice::from_raw_parts(ptr, std::mem::size_of::<T>())
 }

@@ -96,6 +96,63 @@ pub struct Material {
     is_unlit: bool,
 }
 
+#[derive(Clone, Copy)]
+pub struct MaterialUniform {
+    base_color: Vec4,
+    emissive_and_roughness_glossiness: Vec4,
+    metallic_specular_and_occlusion: Vec4,
+    workflow: u32,
+}
+
+impl From<Material> for MaterialUniform {
+    fn from(material: Material) -> MaterialUniform {
+        let base_color = material.base_color();
+        let emissive_factor = material.emissive();
+
+        let workflow = material.workflow();
+
+        let roughness_glossiness = match workflow {
+            PBRWorkflow::MetallicRoughness(workflow) => workflow.roughness(),
+            PBRWorkflow::SpecularGlossiness(workflow) => workflow.glossiness(),
+        };
+
+        let emissive_and_roughness_glossiness = Vec4::new(
+            emissive_factor[0],
+            emissive_factor[1],
+            emissive_factor[2],
+            roughness_glossiness,
+        );
+
+        let metallic_specular = match workflow {
+            PBRWorkflow::MetallicRoughness(workflow) => Vec3::new(workflow.metallic(), 0.0, 0.0),
+            PBRWorkflow::SpecularGlossiness(workflow) => workflow.specular(),
+        };
+
+        let occlusion = material.occlusion();
+        let metallic_specular_and_occlusion = Vec4::new(
+            metallic_specular[0],
+            metallic_specular[1],
+            metallic_specular[2],
+            occlusion,
+        );
+
+        const METALLIC_ROUGHNESS_WORKFLOW: u32 = 0;
+        const SPECULAR_GLOSSINESS_WORKFLOW: u32 = 1;
+        let workflow = if let PBRWorkflow::MetallicRoughness { .. } = workflow {
+            METALLIC_ROUGHNESS_WORKFLOW
+        } else {
+            SPECULAR_GLOSSINESS_WORKFLOW
+        };
+
+        MaterialUniform {
+            base_color,
+            emissive_and_roughness_glossiness,
+            metallic_specular_and_occlusion,
+            workflow,
+        }
+    }
+}
+
 impl Material {
     pub fn base_color(&self) -> Vec4 {
         self.base_color
