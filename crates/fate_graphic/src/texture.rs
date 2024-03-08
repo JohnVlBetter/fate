@@ -1,6 +1,9 @@
 use crate::{buffer::*, tools::*};
 use std::{collections::HashSet, ptr::copy_nonoverlapping as memcpy};
 
+use image::{codecs::hdr::HdrDecoder, Rgb};
+use std::{fs::File, io::BufReader, path::Path};
+
 use anyhow::{anyhow, Result};
 use gltf::{
     image::{Data, Format},
@@ -549,4 +552,16 @@ unsafe fn generate_mipmaps(
     end_single_time_commands(device, graphics_queue, command_pool, command_buffer)?;
 
     Ok(())
+}
+
+pub fn load_hdr_image<P: AsRef<Path>>(path: P) -> (u32, u32, Vec<f32>) {
+    let decoder = HdrDecoder::new(BufReader::new(File::open(path).unwrap())).unwrap();
+    let (width, height) = (decoder.metadata().width, decoder.metadata().height);
+    let rgb = decoder.read_image_hdr().unwrap();
+    let mut data = Vec::with_capacity(rgb.len() * 4);
+    for Rgb(p) in rgb.iter() {
+        data.extend_from_slice(p);
+        data.push(0.0);
+    }
+    (width, height, data)
 }

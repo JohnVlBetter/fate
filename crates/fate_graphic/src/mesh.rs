@@ -6,7 +6,6 @@ use gltf::{
     mesh::{Reader, Semantic},
     Document,
 };
-use std::hash::{Hash, Hasher};
 use std::mem::size_of;
 use std::ptr::copy_nonoverlapping as memcpy;
 use vulkanalia::prelude::v1_0::*;
@@ -86,7 +85,7 @@ impl Vertex {
     }
 }
 
-impl PartialEq for Vertex {
+/*impl PartialEq for Vertex {
     fn eq(&self, other: &Self) -> bool {
         self.pos == other.pos
             && self.color == other.color
@@ -113,7 +112,7 @@ impl Hash for Vertex {
         self.tangent[2].to_bits().hash(state);
         self.tangent[3].to_bits().hash(state);
     }
-}
+}*/
 
 #[derive(Clone, Debug)]
 pub struct Mesh {
