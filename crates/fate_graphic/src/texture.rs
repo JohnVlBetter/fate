@@ -1,5 +1,5 @@
 use crate::{buffer::*, tools::*};
-use std::{collections::HashSet, ptr::copy_nonoverlapping as memcpy};
+use std::{collections::HashSet, mem::size_of, ptr::copy_nonoverlapping as memcpy};
 
 use image::{codecs::hdr::HdrDecoder, Rgb};
 use std::{fs::File, io::BufReader, path::Path};
@@ -154,6 +154,206 @@ impl Texture {
             texture_image_view,
             texture_sampler,
         })
+    }
+
+    pub unsafe fn new_hdr(
+        pixels: Vec<f32>,
+        width: u32,
+        height: u32,
+        is_srgb: bool,
+        instance: &Instance,
+        device: &VkDevice,
+    ) -> Result<Self> {
+        let size = (pixels.len() * size_of::<f32>()) as u64;
+        let mip_levels = (width.max(height) as f32).log2().floor() as u32 + 1;
+
+        let (staging_buffer, staging_buffer_memory) = create_buffer(
+            instance,
+            &device.device,
+            device.physical_device,
+            size,
+            vk::BufferUsageFlags::TRANSFER_SRC,
+            vk::MemoryPropertyFlags::HOST_COHERENT | vk::MemoryPropertyFlags::HOST_VISIBLE,
+        )?;
+
+        let memory = device.device.map_memory(
+            staging_buffer_memory,
+            0,
+            size,
+            vk::MemoryMapFlags::empty(),
+        )?;
+
+        memcpy(pixels.as_ptr(), memory.cast(), pixels.len());
+
+        device.device.unmap_memory(staging_buffer_memory);
+
+        let format = vk::Format::R32G32B32A32_SFLOAT;
+
+        let (texture_image, texture_image_memory) = create_image(
+            instance,
+            &device.device,
+            device.physical_device,
+            width,
+            height,
+            mip_levels,
+            vk::SampleCountFlags::_1,
+            format,
+            vk::ImageTiling::OPTIMAL,
+            vk::ImageUsageFlags::SAMPLED
+                | vk::ImageUsageFlags::TRANSFER_DST
+                | vk::ImageUsageFlags::TRANSFER_SRC,
+            vk::MemoryPropertyFlags::DEVICE_LOCAL,
+        )?;
+
+        let texture_image = texture_image;
+        let texture_image_memory = texture_image_memory;
+
+        transition_image_layout(
+            &device.device,
+            device.graphics_queue,
+            device.command_pool,
+            texture_image,
+            format,
+            vk::ImageLayout::UNDEFINED,
+            vk::ImageLayout::TRANSFER_DST_OPTIMAL,
+            mip_levels,
+        )?;
+
+        copy_buffer_to_image(
+            &device.device,
+            device.graphics_queue,
+            device.command_pool,
+            staging_buffer,
+            texture_image,
+            width,
+            height,
+        )?;
+
+        // Cleanup
+
+        device.device.destroy_buffer(staging_buffer, None);
+        device.device.free_memory(staging_buffer_memory, None);
+
+        // Mipmaps
+        generate_mipmaps(
+            instance,
+            &device.device,
+            device.physical_device,
+            device.graphics_queue,
+            device.command_pool,
+            texture_image,
+            format,
+            width,
+            height,
+            mip_levels,
+        )?;
+
+        let texture_image_view = create_image_view(
+            &device.device,
+            texture_image,
+            format,
+            vk::ImageAspectFlags::COLOR,
+            mip_levels,
+        )?;
+
+        let info = vk::SamplerCreateInfo::builder()
+            .mag_filter(vk::Filter::LINEAR)
+            .min_filter(vk::Filter::LINEAR)
+            .address_mode_u(vk::SamplerAddressMode::REPEAT)
+            .address_mode_v(vk::SamplerAddressMode::REPEAT)
+            .address_mode_w(vk::SamplerAddressMode::REPEAT)
+            .anisotropy_enable(true)
+            .max_anisotropy(16.0)
+            .border_color(vk::BorderColor::INT_OPAQUE_BLACK)
+            .unnormalized_coordinates(false)
+            .compare_enable(false)
+            .compare_op(vk::CompareOp::ALWAYS)
+            .mipmap_mode(vk::SamplerMipmapMode::LINEAR)
+            .min_lod(0.0)
+            .max_lod(mip_levels as f32)
+            .mip_lod_bias(0.0);
+
+        let texture_sampler = device.device.create_sampler(&info, None)?;
+
+        Ok(Self {
+            mip_levels,
+            is_srgb,
+            texture_image,
+            texture_image_memory,
+            texture_image_view,
+            texture_sampler,
+        })
+    }
+
+    pub fn create_renderable_cubemap(
+        size: u32,
+        mip_levels: u32,
+        format: vk::Format,
+    ) -> Self {
+        let extent = vk::Extent2D {
+            width: size,
+            height: size,
+        };
+
+        let device = context.device();
+
+        let image = Image::create(
+            Arc::clone(context),
+            ImageParameters {
+                mem_properties: vk::MemoryPropertyFlags::DEVICE_LOCAL,
+                extent,
+                format,
+                layers: 6,
+                mip_levels,
+                usage: vk::ImageUsageFlags::TRANSFER_SRC
+                    | vk::ImageUsageFlags::TRANSFER_DST
+                    | vk::ImageUsageFlags::SAMPLED
+                    | vk::ImageUsageFlags::COLOR_ATTACHMENT,
+                create_flags: vk::ImageCreateFlags::CUBE_COMPATIBLE,
+                ..Default::default()
+            },
+        );
+
+        image.transition_image_layout(
+            vk::ImageLayout::UNDEFINED,
+            vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
+        );
+
+        let image_view = image.create_view(vk::ImageViewType::CUBE, vk::ImageAspectFlags::COLOR);
+
+        let sampler = {
+            let sampler_info = vk::SamplerCreateInfo::builder()
+                .mag_filter(vk::Filter::LINEAR)
+                .min_filter(vk::Filter::LINEAR)
+                .address_mode_u(vk::SamplerAddressMode::CLAMP_TO_EDGE)
+                .address_mode_v(vk::SamplerAddressMode::CLAMP_TO_EDGE)
+                .address_mode_w(vk::SamplerAddressMode::CLAMP_TO_EDGE)
+                .anisotropy_enable(false)
+                .max_anisotropy(0.0)
+                .border_color(vk::BorderColor::FLOAT_OPAQUE_WHITE)
+                .unnormalized_coordinates(false)
+                .compare_enable(false)
+                .compare_op(vk::CompareOp::ALWAYS)
+                .mipmap_mode(vk::SamplerMipmapMode::LINEAR)
+                .mip_lod_bias(0.0)
+                .min_lod(0.0)
+                .max_lod(mip_levels as _);
+
+            unsafe {
+                device
+                    .create_sampler(&sampler_info, None)
+                    .expect("Failed to create sampler")
+            }
+        };
+
+        Texture {
+            mip_levels,
+            is_srgb: false,
+            texture_image: image,
+            texture_image_memory: image,
+            texture_image_view: image_view,
+            texture_sampler: sampler,
+        }
     }
 
     pub unsafe fn destory(&mut self, device: &VkDevice) -> () {
