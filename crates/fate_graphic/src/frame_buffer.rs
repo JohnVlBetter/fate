@@ -67,6 +67,8 @@ impl ColorAttachment {
             vk::ImageTiling::OPTIMAL,
             vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::TRANSIENT_ATTACHMENT,
             vk::MemoryPropertyFlags::DEVICE_LOCAL,
+            1,
+            vk::ImageCreateFlags::default(),
         )?;
 
         // Image View
@@ -77,6 +79,8 @@ impl ColorAttachment {
             swapchain.swapchain_format,
             vk::ImageAspectFlags::COLOR,
             1,
+            1,
+            vk::ImageViewType::_2D,
         )?;
 
         Ok(Self {
@@ -122,6 +126,8 @@ impl DepthAttachment {
             vk::ImageTiling::OPTIMAL,
             vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT,
             vk::MemoryPropertyFlags::DEVICE_LOCAL,
+            1,
+            vk::ImageCreateFlags::default(),
         )?;
 
         let depth_image_view = create_image_view(
@@ -130,6 +136,8 @@ impl DepthAttachment {
             format,
             vk::ImageAspectFlags::DEPTH,
             1,
+            1,
+            vk::ImageViewType::_2D,
         )?;
 
         Ok(Self {

@@ -1,6 +1,7 @@
 pub mod buffer;
 pub mod camera;
 pub mod cubemap;
+pub mod descriptors;
 pub mod device;
 pub mod frame_buffer;
 pub mod light;

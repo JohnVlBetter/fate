@@ -24,7 +24,8 @@ pub(crate) unsafe fn create_skybox_cubemap<P: AsRef<Path>>(
     let cubemap_format = vk::Format::R16G16B16A16_SFLOAT;
 
     let texture = Texture::new_hdr(data, w, h, true, instance, device);
-    let cubemap = Texture::create_renderable_cubemap(context, size, mip_levels, cubemap_format);
+    let cubemap =
+        Texture::create_renderable_cubemap(instance, device, size, mip_levels, cubemap_format);
 
     let skybox_model = SkyboxModel::new(instance, device);
 

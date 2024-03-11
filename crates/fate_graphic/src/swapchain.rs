@@ -97,7 +97,15 @@ impl Swapchain {
         let swapchain_image_views = swapchain_images
             .iter()
             .map(|i| {
-                create_image_view(device, *i, swapchain_format, vk::ImageAspectFlags::COLOR, 1)
+                create_image_view(
+                    device,
+                    *i,
+                    swapchain_format,
+                    vk::ImageAspectFlags::COLOR,
+                    1,
+                    1,
+                    vk::ImageViewType::_2D,
+                )
             })
             .collect::<Result<Vec<_>, _>>()?;
 
