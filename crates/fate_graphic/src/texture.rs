@@ -74,6 +74,8 @@ impl Texture {
                 | vk::ImageUsageFlags::TRANSFER_DST
                 | vk::ImageUsageFlags::TRANSFER_SRC,
             vk::MemoryPropertyFlags::DEVICE_LOCAL,
+            1,
+            vk::ImageCreateFlags::default(),
         )?;
 
         let texture_image = texture_image;
@@ -88,6 +90,7 @@ impl Texture {
             vk::ImageLayout::UNDEFINED,
             vk::ImageLayout::TRANSFER_DST_OPTIMAL,
             mip_levels,
+            1,
         )?;
 
         copy_buffer_to_image(
@@ -125,6 +128,8 @@ impl Texture {
             format,
             vk::ImageAspectFlags::COLOR,
             mip_levels,
+            1,
+            vk::ImageViewType::_2D,
         )?;
 
         let info = vk::SamplerCreateInfo::builder()
@@ -203,6 +208,8 @@ impl Texture {
                 | vk::ImageUsageFlags::TRANSFER_DST
                 | vk::ImageUsageFlags::TRANSFER_SRC,
             vk::MemoryPropertyFlags::DEVICE_LOCAL,
+            1,
+            vk::ImageCreateFlags::default(),
         )?;
 
         let texture_image = texture_image;
@@ -217,6 +224,7 @@ impl Texture {
             vk::ImageLayout::UNDEFINED,
             vk::ImageLayout::TRANSFER_DST_OPTIMAL,
             mip_levels,
+            1,
         )?;
 
         copy_buffer_to_image(
@@ -254,6 +262,8 @@ impl Texture {
             format,
             vk::ImageAspectFlags::COLOR,
             mip_levels,
+            1,
+            vk::ImageViewType::_2D,
         )?;
 
         let info = vk::SamplerCreateInfo::builder()
@@ -285,7 +295,9 @@ impl Texture {
         })
     }
 
-    pub fn create_renderable_cubemap(
+    pub unsafe fn create_renderable_cubemap(
+        instance: &Instance,
+        device: &VkDevice,
         size: u32,
         mip_levels: u32,
         format: vk::Format,
@@ -295,64 +307,78 @@ impl Texture {
             height: size,
         };
 
-        let device = context.device();
+        let width = size;
+        let height = size;
+        let (texture_image, texture_image_memory) = create_image(
+            instance,
+            &device.device,
+            device.physical_device,
+            width,
+            height,
+            mip_levels,
+            vk::SampleCountFlags::default(),
+            format,
+            vk::ImageTiling::default(),
+            vk::ImageUsageFlags::TRANSFER_SRC
+                | vk::ImageUsageFlags::TRANSFER_DST
+                | vk::ImageUsageFlags::SAMPLED
+                | vk::ImageUsageFlags::COLOR_ATTACHMENT,
+            vk::MemoryPropertyFlags::DEVICE_LOCAL,
+            6,
+            vk::ImageCreateFlags::CUBE_COMPATIBLE,
+        )
+        .unwrap();
 
-        let image = Image::create(
-            Arc::clone(context),
-            ImageParameters {
-                mem_properties: vk::MemoryPropertyFlags::DEVICE_LOCAL,
-                extent,
-                format,
-                layers: 6,
-                mip_levels,
-                usage: vk::ImageUsageFlags::TRANSFER_SRC
-                    | vk::ImageUsageFlags::TRANSFER_DST
-                    | vk::ImageUsageFlags::SAMPLED
-                    | vk::ImageUsageFlags::COLOR_ATTACHMENT,
-                create_flags: vk::ImageCreateFlags::CUBE_COMPATIBLE,
-                ..Default::default()
-            },
-        );
-
-        image.transition_image_layout(
+        transition_image_layout(
+            &device.device,
+            device.graphics_queue,
+            device.command_pool,
+            texture_image,
+            format,
             vk::ImageLayout::UNDEFINED,
             vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
-        );
+            mip_levels,
+            6,
+        )
+        .unwrap();
 
-        let image_view = image.create_view(vk::ImageViewType::CUBE, vk::ImageAspectFlags::COLOR);
+        let texture_image_view = create_image_view(
+            &device.device,
+            texture_image,
+            format,
+            vk::ImageAspectFlags::COLOR,
+            mip_levels,
+            6,
+            vk::ImageViewType::CUBE,
+        )
+        .unwrap();
 
-        let sampler = {
-            let sampler_info = vk::SamplerCreateInfo::builder()
-                .mag_filter(vk::Filter::LINEAR)
-                .min_filter(vk::Filter::LINEAR)
-                .address_mode_u(vk::SamplerAddressMode::CLAMP_TO_EDGE)
-                .address_mode_v(vk::SamplerAddressMode::CLAMP_TO_EDGE)
-                .address_mode_w(vk::SamplerAddressMode::CLAMP_TO_EDGE)
-                .anisotropy_enable(false)
-                .max_anisotropy(0.0)
-                .border_color(vk::BorderColor::FLOAT_OPAQUE_WHITE)
-                .unnormalized_coordinates(false)
-                .compare_enable(false)
-                .compare_op(vk::CompareOp::ALWAYS)
-                .mipmap_mode(vk::SamplerMipmapMode::LINEAR)
-                .mip_lod_bias(0.0)
-                .min_lod(0.0)
-                .max_lod(mip_levels as _);
+        let info = vk::SamplerCreateInfo::builder()
+            .mag_filter(vk::Filter::LINEAR)
+            .min_filter(vk::Filter::LINEAR)
+            .address_mode_u(vk::SamplerAddressMode::CLAMP_TO_EDGE)
+            .address_mode_v(vk::SamplerAddressMode::CLAMP_TO_EDGE)
+            .address_mode_w(vk::SamplerAddressMode::CLAMP_TO_EDGE)
+            .anisotropy_enable(false)
+            .max_anisotropy(0.0)
+            .border_color(vk::BorderColor::FLOAT_OPAQUE_WHITE)
+            .unnormalized_coordinates(false)
+            .compare_enable(false)
+            .compare_op(vk::CompareOp::ALWAYS)
+            .mipmap_mode(vk::SamplerMipmapMode::LINEAR)
+            .min_lod(0.0)
+            .max_lod(mip_levels as f32)
+            .mip_lod_bias(0.0);
 
-            unsafe {
-                device
-                    .create_sampler(&sampler_info, None)
-                    .expect("Failed to create sampler")
-            }
-        };
+        let texture_sampler = device.device.create_sampler(&info, None).unwrap();
 
         Texture {
             mip_levels,
             is_srgb: false,
-            texture_image: image,
-            texture_image_memory: image,
-            texture_image_view: image_view,
-            texture_sampler: sampler,
+            texture_image,
+            texture_image_memory,
+            texture_image_view,
+            texture_sampler,
         }
     }
 
@@ -461,6 +487,8 @@ pub unsafe fn create_image(
     tiling: vk::ImageTiling,
     usage: vk::ImageUsageFlags,
     properties: vk::MemoryPropertyFlags,
+    layers: u32,
+    create_flags: vk::ImageCreateFlags,
 ) -> Result<(vk::Image, vk::DeviceMemory)> {
     // Image
     let info = vk::ImageCreateInfo::builder()
@@ -471,13 +499,14 @@ pub unsafe fn create_image(
             depth: 1,
         })
         .mip_levels(mip_levels)
-        .array_layers(1)
+        .array_layers(layers)
         .format(format)
         .tiling(tiling)
         .initial_layout(vk::ImageLayout::UNDEFINED)
         .usage(usage)
         .sharing_mode(vk::SharingMode::EXCLUSIVE)
-        .samples(samples);
+        .samples(samples)
+        .flags(create_flags);
     let image = device.create_image(&info, None)?;
     // Memory
     let requirements = device.get_image_memory_requirements(image);
@@ -500,16 +529,18 @@ pub unsafe fn create_image_view(
     format: vk::Format,
     aspects: vk::ImageAspectFlags,
     mip_levels: u32,
+    layers: u32,
+    view_type: vk::ImageViewType,
 ) -> Result<vk::ImageView> {
     let subresource_range = vk::ImageSubresourceRange::builder()
         .aspect_mask(aspects)
         .base_mip_level(0)
         .level_count(mip_levels)
         .base_array_layer(0)
-        .layer_count(1);
+        .layer_count(layers);
     let info = vk::ImageViewCreateInfo::builder()
         .image(image)
-        .view_type(vk::ImageViewType::_2D)
+        .view_type(view_type)
         .format(format)
         .subresource_range(subresource_range);
     Ok(device.create_image_view(&info, None)?)
@@ -520,10 +551,11 @@ pub unsafe fn transition_image_layout(
     graphics_queue: vk::Queue,
     command_pool: vk::CommandPool,
     image: vk::Image,
-    _format: vk::Format,
+    format: vk::Format,
     old_layout: vk::ImageLayout,
     new_layout: vk::ImageLayout,
     mip_levels: u32,
+    layers: u32,
 ) -> Result<()> {
     let (src_access_mask, dst_access_mask, src_stage_mask, dst_stage_mask) =
         match (old_layout, new_layout) {
@@ -539,15 +571,99 @@ pub unsafe fn transition_image_layout(
                 vk::PipelineStageFlags::TRANSFER,
                 vk::PipelineStageFlags::FRAGMENT_SHADER,
             ),
+            (vk::ImageLayout::UNDEFINED, vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL) => (
+                vk::AccessFlags::empty(),
+                vk::AccessFlags::DEPTH_STENCIL_ATTACHMENT_READ
+                    | vk::AccessFlags::DEPTH_STENCIL_ATTACHMENT_WRITE,
+                vk::PipelineStageFlags::empty(),
+                vk::PipelineStageFlags::EARLY_FRAGMENT_TESTS,
+            ),
+            (vk::ImageLayout::UNDEFINED, vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL) => (
+                vk::AccessFlags::empty(),
+                vk::AccessFlags::COLOR_ATTACHMENT_READ | vk::AccessFlags::COLOR_ATTACHMENT_WRITE,
+                vk::PipelineStageFlags::empty(),
+                vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
+            ),
+            (
+                vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
+                vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+            ) => (
+                vk::AccessFlags::COLOR_ATTACHMENT_WRITE,
+                vk::AccessFlags::SHADER_READ,
+                vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
+                vk::PipelineStageFlags::FRAGMENT_SHADER,
+            ),
+            (vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL, vk::ImageLayout::TRANSFER_DST_OPTIMAL) => (
+                vk::AccessFlags::COLOR_ATTACHMENT_WRITE,
+                vk::AccessFlags::TRANSFER_WRITE,
+                vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
+                vk::PipelineStageFlags::TRANSFER,
+            ),
+            (vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL, vk::ImageLayout::PRESENT_SRC_KHR) => (
+                vk::AccessFlags::COLOR_ATTACHMENT_WRITE,
+                vk::AccessFlags::COLOR_ATTACHMENT_READ,
+                vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
+                vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
+            ),
+            (
+                vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+                vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+            ) => (
+                vk::AccessFlags::DEPTH_STENCIL_ATTACHMENT_WRITE,
+                vk::AccessFlags::SHADER_READ,
+                vk::PipelineStageFlags::EARLY_FRAGMENT_TESTS
+                    | vk::PipelineStageFlags::LATE_FRAGMENT_TESTS,
+                vk::PipelineStageFlags::FRAGMENT_SHADER,
+            ),
+            (vk::ImageLayout::UNDEFINED, vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL) => (
+                vk::AccessFlags::empty(),
+                vk::AccessFlags::SHADER_READ,
+                vk::PipelineStageFlags::empty(),
+                vk::PipelineStageFlags::FRAGMENT_SHADER,
+            ),
+            (
+                vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+                vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
+            ) => (
+                vk::AccessFlags::SHADER_READ,
+                vk::AccessFlags::COLOR_ATTACHMENT_WRITE,
+                vk::PipelineStageFlags::FRAGMENT_SHADER,
+                vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
+            ),
+            (vk::ImageLayout::TRANSFER_DST_OPTIMAL, vk::ImageLayout::TRANSFER_SRC_OPTIMAL) => (
+                vk::AccessFlags::TRANSFER_WRITE,
+                vk::AccessFlags::TRANSFER_READ,
+                vk::PipelineStageFlags::TRANSFER,
+                vk::PipelineStageFlags::TRANSFER,
+            ),
+            (vk::ImageLayout::TRANSFER_SRC_OPTIMAL, vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL) => (
+                vk::AccessFlags::TRANSFER_WRITE,
+                vk::AccessFlags::SHADER_READ,
+                vk::PipelineStageFlags::TRANSFER,
+                vk::PipelineStageFlags::FRAGMENT_SHADER,
+            ),
             _ => return Err(anyhow!("Unsupported image layout transition!")),
         };
+
+    let aspect_mask = if new_layout == vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL
+        || old_layout == vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL
+    {
+        let mut mask = vk::ImageAspectFlags::DEPTH;
+        if has_stencil_component(format) {
+            mask |= vk::ImageAspectFlags::STENCIL;
+        }
+        mask
+    } else {
+        vk::ImageAspectFlags::COLOR
+    };
+
     let command_buffer = begin_single_time_commands(device, command_pool)?;
     let subresource = vk::ImageSubresourceRange::builder()
         .aspect_mask(vk::ImageAspectFlags::COLOR)
         .base_mip_level(0)
         .level_count(mip_levels)
         .base_array_layer(0)
-        .layer_count(1);
+        .layer_count(layers);
     let barrier = vk::ImageMemoryBarrier::builder()
         .old_layout(old_layout)
         .new_layout(new_layout)
@@ -568,6 +684,10 @@ pub unsafe fn transition_image_layout(
     );
     end_single_time_commands(device, graphics_queue, command_pool, command_buffer)?;
     Ok(())
+}
+
+fn has_stencil_component(format: vk::Format) -> bool {
+    format == vk::Format::D32_SFLOAT_S8_UINT || format == vk::Format::D24_UNORM_S8_UINT
 }
 
 unsafe fn copy_buffer_to_image(
