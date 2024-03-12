@@ -1,4 +1,4 @@
-use crate::{material::Material, mikktspace::generate_tangents};
+use crate::{material::Material, mikktspace::generate_tangents, vertex::Vertex};
 use anyhow::Result;
 use cgmath::{vec2, vec3, vec4};
 use gltf::{
@@ -20,7 +20,7 @@ pub type Mat4 = cgmath::Matrix4<f32>;
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
-pub struct Vertex {
+pub struct ModelVertex {
     pub pos: Vec3,
     pub color: Vec3,
     pub normal: Vec3,
@@ -28,7 +28,7 @@ pub struct Vertex {
     pub tangent: Vec4,
 }
 
-impl Vertex {
+impl ModelVertex {
     pub fn new(pos: Vec3, color: Vec3, normal: Vec3, tex_coord: Vec2, tangent: Vec4) -> Self {
         Self {
             pos,
@@ -38,16 +38,18 @@ impl Vertex {
             tangent,
         }
     }
+}
 
-    pub fn binding_description() -> vk::VertexInputBindingDescription {
-        vk::VertexInputBindingDescription::builder()
+impl Vertex for ModelVertex {
+    fn binding_description() -> Vec<vk::VertexInputBindingDescription> {
+        vec![vk::VertexInputBindingDescription::builder()
             .binding(0)
-            .stride(size_of::<Vertex>() as u32)
+            .stride(size_of::<ModelVertex>() as u32)
             .input_rate(vk::VertexInputRate::VERTEX)
-            .build()
+            .build()]
     }
 
-    pub fn attribute_descriptions() -> [vk::VertexInputAttributeDescription; 5] {
+    fn attribute_descriptions() -> Vec<vk::VertexInputAttributeDescription> {
         let pos = vk::VertexInputAttributeDescription::builder()
             .binding(0)
             .location(0)
@@ -81,7 +83,7 @@ impl Vertex {
                     as u32,
             )
             .build();
-        [pos, color, normal, tex_coord, tangent]
+        vec![pos, color, normal, tex_coord, tangent]
     }
 }
 
@@ -195,7 +197,7 @@ pub unsafe fn create_meshes_from_gltf(
                         let tangent = *tangents.get(index).unwrap_or(&[1.0, 1.0, 1.0, 1.0]);
                         let colors = *colors.get(index).unwrap_or(&[1.0, 1.0, 1.0, 1.0]);
 
-                        Vertex {
+                        ModelVertex {
                             pos: vec3(position[0], position[1], position[2]),
                             color: vec3(colors[0], colors[1], colors[2]),
                             normal: vec3(normal[0], normal[1], normal[2]),
@@ -237,9 +239,9 @@ pub unsafe fn create_meshes_from_gltf(
 unsafe fn create_vertex_buffer(
     instance: &Instance,
     device: &VkDevice,
-    vertices: &Vec<Vertex>,
+    vertices: &Vec<ModelVertex>,
 ) -> Result<Buffer> {
-    let size = (size_of::<Vertex>() * vertices.len()) as u64;
+    let size = (size_of::<ModelVertex>() * vertices.len()) as u64;
 
     let (staging_buffer, staging_buffer_memory) = create_buffer(
         instance,

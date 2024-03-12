@@ -1,6 +1,6 @@
 use cgmath::vec4;
 
-use crate::mesh::Vertex;
+use crate::mesh::ModelVertex;
 
 const VERTEX_PER_FACE: usize = 3;
 
@@ -8,16 +8,16 @@ type Face = [u32; 3];
 
 struct Mesh<'a> {
     faces: Vec<Face>,
-    vertices: &'a mut [Vertex],
+    vertices: &'a mut [ModelVertex],
 }
 
 impl<'a> Mesh<'a> {
-    fn get_vertex(&self, face: usize, vert: usize) -> Vertex {
+    fn get_vertex(&self, face: usize, vert: usize) -> ModelVertex {
         let face = self.faces[face];
         self.vertices[face[vert] as usize]
     }
 
-    fn get_vertex_mut(&mut self, face: usize, vert: usize) -> &mut Vertex {
+    fn get_vertex_mut(&mut self, face: usize, vert: usize) -> &mut ModelVertex {
         let face = self.faces[face];
         &mut self.vertices[face[vert] as usize]
     }
@@ -67,7 +67,7 @@ impl<'a> mikktspace::Geometry for Mesh<'a> {
     }
 }
 
-pub fn generate_tangents(indices: Option<&[u32]>, vertices: &mut [Vertex]) {
+pub fn generate_tangents(indices: Option<&[u32]>, vertices: &mut [ModelVertex]) {
     log::info!("生成切线");
 
     let index_count = indices.map_or(0, |indices| indices.len());
@@ -106,9 +106,7 @@ fn can_generate_inputs(index_count: usize, vertex_count: usize) -> bool {
     }
 
     if index_count == 0 && vertex_count % VERTEX_PER_FACE != 0 {
-        log::warn!(
-            "顶点数不是三的倍数"
-        );
+        log::warn!("顶点数不是三的倍数");
         return false;
     }
 

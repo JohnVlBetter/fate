@@ -15,8 +15,8 @@ use fate_graphic::material::PBRWorkflow;
 use fate_graphic::material::MaterialUniform;
 use fate_graphic::mesh;
 use fate_graphic::mesh::Mat4;
+use fate_graphic::mesh::ModelVertex;
 use fate_graphic::mesh::Vec4;
-use fate_graphic::mesh::Vertex;
 use fate_graphic::model::*;
 use fate_graphic::render_pass::RenderPass;
 use fate_graphic::shader::Shader;
@@ -24,6 +24,7 @@ use fate_graphic::swapchain::Swapchain;
 use fate_graphic::texture::*;
 use fate_graphic::uniform_buffer::UniformBuffer;
 use fate_graphic::uniform_buffer::UniformBufferObject;
+use fate_graphic::vertex::Vertex;
 use std::collections::HashSet;
 use std::ffi::CStr;
 use std::mem::size_of;
@@ -93,7 +94,7 @@ impl App {
         )?;
         data.render_pass = RenderPass::new(&instance, &device, &data.swapchain)?;
         create_descriptor_set_layout(&device.device, &mut data)?;
-        create_pipeline(&device, &mut data)?;
+        create_pipeline::<ModelVertex>(&device, &mut data)?;
         let num_images: usize = data.swapchain.swapchain_images.len();
         device.create_command_pools(&instance, data.surface, num_images)?;
         data.color_attachment = ColorAttachment::new(&instance, &device, &data.swapchain)?;
@@ -386,7 +387,7 @@ impl App {
         let size = window.inner_size();
         self.data.swapchain = Swapchain::new(size.width, size.height, &self.instance, &self.device.device, self.device.physical_device, self.data.surface)?;
         self.data.render_pass = RenderPass::new(&self.instance, &self.device, &self.data.swapchain)?;
-        create_pipeline(&self.device, &mut self.data)?;
+        create_pipeline::<ModelVertex>(&self.device, &mut self.data)?;
         self.data.color_attachment = ColorAttachment::new(&self.instance, &self.device, &self.data.swapchain)?;
         self.data.depth_attachment = DepthAttachment::new(&self.instance, &self.device, &self.data.swapchain)?;
         create_framebuffers(&self.device.device, &mut self.data)?;
@@ -615,15 +616,15 @@ unsafe fn create_descriptor_set_layout(device: &Device, data: &mut AppData) -> R
     Ok(())
 }
 
-unsafe fn create_pipeline(device: &VkDevice, data: &mut AppData) -> Result<()> {
+unsafe fn create_pipeline<V: Vertex>(device: &VkDevice, data: &mut AppData) -> Result<()> {
     // Shader
     let mut shader = Shader::new(b"main\0", &device.device)?;
 
     // Vertex Input State
-    let binding_descriptions = &[Vertex::binding_description()];
-    let attribute_descriptions = Vertex::attribute_descriptions();
+    let binding_descriptions = V::binding_description();
+    let attribute_descriptions = V::attribute_descriptions();
     let vertex_input_state = vk::PipelineVertexInputStateCreateInfo::builder()
-        .vertex_binding_descriptions(binding_descriptions)
+        .vertex_binding_descriptions(&binding_descriptions)
         .vertex_attribute_descriptions(&attribute_descriptions);
 
     // Input Assembly State
