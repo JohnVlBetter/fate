@@ -1,3 +1,5 @@
+use std::fs;
+
 use vulkanalia::vk::{PipelineShaderStageCreateInfoBuilder, ShaderModule};
 
 use anyhow::Result;
@@ -15,11 +17,12 @@ pub struct Shader<'a> {
 
 impl<'a> Shader<'a> {
     pub unsafe fn new(
+        shader_name: String,
         main_func_name: &'a [u8],
         device: &Device,
     ) -> Result<Self> {
-        let vert = include_bytes!("../../../shaders/shader.vert.spv");
-        let frag = include_bytes!("../../../shaders/shader.frag.spv");
+        let vert = fs::read(format!("shaders/{}.vert.spv", shader_name)).expect("读取失败！");
+        let frag = fs::read(format!("shaders/{}.frag.spv", shader_name)).expect("读取失败！");
         let vert_shader_module = create_shader_module(device, &vert[..])?;
         let frag_shader_module = create_shader_module(device, &frag[..])?;
 

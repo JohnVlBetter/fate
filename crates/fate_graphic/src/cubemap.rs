@@ -1,12 +1,13 @@
-use cgmath::{Deg, Matrix4};
+/*use cgmath::{Deg, Matrix4};
 use std::mem::size_of;
 use std::path::Path;
 use std::time::Instant;
 use vulkanalia::prelude::v1_0::*;
 
 use crate::{
+    descriptors::create_descriptors,
     device::VkDevice,
-    skybox::SkyboxModel,
+    skybox::{SkyboxModel, SkyboxVertex},
     texture::{load_hdr_image, Texture},
 };
 
@@ -23,13 +24,13 @@ pub(crate) unsafe fn create_skybox_cubemap<P: AsRef<Path>>(
 
     let cubemap_format = vk::Format::R16G16B16A16_SFLOAT;
 
-    let texture = Texture::new_hdr(data, w, h, true, instance, device);
+    let texture = Texture::new_hdr(data, w, h, true, instance, device).unwrap();
     let cubemap =
         Texture::create_renderable_cubemap(instance, device, size, mip_levels, cubemap_format);
 
     let skybox_model = SkyboxModel::new(instance, device);
 
-    let descriptors = create_descriptors(context, &texture);
+    let descriptors = create_descriptors(instance, &device.device, &texture);
 
     let (pipeline_layout, pipeline) = {
         let layout = {
@@ -43,7 +44,10 @@ pub(crate) unsafe fn create_skybox_cubemap<P: AsRef<Path>>(
                 .set_layouts(&layouts)
                 .push_constant_ranges(&push_constant_range);
 
-            unsafe { device.create_pipeline_layout(&layout_info, None).unwrap() }
+            device
+                .device
+                .create_pipeline_layout(&layout_info, None)
+                .unwrap();
         };
 
         let pipeline = {
@@ -234,3 +238,4 @@ pub(crate) unsafe fn create_skybox_cubemap<P: AsRef<Path>>(
 
     cubemap
 }
+*/

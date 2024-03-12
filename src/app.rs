@@ -618,7 +618,7 @@ unsafe fn create_descriptor_set_layout(device: &Device, data: &mut AppData) -> R
 
 unsafe fn create_pipeline<V: Vertex>(device: &VkDevice, data: &mut AppData) -> Result<()> {
     // Shader
-    let mut shader = Shader::new(b"main\0", &device.device)?;
+    let mut shader = Shader::new(String::from("shader"), b"main\0", &device.device)?;
 
     // Vertex Input State
     let binding_descriptions = V::binding_description();

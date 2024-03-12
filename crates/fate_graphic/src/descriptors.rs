@@ -62,46 +62,33 @@ pub unsafe fn create_descriptors(
     let pool_sizes = vk::DescriptorPoolSize::builder()
         .type_(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
         .descriptor_count(1);
+    let binding = [pool_sizes];
     let info = vk::DescriptorPoolCreateInfo::builder()
-        .pool_sizes(&[pool_sizes])
+        .pool_sizes(&binding)
         .max_sets(1);
     let pool = device.create_descriptor_pool(&info, None).unwrap();
 
-    let sets = {
-        let layouts = [layout];
+    let layouts = [layout];
+    let allocate_info = vk::DescriptorSetAllocateInfo::builder()
+        .descriptor_pool(pool)
+        .set_layouts(&layouts);
 
-        let allocate_info = vk::DescriptorSetAllocateInfo::builder()
-            .descriptor_pool(pool)
-            .set_layouts(&layouts);
+    let sets = device.allocate_descriptor_sets(&allocate_info).unwrap();
 
-        let sets = unsafe {
-            context
-                .device()
-                .allocate_descriptor_sets(&allocate_info)
-                .unwrap()
-        };
+    let cubemap_info = [vk::DescriptorImageInfo::builder()
+        .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
+        .image_view(texture.texture_image_view)
+        .sampler(texture.texture_sampler)
+        .build()];
 
-        let cubemap_info = [vk::DescriptorImageInfo::builder()
-            .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
-            .image_view(texture.view)
-            .sampler(texture.sampler.unwrap())
-            .build()];
+    let descriptor_writes = [vk::WriteDescriptorSet::builder()
+        .dst_set(sets[0])
+        .dst_binding(0)
+        .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
+        .image_info(&cubemap_info)
+        .build()];
 
-        let descriptor_writes = [vk::WriteDescriptorSet::builder()
-            .dst_set(sets[0])
-            .dst_binding(0)
-            .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
-            .image_info(&cubemap_info)
-            .build()];
-
-        unsafe {
-            context
-                .device()
-                .update_descriptor_sets(&descriptor_writes, &[])
-        }
-
-        sets
-    };
+    device.update_descriptor_sets(&descriptor_writes, &[] as &[vk::CopyDescriptorSet]);
 
     Descriptors::new(layout, pool, sets)
 }

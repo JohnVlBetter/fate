@@ -1,12 +1,10 @@
-/*use std::{ffi::CString, sync::Arc};
+use std::{ffi::CString, sync::Arc};
 use vulkanalia::prelude::v1_0::*;
 
 use crate::{device::VkDevice, shader::Shader, vertex::Vertex};
 
 #[derive(Copy, Clone)]
 pub struct PipelineParameters<'a> {
-    pub vertex_shader_params: ShaderParameters<'a>,
-    pub fragment_shader_params: ShaderParameters<'a>,
     pub multisampling_info: &'a vk::PipelineMultisampleStateCreateInfo,
     pub viewport_info: &'a vk::PipelineViewportStateCreateInfo,
     pub rasterizer_info: &'a vk::PipelineRasterizationStateCreateInfo,
@@ -20,9 +18,12 @@ pub struct PipelineParameters<'a> {
     pub allow_derivatives: bool,
 }
 
-unsafe fn create_pipeline<V: Vertex>(device: &VkDevice, data: &mut AppData) -> Result<()> {
+unsafe fn create_pipeline<V: Vertex>(
+    device: &VkDevice,
+    params: PipelineParameters,
+) -> vk::Pipeline {
     // Shader
-    let mut shader = Shader::new(b"main\0", &device.device)?;
+    let mut shader = Shader::new(String::form("skybox"), b"main\0", &device.device)?;
 
     // Vertex Input State
     let binding_descriptions = V::binding_description();
@@ -32,33 +33,11 @@ unsafe fn create_pipeline<V: Vertex>(device: &VkDevice, data: &mut AppData) -> R
         .vertex_attribute_descriptions(&attribute_descriptions);
 
     // Input Assembly State
-
     let input_assembly_state = vk::PipelineInputAssemblyStateCreateInfo::builder()
         .topology(vk::PrimitiveTopology::TRIANGLE_LIST)
         .primitive_restart_enable(false);
 
-    // Viewport State
-
-    let viewport = vk::Viewport::builder()
-        .x(0.0)
-        .y(0.0)
-        .width(data.swapchain.swapchain_extent.width as f32)
-        .height(data.swapchain.swapchain_extent.height as f32)
-        .min_depth(0.0)
-        .max_depth(1.0);
-
-    let scissor = vk::Rect2D::builder()
-        .offset(vk::Offset2D { x: 0, y: 0 })
-        .extent(data.swapchain.swapchain_extent);
-
-    let viewports = &[viewport];
-    let scissors = &[scissor];
-    let viewport_state = vk::PipelineViewportStateCreateInfo::builder()
-        .viewports(viewports)
-        .scissors(scissors);
-
     // Rasterization State
-
     let rasterization_state = vk::PipelineRasterizationStateCreateInfo::builder()
         .depth_clamp_enable(false)
         .rasterizer_discard_enable(false)
@@ -69,14 +48,12 @@ unsafe fn create_pipeline<V: Vertex>(device: &VkDevice, data: &mut AppData) -> R
         .depth_bias_enable(false);
 
     // Multisample State
-
     let multisample_state = vk::PipelineMultisampleStateCreateInfo::builder()
         .sample_shading_enable(true)
         .min_sample_shading(0.2)
         .rasterization_samples(device.msaa_samples);
 
     // Depth Stencil State
-
     let depth_stencil_state = vk::PipelineDepthStencilStateCreateInfo::builder()
         .depth_test_enable(true)
         .depth_write_enable(true)
@@ -85,7 +62,6 @@ unsafe fn create_pipeline<V: Vertex>(device: &VkDevice, data: &mut AppData) -> R
         .stencil_test_enable(false);
 
     // Color Blend State
-
     let attachment = vk::PipelineColorBlendAttachmentState::builder()
         .color_write_mask(vk::ColorComponentFlags::all())
         .blend_enable(true)
@@ -104,7 +80,6 @@ unsafe fn create_pipeline<V: Vertex>(device: &VkDevice, data: &mut AppData) -> R
         .blend_constants([0.0, 0.0, 0.0, 0.0]);
 
     // Push Constant Ranges
-
     let vert_push_constant_range = vk::PushConstantRange::builder()
         .stage_flags(vk::ShaderStageFlags::VERTEX)
         .offset(0)
@@ -116,33 +91,29 @@ unsafe fn create_pipeline<V: Vertex>(device: &VkDevice, data: &mut AppData) -> R
         .size(52);
 
     // Layout
-
     let set_layouts = &[data.descriptor_set_layout];
     let push_constant_ranges = &[vert_push_constant_range, frag_push_constant_range];
     let layout_info = vk::PipelineLayoutCreateInfo::builder()
         .set_layouts(set_layouts)
         .push_constant_ranges(push_constant_ranges);
 
-    data.pipeline_layout = device.device.create_pipeline_layout(&layout_info, None)?;
-
     // Create
-
     let (vert_stage, frag_stage) = shader.get_stages()?;
     let stages = &[vert_stage, frag_stage];
     let info = vk::GraphicsPipelineCreateInfo::builder()
         .stages(stages)
         .vertex_input_state(&vertex_input_state)
         .input_assembly_state(&input_assembly_state)
-        .viewport_state(&viewport_state)
+        .viewport_state(&params.viewport_info)
         .rasterization_state(&rasterization_state)
         .multisample_state(&multisample_state)
         .depth_stencil_state(&depth_stencil_state)
         .color_blend_state(&color_blend_state)
-        .layout(data.pipeline_layout)
-        .render_pass(data.render_pass.render_pass)
+        .layout(params.layout)
+        //.render_pass(data.render_pass.render_pass)
         .subpass(0);
 
-    data.pipeline = device
+    let pipeline = device
         .device
         .create_graphics_pipelines(vk::PipelineCache::null(), &[info], None)?
         .0[0];
@@ -151,7 +122,7 @@ unsafe fn create_pipeline<V: Vertex>(device: &VkDevice, data: &mut AppData) -> R
 
     shader.destory(&device.device);
 
-    Ok(())
+    pipeline
 }
 
 pub fn create_pipeline1<V: Vertex>(
@@ -285,4 +256,3 @@ impl<'a> ShaderParameters<'a> {
         }
     }
 }
-*/
