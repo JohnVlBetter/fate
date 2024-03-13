@@ -3,7 +3,6 @@ use vulkanalia::prelude::v1_0::*;
 
 use crate::device::VkDevice;
 use crate::frame_buffer::*;
-use crate::swapchain::Swapchain;
 
 #[derive(Copy, Clone, Debug, Default)]
 pub struct RenderPass {
@@ -14,12 +13,12 @@ impl RenderPass {
     pub unsafe fn new(
         instance: &Instance,
         device: &VkDevice,
-        swapchain: &Swapchain,
+        swapchain_format: vk::Format,
     ) -> Result<Self> {
         // Attachments
 
         let color_attachment = vk::AttachmentDescription::builder()
-            .format(swapchain.swapchain_format)
+            .format(swapchain_format)
             .samples(device.msaa_samples)
             .load_op(vk::AttachmentLoadOp::CLEAR)
             .store_op(vk::AttachmentStoreOp::STORE)
@@ -39,7 +38,7 @@ impl RenderPass {
             .final_layout(vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
 
         let color_resolve_attachment = vk::AttachmentDescription::builder()
-            .format(swapchain.swapchain_format)
+            .format(swapchain_format)
             .samples(vk::SampleCountFlags::_1)
             .load_op(vk::AttachmentLoadOp::DONT_CARE)
             .store_op(vk::AttachmentStoreOp::STORE)

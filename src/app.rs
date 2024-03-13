@@ -92,7 +92,7 @@ impl App {
             device.physical_device,
             data.surface,
         )?;
-        data.render_pass = RenderPass::new(&instance, &device, &data.swapchain)?;
+        data.render_pass = RenderPass::new(&instance, &device, data.swapchain.swapchain_format)?;
         create_descriptor_set_layout(&device.device, &mut data)?;
         create_pipeline::<ModelVertex>(&device, &mut data)?;
         let num_images: usize = data.swapchain.swapchain_images.len();
@@ -386,7 +386,7 @@ impl App {
         self.destroy_swapchain();
         let size = window.inner_size();
         self.data.swapchain = Swapchain::new(size.width, size.height, &self.instance, &self.device.device, self.device.physical_device, self.data.surface)?;
-        self.data.render_pass = RenderPass::new(&self.instance, &self.device, &self.data.swapchain)?;
+        self.data.render_pass = RenderPass::new(&self.instance, &self.device, self.data.swapchain.swapchain_format)?;
         create_pipeline::<ModelVertex>(&self.device, &mut self.data)?;
         self.data.color_attachment = ColorAttachment::new(&self.instance, &self.device, &self.data.swapchain)?;
         self.data.depth_attachment = DepthAttachment::new(&self.instance, &self.device, &self.data.swapchain)?;

@@ -5,6 +5,7 @@ use vulkanalia::prelude::v1_0::*;
 
 use crate::buffer::{copy_buffer, create_buffer, Buffer};
 use crate::device::VkDevice;
+use crate::vertex::Vertex;
 
 pub type Vec2 = cgmath::Vector2<f32>;
 pub type Vec3 = cgmath::Vector3<f32>;
@@ -22,23 +23,25 @@ impl SkyboxVertex {
     pub fn new(position: Vec3) -> Self {
         Self { position }
     }
+}
 
-    pub fn binding_description() -> vk::VertexInputBindingDescription {
-        vk::VertexInputBindingDescription::builder()
+impl Vertex for SkyboxVertex {
+    fn binding_description() -> Vec<vk::VertexInputBindingDescription> {
+        vec![vk::VertexInputBindingDescription::builder()
             .binding(0)
             .stride(size_of::<SkyboxVertex>() as u32)
             .input_rate(vk::VertexInputRate::VERTEX)
-            .build()
+            .build()]
     }
 
-    pub fn attribute_descriptions() -> [vk::VertexInputAttributeDescription; 1] {
+    fn attribute_descriptions() -> Vec<vk::VertexInputAttributeDescription> {
         let pos = vk::VertexInputAttributeDescription::builder()
             .binding(0)
             .location(0)
             .format(vk::Format::R32G32B32_SFLOAT)
             .offset(0)
             .build();
-        [pos]
+        vec![pos]
     }
 }
 

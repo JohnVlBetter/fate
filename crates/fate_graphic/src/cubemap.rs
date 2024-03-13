@@ -1,4 +1,4 @@
-/*use cgmath::{Deg, Matrix4};
+use cgmath::{Deg, Matrix4};
 use std::mem::size_of;
 use std::path::Path;
 use std::time::Instant;
@@ -7,8 +7,10 @@ use vulkanalia::prelude::v1_0::*;
 use crate::{
     descriptors::create_descriptors,
     device::VkDevice,
+    pipeline::{create_pipeline, PipelineParameters},
     skybox::{SkyboxModel, SkyboxVertex},
     texture::{load_hdr_image, Texture},
+    vertex::Vertex,
 };
 
 pub(crate) unsafe fn create_skybox_cubemap<P: AsRef<Path>>(
@@ -47,31 +49,31 @@ pub(crate) unsafe fn create_skybox_cubemap<P: AsRef<Path>>(
             device
                 .device
                 .create_pipeline_layout(&layout_info, None)
-                .unwrap();
+                .unwrap()
         };
 
         let pipeline = {
-            let viewport = vk::Viewport {
-                x: 0.0,
-                y: 0.0,
-                width: size as _,
-                height: size as _,
-                min_depth: 0.0,
-                max_depth: 1.0,
-            };
+            let viewport = vk::Viewport::builder()
+                .x(0.0)
+                .y(0.0)
+                .width(size as _)
+                .height(size as _)
+                .min_depth(0.0)
+                .max_depth(1.0)
+                .build();
 
-            let viewports = [viewport];
-            let scissor = vk::Rect2D {
-                offset: vk::Offset2D { x: 0, y: 0 },
-                extent: vk::Extent2D {
+            let scissor = vk::Rect2D::builder()
+                .offset(vk::Offset2D { x: 0, y: 0 })
+                .extent(vk::Extent2D {
                     width: size,
                     height: size,
-                },
-            };
-            let scissors = [scissor];
-            let viewport_info = vk::PipelineViewportStateCreateInfo::builder()
-                .viewports(&viewports)
-                .scissors(&scissors);
+                });
+
+            let viewports = &[viewport];
+            let scissors = &[scissor];
+            let viewport_state = vk::PipelineViewportStateCreateInfo::builder()
+                .viewports(viewports)
+                .scissors(scissors);
 
             let rasterizer_info = vk::PipelineRasterizationStateCreateInfo::builder()
                 .depth_clamp_enable(false)
@@ -86,11 +88,9 @@ pub(crate) unsafe fn create_skybox_cubemap<P: AsRef<Path>>(
                 .depth_bias_slope_factor(0.0);
 
             create_env_pipeline::<SkyboxVertex>(
-                context,
+                device,
                 EnvPipelineParameters {
-                    vertex_shader_name: "cubemap",
-                    fragment_shader_name: "spherical",
-                    viewport_info: &viewport_info,
+                    viewport_info: &viewport_state,
                     rasterizer_info: &rasterizer_info,
                     dynamic_state_info: None,
                     layout,
@@ -105,8 +105,8 @@ pub(crate) unsafe fn create_skybox_cubemap<P: AsRef<Path>>(
     let views = (0..6)
         .map(|i| {
             let create_info = vk::ImageViewCreateInfo::builder()
-                .image(cubemap.image.image)
-                .view_type(vk::ImageViewType::TYPE_2D)
+                .image(cubemap.texture_image)
+                .view_type(vk::ImageViewType::_2D)
                 .format(cubemap_format)
                 .subresource_range(vk::ImageSubresourceRange {
                     aspect_mask: vk::ImageAspectFlags::COLOR,
@@ -116,7 +116,7 @@ pub(crate) unsafe fn create_skybox_cubemap<P: AsRef<Path>>(
                     layer_count: 1,
                 });
 
-            unsafe { device.create_image_view(&create_info, None).unwrap() }
+            device.device.create_image_view(&create_info, None).unwrap()
         })
         .collect::<Vec<_>>();
 
@@ -238,4 +238,54 @@ pub(crate) unsafe fn create_skybox_cubemap<P: AsRef<Path>>(
 
     cubemap
 }
-*/
+
+#[derive(Copy, Clone)]
+struct EnvPipelineParameters<'a> {
+    viewport_info: &'a vk::PipelineViewportStateCreateInfo,
+    rasterizer_info: &'a vk::PipelineRasterizationStateCreateInfo,
+    dynamic_state_info: Option<&'a vk::PipelineDynamicStateCreateInfo>,
+    layout: vk::PipelineLayout,
+    format: vk::Format,
+}
+
+unsafe fn create_env_pipeline<V: Vertex>(
+    device: &VkDevice,
+    params: EnvPipelineParameters,
+) -> vk::Pipeline {
+    let multisampling_info = vk::PipelineMultisampleStateCreateInfo::builder()
+        .sample_shading_enable(false)
+        .rasterization_samples(vk::SampleCountFlags::_1)
+        .min_sample_shading(1.0)
+        .alpha_to_coverage_enable(false)
+        .alpha_to_one_enable(false);
+
+    let color_blend_attachments = [vk::PipelineColorBlendAttachmentState::builder()
+        .color_write_mask(
+            vk::ColorComponentFlags::R
+                | vk::ColorComponentFlags::G
+                | vk::ColorComponentFlags::B
+                | vk::ColorComponentFlags::A,
+        )
+        .blend_enable(false)
+        .src_color_blend_factor(vk::BlendFactor::ONE)
+        .dst_color_blend_factor(vk::BlendFactor::ZERO)
+        .color_blend_op(vk::BlendOp::ADD)
+        .src_alpha_blend_factor(vk::BlendFactor::ONE)
+        .dst_alpha_blend_factor(vk::BlendFactor::ZERO)
+        .alpha_blend_op(vk::BlendOp::ADD)
+        .build()];
+
+    create_pipeline::<V>(
+        device,
+        PipelineParameters {
+            multisampling_info: &multisampling_info,
+            viewport_info: params.viewport_info,
+            rasterizer_info: params.rasterizer_info,
+            dynamic_state_info: params.dynamic_state_info,
+            depth_stencil_info: None,
+            color_blend_attachments: &color_blend_attachments,
+            layout: params.layout,
+            render_pass: todo!(),
+        },
+    )
+}

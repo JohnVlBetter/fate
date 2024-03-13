@@ -9,10 +9,10 @@ use vulkanalia::prelude::v1_0::*;
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
 pub struct Shader<'a> {
-    vert_shader_module: ShaderModule,
-    frag_shader_module: ShaderModule,
-    vert_stage: PipelineShaderStageCreateInfoBuilder<'a>,
-    frag_stage: PipelineShaderStageCreateInfoBuilder<'a>,
+    pub vert_shader_module: ShaderModule,
+    pub frag_shader_module: ShaderModule,
+    pub vert_stage: PipelineShaderStageCreateInfoBuilder<'a>,
+    pub frag_stage: PipelineShaderStageCreateInfoBuilder<'a>,
 }
 
 impl<'a> Shader<'a> {
