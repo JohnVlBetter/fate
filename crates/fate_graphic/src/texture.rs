@@ -727,7 +727,7 @@ unsafe fn copy_buffer_to_image(
     Ok(())
 }
 
-unsafe fn generate_mipmaps(
+pub unsafe fn generate_mipmaps(
     instance: &Instance,
     device: &Device,
     physical_device: vk::PhysicalDevice,

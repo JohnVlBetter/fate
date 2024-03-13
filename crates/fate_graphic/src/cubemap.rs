@@ -1,4 +1,4 @@
-use cgmath::{Deg, Matrix4};
+use cgmath::{perspective, Deg, Matrix4, Point3, Vector3};
 use std::mem::size_of;
 use std::path::Path;
 use std::time::Instant;
@@ -9,7 +9,7 @@ use crate::{
     device::VkDevice,
     pipeline::{create_pipeline, PipelineParameters},
     skybox::{SkyboxModel, SkyboxVertex},
-    texture::{load_hdr_image, Texture},
+    texture::{generate_mipmaps, load_hdr_image, transition_image_layout, Texture},
     vertex::Vertex,
 };
 
@@ -211,11 +211,32 @@ pub(crate) unsafe fn create_skybox_cubemap<P: AsRef<Path>>(
         }
     });
 
-    cubemap.image.transition_image_layout(
+    transition_image_layout(
+        &device.device,
+        device.graphics_queue,
+        device.command_pool,
+        cubemap.texture_image,
+        cubemap_format,
         vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
         vk::ImageLayout::TRANSFER_DST_OPTIMAL,
-    );
+        mip_levels,
+        6,
+    )
+    .unwrap();
 
+    generate_mipmaps(
+        instance,
+        &device.device,
+        device.physical_device,
+        device.graphics_queue,
+        device.command_pool,
+        cubemap.texture_image,
+        cubemap_format,
+        size,
+        size,
+        mip_levels,
+    ).unwrap();
+    //layer count!!!!!!!
     cubemap.image.generate_mipmaps(vk::Extent2D {
         width: size,
         height: size,
@@ -288,4 +309,39 @@ unsafe fn create_env_pipeline<V: Vertex>(
             render_pass: todo!(),
         },
     )
+}
+
+fn get_view_matrices() -> [Matrix4<f32>; 6] {
+    [
+        Matrix4::<f32>::look_at_rh(
+            Point3::new(0.0, 0.0, 0.0),
+            Point3::new(1.0, 0.0, 0.0),
+            Vector3::new(0.0, 1.0, 0.0),
+        ),
+        Matrix4::<f32>::look_at_rh(
+            Point3::new(0.0, 0.0, 0.0),
+            Point3::new(-1.0, 0.0, 0.0),
+            Vector3::new(0.0, 1.0, 0.0),
+        ),
+        Matrix4::<f32>::look_at_rh(
+            Point3::new(0.0, 0.0, 0.0),
+            Point3::new(0.0, 1.0, 0.0),
+            Vector3::new(0.0, 0.0, -1.0),
+        ),
+        Matrix4::<f32>::look_at_rh(
+            Point3::new(0.0, 0.0, 0.0),
+            Point3::new(0.0, -1.0, 0.0),
+            Vector3::new(0.0, 0.0, 1.0),
+        ),
+        Matrix4::<f32>::look_at_rh(
+            Point3::new(0.0, 0.0, 0.0),
+            Point3::new(0.0, 0.0, 1.0),
+            Vector3::new(0.0, 1.0, 0.0),
+        ),
+        Matrix4::<f32>::look_at_rh(
+            Point3::new(0.0, 0.0, 0.0),
+            Point3::new(0.0, 0.0, -1.0),
+            Vector3::new(0.0, 1.0, 0.0),
+        ),
+    ]
 }
