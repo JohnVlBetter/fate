@@ -120,6 +120,7 @@ impl Texture {
             width,
             height,
             mip_levels,
+            1,
         )?;
 
         let texture_image_view = create_image_view(
@@ -254,6 +255,7 @@ impl Texture {
             width,
             height,
             mip_levels,
+            1,
         )?;
 
         let texture_image_view = create_image_view(
@@ -738,6 +740,7 @@ pub unsafe fn generate_mipmaps(
     width: u32,
     height: u32,
     mip_levels: u32,
+    layers: u32,
 ) -> Result<()> {
     // Support
 
@@ -758,7 +761,7 @@ pub unsafe fn generate_mipmaps(
     let subresource = vk::ImageSubresourceRange::builder()
         .aspect_mask(vk::ImageAspectFlags::COLOR)
         .base_array_layer(0)
-        .layer_count(1)
+        .layer_count(layers)
         .level_count(1);
 
     let mut barrier = vk::ImageMemoryBarrier::builder()
@@ -791,13 +794,13 @@ pub unsafe fn generate_mipmaps(
             .aspect_mask(vk::ImageAspectFlags::COLOR)
             .mip_level(i - 1)
             .base_array_layer(0)
-            .layer_count(1);
+            .layer_count(layers);
 
         let dst_subresource = vk::ImageSubresourceLayers::builder()
             .aspect_mask(vk::ImageAspectFlags::COLOR)
             .mip_level(i)
             .base_array_layer(0)
-            .layer_count(1);
+            .layer_count(layers);
 
         let blit = vk::ImageBlit::builder()
             .src_offsets([

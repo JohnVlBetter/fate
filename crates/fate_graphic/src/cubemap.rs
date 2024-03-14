@@ -10,12 +10,14 @@ use crate::{
     pipeline::{create_pipeline, PipelineParameters},
     skybox::{SkyboxModel, SkyboxVertex},
     texture::{generate_mipmaps, load_hdr_image, transition_image_layout, Texture},
+    tools::{begin_single_time_commands, end_single_time_commands},
     vertex::Vertex,
 };
 
 pub(crate) unsafe fn create_skybox_cubemap<P: AsRef<Path>>(
     instance: &Instance,
     device: &VkDevice,
+    swapchain_format: vk::Format,
     path: P,
     size: u32,
 ) -> Texture {
@@ -125,91 +127,104 @@ pub(crate) unsafe fn create_skybox_cubemap<P: AsRef<Path>>(
     let proj = perspective(Deg(90.0), 1.0, 0.1, 10.0);
 
     // Render
-    context.execute_one_time_commands(|buffer| {
-        {
-            for face in 0..6 {
-                let attachment_info = RenderingAttachmentInfo::builder()
-                    .clear_value(vk::ClearValue {
-                        color: vk::ClearColorValue {
-                            float32: [0.0, 0.0, 0.0, 1.0],
-                        },
-                    })
-                    .image_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
-                    .image_view(views[face])
-                    .load_op(vk::AttachmentLoadOp::CLEAR)
-                    .store_op(vk::AttachmentStoreOp::STORE);
+    let command_buffer = begin_single_time_commands(&device.device, device.command_pool).unwrap();
+    for face in 0..6 {
+        /*let color_attachment = vk::AttachmentDescription::builder()
+            .format(swapchain_format)
+            .samples(device.msaa_samples)
+            .load_op(vk::AttachmentLoadOp::CLEAR)
+            .store_op(vk::AttachmentStoreOp::STORE)
+            .stencil_load_op(vk::AttachmentLoadOp::DONT_CARE)
+            .stencil_store_op(vk::AttachmentStoreOp::DONT_CARE)
+            .initial_layout(vk::ImageLayout::UNDEFINED)
+            .final_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL);
 
-                let rendering_info = RenderingInfo::builder()
-                    .color_attachments(std::slice::from_ref(&attachment_info))
-                    .layer_count(1)
-                    .render_area(vk::Rect2D {
-                        offset: vk::Offset2D { x: 0, y: 0 },
-                        extent: vk::Extent2D {
-                            width: size,
-                            height: size,
-                        },
-                    });
+        let color_resolve_attachment = vk::AttachmentDescription::builder()
+            .format(swapchain_format)
+            .samples(vk::SampleCountFlags::_1)
+            .load_op(vk::AttachmentLoadOp::DONT_CARE)
+            .store_op(vk::AttachmentStoreOp::STORE)
+            .stencil_load_op(vk::AttachmentLoadOp::DONT_CARE)
+            .stencil_store_op(vk::AttachmentStoreOp::DONT_CARE)
+            .initial_layout(vk::ImageLayout::UNDEFINED)
+            .final_layout(vk::ImageLayout::PRESENT_SRC_KHR);
+        let color_attachment_ref = vk::AttachmentReference::builder()
+            .attachment(0)
+            .layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL);
+        let color_attachments = &[color_attachment_ref];
+        let subpass = vk::SubpassDescription::builder()
+            .pipeline_bind_point(vk::PipelineBindPoint::GRAPHICS)
+            .color_attachments(color_attachments)
+            .resolve_attachments(resolve_attachments);*/
+        let attachment_info = RenderingAttachmentInfo::builder()
+            .clear_value(vk::ClearValue {
+                color: vk::ClearColorValue {
+                    float32: [0.0, 0.0, 0.0, 1.0],
+                },
+            })
+            .image_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
+            .image_view(views[face])
+            .load_op(vk::AttachmentLoadOp::CLEAR)
+            .store_op(vk::AttachmentStoreOp::STORE);
 
-                unsafe {
-                    context
-                        .dynamic_rendering()
-                        .cmd_begin_rendering(buffer, &rendering_info)
-                };
+        let rendering_info = RenderingInfo::builder()
+            .color_attachments(std::slice::from_ref(&attachment_info))
+            .layer_count(1)
+            .render_area(vk::Rect2D {
+                offset: vk::Offset2D { x: 0, y: 0 },
+                extent: vk::Extent2D {
+                    width: size,
+                    height: size,
+                },
+            });
 
-                unsafe {
-                    device.cmd_bind_pipeline(buffer, vk::PipelineBindPoint::GRAPHICS, pipeline)
-                };
+        context
+            .dynamic_rendering()
+            .cmd_begin_rendering(buffer, &rendering_info);
 
-                unsafe {
-                    device.cmd_bind_descriptor_sets(
-                        buffer,
-                        vk::PipelineBindPoint::GRAPHICS,
-                        pipeline_layout,
-                        0,
-                        &descriptors.sets()[0..=0],
-                        &[],
-                    )
-                };
+        device.cmd_bind_pipeline(buffer, vk::PipelineBindPoint::GRAPHICS, pipeline);
 
-                let view = view_matrices[face];
-                let view_proj = proj * view;
-                unsafe {
-                    let push = any_as_u8_slice(&view_proj);
-                    device.cmd_push_constants(
-                        buffer,
-                        pipeline_layout,
-                        vk::ShaderStageFlags::VERTEX,
-                        0,
-                        push,
-                    );
-                };
+        device.cmd_bind_descriptor_sets(
+            buffer,
+            vk::PipelineBindPoint::GRAPHICS,
+            pipeline_layout,
+            0,
+            &descriptors.sets()[0..=0],
+            &[],
+        );
 
-                unsafe {
-                    device.cmd_bind_vertex_buffers(
-                        buffer,
-                        0,
-                        &[skybox_model.vertices_buffer().buffer],
-                        &[0],
-                    );
-                }
+        let view = view_matrices[face];
+        let view_proj = proj * view;
+        let push = any_as_u8_slice(&view_proj);
+        device.cmd_push_constants(
+            buffer,
+            pipeline_layout,
+            vk::ShaderStageFlags::VERTEX,
+            0,
+            push,
+        );
 
-                unsafe {
-                    device.cmd_bind_index_buffer(
-                        buffer,
-                        skybox_model.indices_buffer().buffer,
-                        0,
-                        vk::IndexType::UINT32,
-                    );
-                }
+        device.cmd_bind_vertex_buffers(buffer, 0, &[skybox_model.vertices_buffer().buffer], &[0]);
+        device.cmd_bind_index_buffer(
+            buffer,
+            skybox_model.indices_buffer().buffer,
+            0,
+            vk::IndexType::UINT32,
+        );
 
-                // Draw skybox
-                unsafe { device.cmd_draw_indexed(buffer, 36, 1, 0, 0, 0) };
+        // Draw skybox
+        device.cmd_draw_indexed(buffer, 36, 1, 0, 0, 0);
 
-                // End render pass
-                unsafe { context.dynamic_rendering().cmd_end_rendering(buffer) };
-            }
-        }
-    });
+        // End render pass
+        context.dynamic_rendering().cmd_end_rendering(buffer);
+    }
+    end_single_time_commands(
+        &device.device,
+        device.graphics_queue,
+        device.command_pool,
+        command_buffer,
+    )
+    .unwrap();
 
     transition_image_layout(
         &device.device,
@@ -235,21 +250,16 @@ pub(crate) unsafe fn create_skybox_cubemap<P: AsRef<Path>>(
         size,
         size,
         mip_levels,
-    ).unwrap();
-    //layer count!!!!!!!
-    cubemap.image.generate_mipmaps(vk::Extent2D {
-        width: size,
-        height: size,
-    });
+        6,
+    )
+    .unwrap();
 
     // Cleanup
-    unsafe {
-        views
-            .iter()
-            .for_each(|v| device.destroy_image_view(*v, None));
-        device.destroy_pipeline(pipeline, None);
-        device.destroy_pipeline_layout(pipeline_layout, None);
-    }
+    views
+        .iter()
+        .for_each(|v| device.device.destroy_image_view(*v, None));
+    device.device.destroy_pipeline(pipeline, None);
+    device.device.destroy_pipeline_layout(pipeline_layout, None);
 
     let time = start.elapsed().as_millis();
     log::info!(
