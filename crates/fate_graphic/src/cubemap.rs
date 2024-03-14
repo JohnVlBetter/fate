@@ -1,12 +1,13 @@
 use cgmath::{perspective, Deg, Matrix4, Point3, Vector3};
-use std::mem::size_of;
 use std::path::Path;
 use std::time::Instant;
+use std::{mem::size_of, ptr::slice_from_raw_parts};
 use vulkanalia::prelude::v1_0::*;
 
 use crate::{
     descriptors::create_descriptors,
     device::VkDevice,
+    mesh::Mat4,
     pipeline::{create_pipeline, PipelineParameters},
     skybox::{SkyboxModel, SkyboxVertex},
     texture::{generate_mipmaps, load_hdr_image, transition_image_layout, Texture},
@@ -127,7 +128,6 @@ pub(crate) unsafe fn create_skybox_cubemap<P: AsRef<Path>>(
     let proj = perspective(Deg(90.0), 1.0, 0.1, 10.0);
 
     // Render
-    let command_buffer = begin_single_time_commands(&device.device, device.command_pool).unwrap();
     for face in 0..6 {
         /*let color_attachment = vk::AttachmentDescription::builder()
             .format(swapchain_format)
@@ -178,14 +178,15 @@ pub(crate) unsafe fn create_skybox_cubemap<P: AsRef<Path>>(
                 },
             });
 
-        context
-            .dynamic_rendering()
-            .cmd_begin_rendering(buffer, &rendering_info);
+        let command_buffer =
+            begin_single_time_commands(&device.device, device.command_pool).unwrap();
 
-        device.cmd_bind_pipeline(buffer, vk::PipelineBindPoint::GRAPHICS, pipeline);
+        device
+            .device
+            .cmd_bind_pipeline(command_buffer, vk::PipelineBindPoint::GRAPHICS, pipeline);
 
-        device.cmd_bind_descriptor_sets(
-            buffer,
+        device.device.cmd_bind_descriptor_sets(
+            command_buffer,
             vk::PipelineBindPoint::GRAPHICS,
             pipeline_layout,
             0,
@@ -195,36 +196,42 @@ pub(crate) unsafe fn create_skybox_cubemap<P: AsRef<Path>>(
 
         let view = view_matrices[face];
         let view_proj = proj * view;
-        let push = any_as_u8_slice(&view_proj);
-        device.cmd_push_constants(
-            buffer,
+        let push =
+            &*slice_from_raw_parts(&view_proj as *const Mat4 as *const u8, size_of::<Mat4>());
+        device.device.cmd_push_constants(
+            command_buffer,
             pipeline_layout,
             vk::ShaderStageFlags::VERTEX,
             0,
             push,
         );
 
-        device.cmd_bind_vertex_buffers(buffer, 0, &[skybox_model.vertices_buffer().buffer], &[0]);
-        device.cmd_bind_index_buffer(
-            buffer,
+        device.device.cmd_bind_vertex_buffers(
+            command_buffer,
+            0,
+            &[skybox_model.vertices_buffer().buffer],
+            &[0],
+        );
+        device.device.cmd_bind_index_buffer(
+            command_buffer,
             skybox_model.indices_buffer().buffer,
             0,
             vk::IndexType::UINT32,
         );
 
         // Draw skybox
-        device.cmd_draw_indexed(buffer, 36, 1, 0, 0, 0);
+        device
+            .device
+            .cmd_draw_indexed(command_buffer, 36, 1, 0, 0, 0);
 
-        // End render pass
-        context.dynamic_rendering().cmd_end_rendering(buffer);
+        end_single_time_commands(
+            &device.device,
+            device.graphics_queue,
+            device.command_pool,
+            command_buffer,
+        )
+        .unwrap();
     }
-    end_single_time_commands(
-        &device.device,
-        device.graphics_queue,
-        device.command_pool,
-        command_buffer,
-    )
-    .unwrap();
 
     transition_image_layout(
         &device.device,
