@@ -4,6 +4,7 @@ use std::time::Instant;
 use std::{mem::size_of, ptr::slice_from_raw_parts};
 use vulkanalia::prelude::v1_0::*;
 
+use crate::render_pass::{self, RenderPass};
 use crate::{
     descriptors::create_descriptors,
     device::VkDevice,
@@ -18,7 +19,6 @@ use crate::{
 pub(crate) unsafe fn create_skybox_cubemap<P: AsRef<Path>>(
     instance: &Instance,
     device: &VkDevice,
-    swapchain_format: vk::Format,
     path: P,
     size: u32,
 ) -> Texture {
@@ -36,6 +36,8 @@ pub(crate) unsafe fn create_skybox_cubemap<P: AsRef<Path>>(
     let skybox_model = SkyboxModel::new(instance, device);
 
     let descriptors = create_descriptors(instance, &device.device, &texture);
+
+    let render_pass = RenderPass::new(instance, device, cubemap_format).unwrap();
 
     let (pipeline_layout, pipeline) = {
         let layout = {
@@ -98,6 +100,7 @@ pub(crate) unsafe fn create_skybox_cubemap<P: AsRef<Path>>(
                     dynamic_state_info: None,
                     layout,
                     format: cubemap_format,
+                    render_pass: render_pass.render_pass,
                 },
             )
         };
@@ -129,33 +132,15 @@ pub(crate) unsafe fn create_skybox_cubemap<P: AsRef<Path>>(
 
     // Render
     for face in 0..6 {
-        /*let color_attachment = vk::AttachmentDescription::builder()
-            .format(swapchain_format)
-            .samples(device.msaa_samples)
-            .load_op(vk::AttachmentLoadOp::CLEAR)
-            .store_op(vk::AttachmentStoreOp::STORE)
-            .stencil_load_op(vk::AttachmentLoadOp::DONT_CARE)
-            .stencil_store_op(vk::AttachmentStoreOp::DONT_CARE)
-            .initial_layout(vk::ImageLayout::UNDEFINED)
-            .final_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL);
+        let inheritance_info = vk::CommandBufferInheritanceInfo::builder()
+            .render_pass(render_pass.render_pass)
+            .subpass(0)
+            .framebuffer(self.data.framebuffers[image_index].frame_buffer);
 
-        let color_resolve_attachment = vk::AttachmentDescription::builder()
-            .format(swapchain_format)
-            .samples(vk::SampleCountFlags::_1)
-            .load_op(vk::AttachmentLoadOp::DONT_CARE)
-            .store_op(vk::AttachmentStoreOp::STORE)
-            .stencil_load_op(vk::AttachmentLoadOp::DONT_CARE)
-            .stencil_store_op(vk::AttachmentStoreOp::DONT_CARE)
-            .initial_layout(vk::ImageLayout::UNDEFINED)
-            .final_layout(vk::ImageLayout::PRESENT_SRC_KHR);
-        let color_attachment_ref = vk::AttachmentReference::builder()
-            .attachment(0)
-            .layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL);
-        let color_attachments = &[color_attachment_ref];
-        let subpass = vk::SubpassDescription::builder()
-            .pipeline_bind_point(vk::PipelineBindPoint::GRAPHICS)
-            .color_attachments(color_attachments)
-            .resolve_attachments(resolve_attachments);*/
+        let info = vk::CommandBufferBeginInfo::builder()
+            .flags(vk::CommandBufferUsageFlags::RENDER_PASS_CONTINUE)
+            .inheritance_info(&inheritance_info);
+
         let attachment_info = RenderingAttachmentInfo::builder()
             .clear_value(vk::ClearValue {
                 color: vk::ClearColorValue {
@@ -267,6 +252,7 @@ pub(crate) unsafe fn create_skybox_cubemap<P: AsRef<Path>>(
         .for_each(|v| device.device.destroy_image_view(*v, None));
     device.device.destroy_pipeline(pipeline, None);
     device.device.destroy_pipeline_layout(pipeline_layout, None);
+    render_pass.destory(device);
 
     let time = start.elapsed().as_millis();
     log::info!(
@@ -284,6 +270,7 @@ struct EnvPipelineParameters<'a> {
     dynamic_state_info: Option<&'a vk::PipelineDynamicStateCreateInfo>,
     layout: vk::PipelineLayout,
     format: vk::Format,
+    render_pass: vk::RenderPass,
 }
 
 unsafe fn create_env_pipeline<V: Vertex>(
@@ -323,7 +310,7 @@ unsafe fn create_env_pipeline<V: Vertex>(
             depth_stencil_info: None,
             color_blend_attachments: &color_blend_attachments,
             layout: params.layout,
-            render_pass: todo!(),
+            render_pass: params.render_pass,
         },
     )
 }
