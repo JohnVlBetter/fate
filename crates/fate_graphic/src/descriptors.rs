@@ -35,7 +35,7 @@ impl Descriptors {
         self.sets = sets;
     }
 
-    fn destory(&mut self, device: &Device) {
+    fn _destory(&mut self, device: &Device) {
         unsafe {
             device.destroy_descriptor_pool(self.pool, None);
             device.destroy_descriptor_set_layout(self.layout, None);
@@ -43,11 +43,7 @@ impl Descriptors {
     }
 }
 
-pub unsafe fn create_descriptors(
-    instance: &Instance,
-    device: &Device,
-    texture: &Texture,
-) -> Descriptors {
+pub unsafe fn create_descriptors(device: &Device, texture: &Texture) -> Descriptors {
     let bindings = [vk::DescriptorSetLayoutBinding::builder()
         .binding(0)
         .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)

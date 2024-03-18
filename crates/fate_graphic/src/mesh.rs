@@ -118,7 +118,7 @@ impl Hash for Vertex {
 
 #[derive(Clone, Debug)]
 pub struct Mesh {
-    primitives: Vec<Primitive>,
+    pub primitives: Vec<Primitive>,
 }
 
 impl Mesh {

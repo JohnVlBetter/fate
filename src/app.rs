@@ -21,12 +21,10 @@ use fate_graphic::model::*;
 use fate_graphic::pipeline::create_pipeline;
 use fate_graphic::pipeline::PipelineParameters;
 use fate_graphic::render_pass::RenderPass;
-use fate_graphic::shader::Shader;
 use fate_graphic::swapchain::Swapchain;
 use fate_graphic::texture::*;
 use fate_graphic::uniform_buffer::UniformBuffer;
 use fate_graphic::uniform_buffer::UniformBufferObject;
-use fate_graphic::vertex::Vertex;
 use std::collections::HashSet;
 use std::ffi::CStr;
 use std::mem::size_of;
@@ -96,7 +94,7 @@ impl App {
         )?;
         data.render_pass = RenderPass::new(&instance, &device, data.swapchain.swapchain_format)?;
         create_descriptor_set_layout(&device.device, &mut data)?;
-        create_pipeline1::<ModelVertex>(&device, &mut data)?;
+        create_light_pass_pipeline(&device, &mut data)?;
         let num_images: usize = data.swapchain.swapchain_images.len();
         device.create_command_pools(&instance, data.surface, num_images)?;
         data.color_attachment = ColorAttachment::new(&instance, &device, &data.swapchain)?;
@@ -389,7 +387,7 @@ impl App {
         let size = window.inner_size();
         self.data.swapchain = Swapchain::new(size.width, size.height, &self.instance, &self.device.device, self.device.physical_device, self.data.surface)?;
         self.data.render_pass = RenderPass::new(&self.instance, &self.device, self.data.swapchain.swapchain_format)?;
-        create_pipeline1::<ModelVertex>(&self.device, &mut self.data)?;
+        create_light_pass_pipeline(&self.device, &mut self.data)?;
         self.data.color_attachment = ColorAttachment::new(&self.instance, &self.device, &self.data.swapchain)?;
         self.data.depth_attachment = DepthAttachment::new(&self.instance, &self.device, &self.data.swapchain)?;
         create_framebuffers(&self.device.device, &mut self.data)?;
@@ -618,25 +616,14 @@ unsafe fn create_descriptor_set_layout(device: &Device, data: &mut AppData) -> R
     Ok(())
 }
 
-unsafe fn create_pipeline1<V: Vertex>(device: &VkDevice, data: &mut AppData) -> Result<()> {
-    // Shader
-    let mut shader = Shader::new(String::from("shader"), b"main\0", &device.device)?;
-
-    // Vertex Input State
-    let binding_descriptions = V::binding_description();
-    let attribute_descriptions = V::attribute_descriptions();
-    let vertex_input_state = vk::PipelineVertexInputStateCreateInfo::builder()
-        .vertex_binding_descriptions(&binding_descriptions)
-        .vertex_attribute_descriptions(&attribute_descriptions);
-
-    // Input Assembly State
-
-    let input_assembly_state = vk::PipelineInputAssemblyStateCreateInfo::builder()
-        .topology(vk::PrimitiveTopology::TRIANGLE_LIST)
-        .primitive_restart_enable(false);
+unsafe fn create_light_pass_pipeline(device: &VkDevice, data: &mut AppData) -> Result<()> {
+    // Multisample State
+    let multisample_state = vk::PipelineMultisampleStateCreateInfo::builder()
+        .sample_shading_enable(true)
+        .min_sample_shading(0.2)
+        .rasterization_samples(device.msaa_samples);
 
     // Viewport State
-
     let viewport = vk::Viewport::builder()
         .x(0.0)
         .y(0.0)
@@ -656,7 +643,6 @@ unsafe fn create_pipeline1<V: Vertex>(device: &VkDevice, data: &mut AppData) -> 
         .scissors(scissors);
 
     // Rasterization State
-
     let rasterization_state = vk::PipelineRasterizationStateCreateInfo::builder()
         .depth_clamp_enable(false)
         .rasterizer_discard_enable(false)
@@ -665,24 +651,6 @@ unsafe fn create_pipeline1<V: Vertex>(device: &VkDevice, data: &mut AppData) -> 
         .cull_mode(vk::CullModeFlags::NONE)
         .front_face(vk::FrontFace::COUNTER_CLOCKWISE)
         .depth_bias_enable(false);
-
-    // Multisample State
-
-    let multisample_state = vk::PipelineMultisampleStateCreateInfo::builder()
-        .sample_shading_enable(true)
-        .min_sample_shading(0.2)
-        .rasterization_samples(device.msaa_samples);
-
-    // Depth Stencil State
-
-    let depth_stencil_state = vk::PipelineDepthStencilStateCreateInfo::builder()
-        .depth_test_enable(true)
-        .depth_write_enable(true)
-        .depth_compare_op(vk::CompareOp::LESS)
-        .depth_bounds_test_enable(false)
-        .stencil_test_enable(false);
-
-    // Color Blend State
 
     let attachment = vk::PipelineColorBlendAttachmentState::builder()
         .color_write_mask(vk::ColorComponentFlags::all())
@@ -694,16 +662,17 @@ unsafe fn create_pipeline1<V: Vertex>(device: &VkDevice, data: &mut AppData) -> 
         .dst_alpha_blend_factor(vk::BlendFactor::ZERO)
         .alpha_blend_op(vk::BlendOp::ADD)
         .build();
-
     let attachments = &[attachment];
-    let color_blend_state = vk::PipelineColorBlendStateCreateInfo::builder()
-        .logic_op_enable(false)
-        .logic_op(vk::LogicOp::COPY)
-        .attachments(attachments)
-        .blend_constants([0.0, 0.0, 0.0, 0.0]);
+
+    // Depth Stencil State
+    let depth_stencil_state = vk::PipelineDepthStencilStateCreateInfo::builder()
+        .depth_test_enable(true)
+        .depth_write_enable(true)
+        .depth_compare_op(vk::CompareOp::LESS)
+        .depth_bounds_test_enable(false)
+        .stencil_test_enable(false);
 
     // Push Constant Ranges
-
     let vert_push_constant_range = vk::PushConstantRange::builder()
         .stage_flags(vk::ShaderStageFlags::VERTEX)
         .offset(0)
@@ -715,7 +684,6 @@ unsafe fn create_pipeline1<V: Vertex>(device: &VkDevice, data: &mut AppData) -> 
         .size(52);
 
     // Layout
-
     let set_layouts = &[data.descriptor_set_layout];
     let push_constant_ranges = &[vert_push_constant_range, frag_push_constant_range];
     let layout_info = vk::PipelineLayoutCreateInfo::builder()
@@ -724,41 +692,20 @@ unsafe fn create_pipeline1<V: Vertex>(device: &VkDevice, data: &mut AppData) -> 
 
     data.pipeline_layout = device.device.create_pipeline_layout(&layout_info, None)?;
 
-    // Create
-
-    let (vert_stage, frag_stage) = shader.get_stages()?;
-    let stages = &[vert_stage, frag_stage];
-    let info = vk::GraphicsPipelineCreateInfo::builder()
-        .stages(stages)
-        .vertex_input_state(&vertex_input_state)
-        .input_assembly_state(&input_assembly_state)
-        .viewport_state(&viewport_state)
-        .rasterization_state(&rasterization_state)
-        .multisample_state(&multisample_state)
-        .depth_stencil_state(&depth_stencil_state)
-        .color_blend_state(&color_blend_state)
-        .layout(data.pipeline_layout)
-        .render_pass(data.render_pass.render_pass)
-        .subpass(0);
-
-    data.pipeline = create_pipeline::<V>(
+    data.pipeline = create_pipeline::<ModelVertex>(
         device,
         PipelineParameters {
             multisampling_info: &multisample_state,
-            viewport_info: params.viewport_info,
-            rasterizer_info: params.rasterizer_info,
-            dynamic_state_info: params.dynamic_state_info,
-            depth_stencil_info: None,
+            viewport_info: &viewport_state,
+            rasterizer_info: &rasterization_state,
+            dynamic_state_info: None,
+            depth_stencil_info: Some(&depth_stencil_state),
             color_blend_attachments: attachments,
-            layout: params.layout,
-            render_pass: params.render_pass,
+            layout: data.pipeline_layout,
+            render_pass: data.render_pass.render_pass,
         },
     );
-
-    // Cleanup
-
-    shader.destory(&device.device);
-
+    
     Ok(())
 }
 

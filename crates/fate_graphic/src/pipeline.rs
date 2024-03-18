@@ -64,9 +64,13 @@ pub unsafe fn create_pipeline<V: Vertex>(
 
     let pipeline_info = pipeline_info.build();
 
-    device
+    let pipeline = device
         .device
         .create_graphics_pipelines(vk::PipelineCache::null(), &[pipeline_info], None)
         .unwrap()
-        .0[0]
+        .0[0];
+
+    shader.destory(&device.device);
+
+    pipeline
 }

@@ -304,11 +304,6 @@ impl Texture {
         mip_levels: u32,
         format: vk::Format,
     ) -> Self {
-        let extent = vk::Extent2D {
-            width: size,
-            height: size,
-        };
-
         let width = size;
         let height = size;
         let (texture_image, texture_image_memory) = create_image(
@@ -661,7 +656,7 @@ pub unsafe fn transition_image_layout(
 
     let command_buffer = begin_single_time_commands(device, command_pool)?;
     let subresource = vk::ImageSubresourceRange::builder()
-        .aspect_mask(vk::ImageAspectFlags::COLOR)
+        .aspect_mask(aspect_mask)
         .base_mip_level(0)
         .level_count(mip_levels)
         .base_array_layer(0)

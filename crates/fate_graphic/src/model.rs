@@ -20,8 +20,7 @@ impl Model {
 
         let meshes = create_meshes_from_gltf(&document, &buffers, instance, device);
 
-        let textures =
-            create_textures_from_gltf(document.materials(), &images, instance, device);
+        let textures = create_textures_from_gltf(document.materials(), &images, instance, device);
 
         let transform = Transform::new(
             Vec3::new(0.0, 0.0, 0.0),
@@ -39,6 +38,11 @@ impl Model {
     pub unsafe fn destory(&mut self, device: &mut VkDevice) {
         for texture in self.textures.iter_mut() {
             texture.destory(&device);
+        }
+        for mesh in self.meshes.iter_mut() {
+            for primitive in mesh.primitives.iter_mut() {
+                primitive.destory(device);
+            }
         }
     }
 }

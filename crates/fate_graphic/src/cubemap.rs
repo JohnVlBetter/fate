@@ -5,7 +5,7 @@ use std::{mem::size_of, ptr::slice_from_raw_parts};
 use vulkanalia::prelude::v1_0::*;
 use vulkanalia::vk::{DeviceV1_3, RenderingAttachmentInfo, RenderingInfo};
 
-use crate::render_pass::{self, RenderPass};
+use crate::render_pass::RenderPass;
 use crate::{
     descriptors::create_descriptors,
     device::VkDevice,
@@ -36,7 +36,7 @@ pub(crate) unsafe fn create_skybox_cubemap<P: AsRef<Path>>(
 
     let skybox_model = SkyboxModel::new(instance, device);
 
-    let descriptors = create_descriptors(instance, &device.device, &texture);
+    let descriptors = create_descriptors(&device.device, &texture);
 
     let render_pass = RenderPass::new(instance, device, cubemap_format).unwrap();
 
