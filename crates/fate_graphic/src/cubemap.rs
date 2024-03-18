@@ -3,6 +3,7 @@ use std::path::Path;
 use std::time::Instant;
 use std::{mem::size_of, ptr::slice_from_raw_parts};
 use vulkanalia::prelude::v1_0::*;
+use vulkanalia::vk::{DeviceV1_3, RenderingAttachmentInfo, RenderingInfo};
 
 use crate::render_pass::{self, RenderPass};
 use crate::{
@@ -132,15 +133,6 @@ pub(crate) unsafe fn create_skybox_cubemap<P: AsRef<Path>>(
 
     // Render
     for face in 0..6 {
-        let inheritance_info = vk::CommandBufferInheritanceInfo::builder()
-            .render_pass(render_pass.render_pass)
-            .subpass(0)
-            .framebuffer(self.data.framebuffers[image_index].frame_buffer);
-
-        let info = vk::CommandBufferBeginInfo::builder()
-            .flags(vk::CommandBufferUsageFlags::RENDER_PASS_CONTINUE)
-            .inheritance_info(&inheritance_info);
-
         let attachment_info = RenderingAttachmentInfo::builder()
             .clear_value(vk::ClearValue {
                 color: vk::ClearColorValue {
@@ -165,6 +157,9 @@ pub(crate) unsafe fn create_skybox_cubemap<P: AsRef<Path>>(
 
         let command_buffer =
             begin_single_time_commands(&device.device, device.command_pool).unwrap();
+        device
+            .device
+            .cmd_begin_rendering(command_buffer, &rendering_info);
 
         device
             .device
@@ -209,6 +204,7 @@ pub(crate) unsafe fn create_skybox_cubemap<P: AsRef<Path>>(
             .device
             .cmd_draw_indexed(command_buffer, 36, 1, 0, 0, 0);
 
+        device.device.cmd_end_rendering(command_buffer);
         end_single_time_commands(
             &device.device,
             device.graphics_queue,
@@ -252,7 +248,7 @@ pub(crate) unsafe fn create_skybox_cubemap<P: AsRef<Path>>(
         .for_each(|v| device.device.destroy_image_view(*v, None));
     device.device.destroy_pipeline(pipeline, None);
     device.device.destroy_pipeline_layout(pipeline_layout, None);
-    render_pass.destory(device);
+    //render_pass.destory(device);
 
     let time = start.elapsed().as_millis();
     log::info!(

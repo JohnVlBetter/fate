@@ -18,6 +18,8 @@ use fate_graphic::mesh::Mat4;
 use fate_graphic::mesh::ModelVertex;
 use fate_graphic::mesh::Vec4;
 use fate_graphic::model::*;
+use fate_graphic::pipeline::create_pipeline;
+use fate_graphic::pipeline::PipelineParameters;
 use fate_graphic::render_pass::RenderPass;
 use fate_graphic::shader::Shader;
 use fate_graphic::swapchain::Swapchain;
@@ -94,7 +96,7 @@ impl App {
         )?;
         data.render_pass = RenderPass::new(&instance, &device, data.swapchain.swapchain_format)?;
         create_descriptor_set_layout(&device.device, &mut data)?;
-        create_pipeline::<ModelVertex>(&device, &mut data)?;
+        create_pipeline1::<ModelVertex>(&device, &mut data)?;
         let num_images: usize = data.swapchain.swapchain_images.len();
         device.create_command_pools(&instance, data.surface, num_images)?;
         data.color_attachment = ColorAttachment::new(&instance, &device, &data.swapchain)?;
@@ -387,7 +389,7 @@ impl App {
         let size = window.inner_size();
         self.data.swapchain = Swapchain::new(size.width, size.height, &self.instance, &self.device.device, self.device.physical_device, self.data.surface)?;
         self.data.render_pass = RenderPass::new(&self.instance, &self.device, self.data.swapchain.swapchain_format)?;
-        create_pipeline::<ModelVertex>(&self.device, &mut self.data)?;
+        create_pipeline1::<ModelVertex>(&self.device, &mut self.data)?;
         self.data.color_attachment = ColorAttachment::new(&self.instance, &self.device, &self.data.swapchain)?;
         self.data.depth_attachment = DepthAttachment::new(&self.instance, &self.device, &self.data.swapchain)?;
         create_framebuffers(&self.device.device, &mut self.data)?;
@@ -616,7 +618,7 @@ unsafe fn create_descriptor_set_layout(device: &Device, data: &mut AppData) -> R
     Ok(())
 }
 
-unsafe fn create_pipeline<V: Vertex>(device: &VkDevice, data: &mut AppData) -> Result<()> {
+unsafe fn create_pipeline1<V: Vertex>(device: &VkDevice, data: &mut AppData) -> Result<()> {
     // Shader
     let mut shader = Shader::new(String::from("shader"), b"main\0", &device.device)?;
 
@@ -690,7 +692,8 @@ unsafe fn create_pipeline<V: Vertex>(device: &VkDevice, data: &mut AppData) -> R
         .color_blend_op(vk::BlendOp::ADD)
         .src_alpha_blend_factor(vk::BlendFactor::ONE)
         .dst_alpha_blend_factor(vk::BlendFactor::ZERO)
-        .alpha_blend_op(vk::BlendOp::ADD);
+        .alpha_blend_op(vk::BlendOp::ADD)
+        .build();
 
     let attachments = &[attachment];
     let color_blend_state = vk::PipelineColorBlendStateCreateInfo::builder()
@@ -738,10 +741,19 @@ unsafe fn create_pipeline<V: Vertex>(device: &VkDevice, data: &mut AppData) -> R
         .render_pass(data.render_pass.render_pass)
         .subpass(0);
 
-    data.pipeline = device
-        .device
-        .create_graphics_pipelines(vk::PipelineCache::null(), &[info], None)?
-        .0[0];
+    data.pipeline = create_pipeline::<V>(
+        device,
+        PipelineParameters {
+            multisampling_info: &multisample_state,
+            viewport_info: params.viewport_info,
+            rasterizer_info: params.rasterizer_info,
+            dynamic_state_info: params.dynamic_state_info,
+            depth_stencil_info: None,
+            color_blend_attachments: attachments,
+            layout: params.layout,
+            render_pass: params.render_pass,
+        },
+    );
 
     // Cleanup
 
