@@ -10,29 +10,22 @@ use crate::buffer::*;
 use crate::swapchain::SwapchainSupport;
 use crate::tools::{QueueFamilyIndices, SuitabilityError};
 
-/// Whether the validation layers should be enabled.
 pub const VALIDATION_ENABLED: bool = cfg!(debug_assertions);
-/// The name of the validation layers.
 pub const VALIDATION_LAYER: vk::ExtensionName =
     vk::ExtensionName::from_bytes(b"VK_LAYER_KHRONOS_validation");
 
-/// The required device extensions.
 pub const DEVICE_EXTENSIONS: &[vk::ExtensionName] = &[vk::KHR_SWAPCHAIN_EXTENSION.name];
 
-/// The Vulkan SDK version that started requiring the portability subset extension for macOS.
 pub const PORTABILITY_MACOS_VERSION: Version = Version::new(1, 3, 216);
 
 #[derive(Clone, Debug)]
 pub struct VkDevice {
-    // Physical Device / Logical Device
     pub device: Device,
     pub physical_device: vk::PhysicalDevice,
     pub msaa_samples: vk::SampleCountFlags,
     pub graphics_queue: vk::Queue,
     pub present_queue: vk::Queue,
-    // Command Pool
     pub command_pool: vk::CommandPool,
-    // Command Buffers
     pub command_pools: Vec<vk::CommandPool>,
     pub command_buffers: Vec<vk::CommandBuffer>,
     pub secondary_command_buffers: Vec<Vec<vk::CommandBuffer>>,
@@ -212,7 +205,6 @@ unsafe fn create_logical_device(
         .collect::<Vec<_>>();
 
     // Layers
-
     let layers = if VALIDATION_ENABLED {
         vec![VALIDATION_LAYER.as_ptr()]
     } else {
@@ -220,25 +212,21 @@ unsafe fn create_logical_device(
     };
 
     // Extensions
-
     let mut extensions = DEVICE_EXTENSIONS
         .iter()
         .map(|n| n.as_ptr())
         .collect::<Vec<_>>();
 
-    // Required by Vulkan SDK on macOS since 1.3.216.
     if cfg!(target_os = "macos") && entry.version()? >= PORTABILITY_MACOS_VERSION {
         extensions.push(vk::KHR_PORTABILITY_SUBSET_EXTENSION.name.as_ptr());
     }
 
     // Features
-
     let features = vk::PhysicalDeviceFeatures::builder()
         .sampler_anisotropy(true)
         .sample_rate_shading(true);
 
     // Create
-
     let info = vk::DeviceCreateInfo::builder()
         .queue_create_infos(&queue_infos)
         .enabled_layer_names(&layers)
@@ -248,7 +236,6 @@ unsafe fn create_logical_device(
     let logic_device = instance.create_device(physical_device, &info, None)?;
 
     // Queues
-
     let graphics_queue = logic_device.get_device_queue(indices.graphics, 0);
     let present_queue = logic_device.get_device_queue(indices.present, 0);
 

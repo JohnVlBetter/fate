@@ -70,7 +70,5 @@ pub unsafe fn create_pipeline<V: Vertex>(
         .unwrap()
         .0[0];
 
-    shader.destory(&device.device);
-
     pipeline
 }

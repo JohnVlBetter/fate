@@ -134,7 +134,6 @@ impl Mesh {
 #[derive(Clone, Debug)]
 pub struct Primitive {
     index: usize,
-    //pub vertices: Vec<Vertex>,
     pub indices: Vec<u32>,
     pub vertex_buffer: Buffer,
     pub index_buffer: Buffer,
@@ -159,7 +158,6 @@ impl Primitive {
     }
 
     pub unsafe fn destory(&mut self, device: &mut VkDevice) {
-        //self.vertices.clear();
         self.indices.clear();
         device.destory_buffer(&self.index_buffer);
         device.destory_buffer(&self.vertex_buffer);

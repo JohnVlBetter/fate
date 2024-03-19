@@ -72,7 +72,6 @@ impl ColorAttachment {
         )?;
 
         // Image View
-
         let color_image_view = create_image_view(
             &device.device,
             color_image,

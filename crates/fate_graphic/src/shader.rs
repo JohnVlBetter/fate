@@ -6,9 +6,8 @@ use anyhow::Result;
 use vulkanalia::bytecode::Bytecode;
 use vulkanalia::prelude::v1_0::*;
 
-#[repr(C)]
-#[derive(Copy, Clone, Debug)]
 pub struct Shader<'a> {
+    device: &'a Device,
     pub vert_shader_module: ShaderModule,
     pub frag_shader_module: ShaderModule,
     pub vert_stage: PipelineShaderStageCreateInfoBuilder<'a>,
@@ -19,7 +18,7 @@ impl<'a> Shader<'a> {
     pub unsafe fn new(
         shader_name: String,
         main_func_name: &'a [u8],
-        device: &Device,
+        device: &'a Device,
     ) -> Result<Self> {
         let vert = fs::read(format!("shaders/{}.vert.spv", shader_name)).expect("读取失败！");
         let frag = fs::read(format!("shaders/{}.frag.spv", shader_name)).expect("读取失败！");
@@ -36,6 +35,7 @@ impl<'a> Shader<'a> {
             .name(main_func_name);
 
         Ok(Self {
+            device,
             vert_shader_module,
             frag_shader_module,
             vert_stage,
@@ -52,9 +52,17 @@ impl<'a> Shader<'a> {
         Ok((self.vert_stage, self.frag_stage))
     }
 
-    pub unsafe fn destory(&mut self, device: &Device) {
-        device.destroy_shader_module(self.vert_shader_module, None);
-        device.destroy_shader_module(self.frag_shader_module, None);
+    pub unsafe fn destory(&mut self) {
+        self.device
+            .destroy_shader_module(self.vert_shader_module, None);
+        self.device
+            .destroy_shader_module(self.frag_shader_module, None);
+    }
+}
+
+impl<'a> Drop for Shader<'a> {
+    fn drop(&mut self) {
+        unsafe { self.destory() };
     }
 }
 
