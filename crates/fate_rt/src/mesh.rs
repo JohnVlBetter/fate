@@ -1,4 +1,6 @@
-use crate::{mikktspace::generate_tangents, triangle::Vertex};
+use std::sync::Arc;
+
+use crate::{aabb::Aabb, material::Scatter, mikktspace::generate_tangents, triangle::Vertex};
 use cgmath::{vec2, vec3, vec4};
 use gltf::{
     buffer::{Buffer as GltfBuffer, Data},
@@ -10,7 +12,7 @@ pub type Vec3 = cgmath::Vector3<f32>;
 pub type Vec4 = cgmath::Vector4<f32>;
 pub type Mat4 = cgmath::Matrix4<f32>;
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Mesh {
     pub primitives: Vec<Primitive>,
 }
@@ -25,25 +27,12 @@ impl Mesh {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Primitive {
     index: usize,
+    pub bbox: Aabb,
     pub indices: Vec<u32>,
-    material: Material,
-}
-
-impl Primitive {
-    pub fn index(&self) -> usize {
-        self.index
-    }
-
-    pub fn material(&self) -> Material {
-        self.material
-    }
-
-    pub unsafe fn destory(&mut self) {
-        self.indices.clear();
-    }
+    pub material: Arc<dyn Scatter>,
 }
 
 pub unsafe fn create_meshes_from_gltf(document: &Document, buffers: &[Data]) -> Vec<Mesh> {

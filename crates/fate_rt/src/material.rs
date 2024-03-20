@@ -81,38 +81,6 @@ impl Scatter for Lambertian {
     }
 }
 
-pub struct PBR {
-    pub albedo: Arc<dyn Texture>,
-    //pub ao: Arc<dyn Texture>,
-    //pub emissive: Arc<dyn Texture>,
-    //pub normal: Arc<dyn Texture>,
-    pub metal_roughness: Arc<dyn Texture>,
-}
-
-impl PBR {
-    pub fn new(albedo: Arc<dyn Texture>, metal_roughness: Arc<dyn Texture>) -> Self {
-        Self { albedo, metal_roughness }
-    }
-}
-
-impl Scatter for PBR {
-    fn scatter(&self, _r_in: &Ray, rec: &HitRecord, srec: &mut ScatterRecord) -> bool {
-        srec.attenuation = self.albedo.value(rec.u, rec.v, rec.p);
-        srec.pdf = Box::new(CosinePdf::new(rec.normal));
-        srec.skip_pdf = false;
-        true
-    }
-
-    fn scattering_pdf(&self, _r_in: &Ray, rec: &HitRecord, scattered: &Ray) -> f64 {
-        let cosine = Vector3::dot(rec.normal, scattered.direction().normalize());
-        if cosine < 0.0 {
-            0.0
-        } else {
-            cosine / PI
-        }
-    }
-}
-
 pub struct Metal {
     albedo: Vector3<f64>,
     fuzz: f64,
