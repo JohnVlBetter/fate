@@ -11,7 +11,6 @@ pub mod mesh;
 pub mod mikktspace;
 pub mod model;
 pub mod onb;
-pub mod pbr_material;
 pub mod pdf;
 pub mod quad;
 pub mod ray;
