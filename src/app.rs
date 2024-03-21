@@ -107,7 +107,8 @@ impl App {
         )?;
         create_uniform_buffers(&instance, &device, &mut data)?;
         create_descriptor_pool(&device.device, &mut data)?;
-        create_descriptor_sets(&device.device, &mut data, &model)?;
+        let dummy_texture = Texture::from_rgba(1, 1, &[std::u8::MAX; 4], true, &instance, &device).unwrap();
+        create_descriptor_sets(&device.device, &mut data, &model, &dummy_texture)?;
         create_command_buffers(&mut device, &mut data)?;
         create_sync_objects(&device.device, &mut data)?;
         let camera = Camera::new(
@@ -393,7 +394,8 @@ impl App {
         create_framebuffers(&self.device.device, &mut self.data)?;
         create_uniform_buffers(&self.instance, &self.device, &mut self.data)?;
         create_descriptor_pool(&self.device.device, &mut self.data)?;
-        create_descriptor_sets(&self.device.device, &mut self.data, &self.model)?;
+        let dummy_texture = Texture::from_rgba(1, 1, &[std::u8::MAX; 4], true, &self.instance, &self.device).unwrap();
+        create_descriptor_sets(&self.device.device, &mut self.data, &self.model, &dummy_texture)?;
         create_command_buffers(&mut self.device, &mut self.data)?;
         self.data.images_in_flight.resize(self.data.swapchain.swapchain_images.len(), vk::Fence::null());
         Ok(())
@@ -763,7 +765,8 @@ unsafe fn create_descriptor_pool(device: &Device, data: &mut AppData) -> Result<
     Ok(())
 }
 
-unsafe fn create_descriptor_sets(device: &Device, data: &mut AppData, model: &Model) -> Result<()> {
+unsafe fn create_descriptor_sets(device: &Device, data: &mut AppData, model: &Model,
+    dummy_texture: &Texture) -> Result<()> {
     // Allocate
 
     let layouts = vec![data.descriptor_set_layout; data.swapchain.swapchain_images.len()];
@@ -793,12 +796,14 @@ unsafe fn create_descriptor_sets(device: &Device, data: &mut AppData, model: &Mo
 
         let albedo_info = create_descriptor_image_info(
             &model.textures,
-            material.albedo_texture_index().unwrap() as usize,
+            material.albedo_texture_index(),
+            dummy_texture
         );
 
         let normal_info = create_descriptor_image_info(
             &model.textures,
-            material.normal_texture_index().unwrap() as usize,
+            material.normal_texture_index(),
+            dummy_texture
         );
 
         let material_texture = match material.workflow() {
@@ -807,17 +812,20 @@ unsafe fn create_descriptor_sets(device: &Device, data: &mut AppData, model: &Mo
         };
         let material_info = create_descriptor_image_info(
             &model.textures,
-            material_texture.map(|t| t.index()).unwrap(),
+            material_texture.map(|t| t.index()),
+            dummy_texture
         );
 
         let ao_info = create_descriptor_image_info(
             &model.textures,
-            material.ao_texture_index().unwrap() as usize,
+            material.ao_texture_index(),
+            dummy_texture
         );
 
         let emissive_info = create_descriptor_image_info(
             &model.textures,
-            material.emissive_texture_index().unwrap() as usize,
+            material.emissive_texture_index(),
+            dummy_texture
         );
 
         let albedo_sampler_write = vk::WriteDescriptorSet::builder()
@@ -864,12 +872,18 @@ unsafe fn create_descriptor_sets(device: &Device, data: &mut AppData, model: &Mo
 
 fn create_descriptor_image_info(
     textures: &[Texture],
-    texture_idx: usize,
+    texture_idx: Option<usize>,
+    dummy_texture: &Texture,
 ) -> [vk::DescriptorImageInfo; 1] {
+    let (texture_image_view, texture_sampler) = texture_idx
+        .map(|i| &textures[i])
+        .map_or((dummy_texture.texture_image_view, dummy_texture.texture_sampler), |t| {
+            (t.texture_image_view, t.texture_sampler)
+        });
     [vk::DescriptorImageInfo::builder()
         .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
-        .image_view(textures[texture_idx].texture_image_view)
-        .sampler(textures[texture_idx].texture_sampler)
+        .image_view(texture_image_view)
+        .sampler(texture_sampler)
         .build()]
 }
 

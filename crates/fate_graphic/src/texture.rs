@@ -78,9 +78,6 @@ impl Texture {
             vk::ImageCreateFlags::default(),
         )?;
 
-        let texture_image = texture_image;
-        let texture_image_memory = texture_image_memory;
-
         transition_image_layout(
             &device.device,
             device.graphics_queue,
@@ -151,6 +148,149 @@ impl Texture {
             .mip_lod_bias(0.0);
 
         let texture_sampler = device.device.create_sampler(&info, None)?;
+
+        Ok(Self {
+            mip_levels,
+            is_srgb,
+            texture_image,
+            texture_image_memory,
+            texture_image_view,
+            texture_sampler,
+        })
+    }
+
+    pub unsafe fn from_rgba(
+        width: u32,
+        height: u32,
+        data: &[u8],
+        is_srgb: bool,
+        instance: &Instance,
+        device: &VkDevice,
+    ) -> Result<Self> {
+        let mip_levels = (width.max(height) as f32).log2().floor() as u32 + 1;
+        let image_size = (data.len() * size_of::<u8>()) as u64;
+
+        let (staging_buffer, staging_buffer_memory) = create_buffer(
+            instance,
+            &device.device,
+            device.physical_device,
+            image_size,
+            vk::BufferUsageFlags::TRANSFER_SRC,
+            vk::MemoryPropertyFlags::HOST_COHERENT | vk::MemoryPropertyFlags::HOST_VISIBLE,
+        )
+        .unwrap();
+
+        let memory = device
+            .device
+            .map_memory(
+                staging_buffer_memory,
+                0,
+                image_size,
+                vk::MemoryMapFlags::empty(),
+            )
+            .unwrap();
+
+        memcpy(data.as_ptr(), memory.cast(), data.len());
+
+        device.device.unmap_memory(staging_buffer_memory);
+
+        let format = is_srgb
+            .then_some(vk::Format::R8G8B8A8_SRGB)
+            .unwrap_or(vk::Format::R8G8B8A8_UNORM);
+
+        let (texture_image, texture_image_memory) = create_image(
+            instance,
+            &device.device,
+            device.physical_device,
+            width,
+            height,
+            mip_levels,
+            vk::SampleCountFlags::_1,
+            format,
+            vk::ImageTiling::OPTIMAL,
+            vk::ImageUsageFlags::SAMPLED
+                | vk::ImageUsageFlags::TRANSFER_DST
+                | vk::ImageUsageFlags::TRANSFER_SRC,
+            vk::MemoryPropertyFlags::DEVICE_LOCAL,
+            1,
+            vk::ImageCreateFlags::default(),
+        )
+        .unwrap();
+
+        transition_image_layout(
+            &device.device,
+            device.graphics_queue,
+            device.command_pool,
+            texture_image,
+            format,
+            vk::ImageLayout::UNDEFINED,
+            vk::ImageLayout::TRANSFER_DST_OPTIMAL,
+            mip_levels,
+            1,
+        )
+        .unwrap();
+
+        copy_buffer_to_image(
+            &device.device,
+            device.graphics_queue,
+            device.command_pool,
+            staging_buffer,
+            texture_image,
+            width,
+            height,
+        )
+        .unwrap();
+
+        // Cleanup
+
+        device.device.destroy_buffer(staging_buffer, None);
+        device.device.free_memory(staging_buffer_memory, None);
+
+        // Mipmaps
+        generate_mipmaps(
+            instance,
+            &device.device,
+            device.physical_device,
+            device.graphics_queue,
+            device.command_pool,
+            texture_image,
+            format,
+            width,
+            height,
+            mip_levels,
+            1,
+        )
+        .unwrap();
+
+        let texture_image_view = create_image_view(
+            &device.device,
+            texture_image,
+            format,
+            vk::ImageAspectFlags::COLOR,
+            mip_levels,
+            1,
+            vk::ImageViewType::_2D,
+        )
+        .unwrap();
+
+        let info = vk::SamplerCreateInfo::builder()
+            .mag_filter(vk::Filter::LINEAR)
+            .min_filter(vk::Filter::LINEAR)
+            .address_mode_u(vk::SamplerAddressMode::REPEAT)
+            .address_mode_v(vk::SamplerAddressMode::REPEAT)
+            .address_mode_w(vk::SamplerAddressMode::REPEAT)
+            .anisotropy_enable(true)
+            .max_anisotropy(16.0)
+            .border_color(vk::BorderColor::INT_OPAQUE_BLACK)
+            .unnormalized_coordinates(false)
+            .compare_enable(false)
+            .compare_op(vk::CompareOp::ALWAYS)
+            .mipmap_mode(vk::SamplerMipmapMode::LINEAR)
+            .min_lod(0.0)
+            .max_lod(mip_levels as f32)
+            .mip_lod_bias(0.0);
+
+        let texture_sampler = device.device.create_sampler(&info, None).unwrap();
 
         Ok(Self {
             mip_levels,
