@@ -7,8 +7,6 @@ pub mod hittable_list;
 pub mod image;
 pub mod interval;
 pub mod material;
-pub mod mesh;
-pub mod mikktspace;
 pub mod model;
 pub mod onb;
 pub mod pdf;

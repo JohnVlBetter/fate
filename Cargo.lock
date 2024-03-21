@@ -456,7 +456,6 @@ dependencies = [
  "fate_graphic",
  "gltf",
  "image",
- "mikktspace",
  "rand",
  "rayon",
  "stb_image",

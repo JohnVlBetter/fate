@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use cgmath::{InnerSpace, Point3, Vector3};
+use cgmath::{InnerSpace, Point3, Vector2, Vector3};
 
 use crate::aabb::Aabb;
 use crate::hit::{Hit, HitRecord};
@@ -9,31 +9,54 @@ use crate::interval::Interval;
 use crate::material::*;
 use crate::ray::Ray;
 use crate::utils::random_double;
-
-pub type Vec2 = cgmath::Vector2<f32>;
-pub type Vec3 = cgmath::Vector3<f32>;
-pub type Vec4 = cgmath::Vector4<f32>;
-pub type Mat4 = cgmath::Matrix4<f32>;
+use std::hash::{Hash, Hasher};
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
 pub struct Vertex {
-    pub pos: Vec3,
-    pub color: Vec3,
-    pub normal: Vec3,
-    pub tex_coord: Vec2,
-    pub tangent: Vec4,
+    pub(crate) pos: Point3<f64>,
+    pub(crate) color: Vector3<f64>,
+    pub(crate) normal: Vector3<f64>,
+    pub(crate) tex_coord: Vector2<f64>,
 }
 
 impl Vertex {
-    pub fn new(pos: Vec3, color: Vec3, normal: Vec3, tex_coord: Vec2, tangent: Vec4) -> Self {
+    pub fn new(
+        pos: Point3<f64>,
+        color: Vector3<f64>,
+        normal: Vector3<f64>,
+        tex_coord: Vector2<f64>,
+    ) -> Self {
         Self {
             pos,
             color,
             normal,
             tex_coord,
-            tangent,
         }
+    }
+}
+
+impl PartialEq for Vertex {
+    fn eq(&self, other: &Self) -> bool {
+        self.pos == other.pos
+            && self.color == other.color
+            && self.normal == other.normal
+            && self.tex_coord == other.tex_coord
+    }
+}
+
+impl Eq for Vertex {}
+
+impl Hash for Vertex {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.pos[0].to_bits().hash(state);
+        self.pos[1].to_bits().hash(state);
+        self.pos[2].to_bits().hash(state);
+        self.color[0].to_bits().hash(state);
+        self.color[1].to_bits().hash(state);
+        self.color[2].to_bits().hash(state);
+        self.tex_coord[0].to_bits().hash(state);
+        self.tex_coord[1].to_bits().hash(state);
     }
 }
 
