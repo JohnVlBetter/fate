@@ -24,8 +24,10 @@ impl Transform {
 
     pub fn local_to_world_matrix(&mut self) -> Mat4 {
         self.local_to_world_matrix = Mat4::from_translation(self.position)
-        * Mat4::from_angle_y(Deg(180.0))
-        * Mat4::from_angle_z(Deg(150.0));
+        * Mat4::from_angle_x(Deg(90.0))
+        * Mat4::from_angle_y(Deg(90.0))
+        * Mat4::from_angle_z(Deg(90.0))
+        * Mat4::from_scale(0.02);
         self.local_to_world_matrix
     }
 }

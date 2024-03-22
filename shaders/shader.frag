@@ -19,7 +19,17 @@ layout(push_constant) uniform PushConstants {
     // - occlusion: metallicSpecularAndOcclusion.a
     vec4 metallicSpecularAndOcclusion;
 
-    uint workflow;
+    // [0-7] Color texture channel
+    // [8-15] metallic/roughness texture channel
+    // [16-23] emissive texture channel
+    // [24-31] normals texture channel
+    uint colorMetallicRoughnessEmissiveNormalTextureChannels;
+
+    // [0-7] Occlusion texture channel
+    // [8-15] Alpha mode
+    // [16-23] Unlit flag
+    // [24-31] Workflow (metallic/roughness or specular/glossiness)
+    uint occlusionTextureChannelAlphaModeUnlitFlagAndWorkflow;
 } pcs;
 
 layout(location = 0) in vec3 frag_color;
@@ -36,17 +46,95 @@ layout(location = 0) out vec4 outColor;
 const uint METALLIC_ROUGHNESS_WORKFLOW = 0;
 const vec3 DIELECTRIC_SPECULAR = vec3(0.04);
 const float PI = 3.1415926;
+const uint NO_TEXTURE = 255;
 
-vec3 get_normal() {
+struct TextureChannels {
+    uint color;
+    uint material;
+    uint emissive;
+    uint normal;
+    uint occlusion;
+};
+
+TextureChannels getTextureChannels() {
+    return TextureChannels(
+        (pcs.colorMetallicRoughnessEmissiveNormalTextureChannels >> 24) & 255,
+        (pcs.colorMetallicRoughnessEmissiveNormalTextureChannels >> 16) & 255,
+        (pcs.colorMetallicRoughnessEmissiveNormalTextureChannels >> 8) & 255,
+        pcs.colorMetallicRoughnessEmissiveNormalTextureChannels & 255,
+        (pcs.occlusionTextureChannelAlphaModeUnlitFlagAndWorkflow >> 24) & 255
+    );
+}
+
+vec3 get_normal(TextureChannels textureChannels) {
     vec3 normalWS = normalize(inNormalWS);
-    vec3 normalVal = texture(normalSampler, uv).rgb * 2.0 - 1.0;
-    normalWS = normalize(TBN * normalVal);
+
+    if (textureChannels.normal != NO_TEXTURE) {
+        vec3 normalVal = texture(normalSampler, uv).rgb * 2.0 - 1.0;
+        normalWS = normalize(TBN * normalVal);
+    }
     
     if (!gl_FrontFacing) {
         normalWS *= -1.0;
     }
 
     return normalWS;
+}
+
+float getRoughness(TextureChannels textureChannels, bool metallicRoughnessWorkflow) {
+    float roughness = pcs.emissiveAndRoughnessGlossiness.a;
+    if(textureChannels.material != NO_TEXTURE) {
+        if (metallicRoughnessWorkflow) {
+            roughness *= texture(materialSampler, uv).g;
+        } else {
+            roughness *= texture(materialSampler, uv).a;
+        }
+    }
+
+    if (metallicRoughnessWorkflow) {
+        return roughness;
+    }
+    return (1 - roughness);
+}
+
+vec3 getEmissiveColor(TextureChannels textureChannels) {
+    vec3 emissive = pcs.emissiveAndRoughnessGlossiness.rgb;
+    if(textureChannels.emissive != NO_TEXTURE) {
+        emissive *= texture(emissiveSampler, uv).rgb;
+    }
+    return emissive/* * pcs.emissiveIntensity*/;
+}
+
+vec4 getBaseColor(TextureChannels textureChannels) {
+    vec4 color = pcs.base_color;
+    if(textureChannels.color != NO_TEXTURE) {
+        color *= vec4(texture(albedoSampler, uv).rgb, 1.0);
+    }
+    return color;
+}
+
+float getMetallic(TextureChannels textureChannels) {
+    float metallic = pcs.metallicSpecularAndOcclusion.r;
+    if(textureChannels.material != NO_TEXTURE) {
+        metallic *= texture(materialSampler, uv).b;
+    }
+    return metallic;
+}
+
+vec3 getSpecular(TextureChannels textureChannels) {
+    vec3 specular = pcs.metallicSpecularAndOcclusion.rgb;
+    if(textureChannels.material != NO_TEXTURE) {
+        specular *= texture(materialSampler, uv).rgb;
+    }
+    return specular;
+}
+
+bool isMetallicRoughnessWorkflow() {
+    uint workflow = pcs.occlusionTextureChannelAlphaModeUnlitFlagAndWorkflow & 255;
+    if (workflow == METALLIC_ROUGHNESS_WORKFLOW) {
+        return true;
+    }
+    return false;
 }
 
 float convertMetallic(vec3 diffuse, vec3 specular, float maxSpecular) {
@@ -131,28 +219,21 @@ vec3 PBRColor(
 }
 
 void main() {
-    vec4 albedo = vec4(texture(albedoSampler, uv).rgb, 1.0);
-    vec3 normalWS = get_normal();
-    vec3 emissive = texture(emissiveSampler, uv).rgb;
+    TextureChannels textureChannels = getTextureChannels();
+
+    vec4 albedo = getBaseColor(textureChannels);
+    vec3 normalWS = get_normal(textureChannels);
+    vec3 emissive = getEmissiveColor(textureChannels);
     vec3 viewDir = normalize(camera_pos.xyz - positionWS.xyz);
     vec3 lightDir = -normalize(main_light_direction.xyz);
 
-    bool isMetallicRoughnessWorkflow = pcs.workflow == METALLIC_ROUGHNESS_WORKFLOW;
-    vec3 specular = pcs.metallicSpecularAndOcclusion.rgb;
-    specular *= texture(materialSampler, uv).rgb;
-
-    float roughness = pcs.emissiveAndRoughnessGlossiness.a;
-    if (isMetallicRoughnessWorkflow) {
-        roughness *= texture(materialSampler, uv).g;
-    } else {
-        roughness *= texture(materialSampler, uv).a;
-        roughness = 1 - roughness;
-    }
+    bool isMetallicRoughnessWorkflow = isMetallicRoughnessWorkflow();
+    vec3 specular = getSpecular(textureChannels);
+    float roughness = getRoughness(textureChannels, isMetallicRoughnessWorkflow);
 
     float metallic;
     if (isMetallicRoughnessWorkflow) {
-        metallic = pcs.metallicSpecularAndOcclusion.r;
-        metallic *= texture(materialSampler, uv).b;
+        metallic = getMetallic(textureChannels);
     } else {
         float maxSpecular = max(specular.r, max(specular.g, specular.b));
         metallic = convertMetallic(albedo.rgb, specular, maxSpecular);

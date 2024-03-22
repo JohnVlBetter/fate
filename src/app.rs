@@ -101,7 +101,7 @@ impl App {
         data.depth_attachment = DepthAttachment::new(&instance, &device, &data.swapchain)?;
         create_framebuffers(&device.device, &mut data)?;
         let model = Model::new(
-            "res/model/DamagedHelmet/glTF/DamagedHelmet.gltf",
+            "res/model/Duck/glTF/Duck.gltf",
             &instance,
             &device,
         )?;
