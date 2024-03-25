@@ -30,6 +30,7 @@ layout(push_constant) uniform PushConstants {
     // [16-23] Unlit flag
     // [24-31] Workflow (metallic/roughness or specular/glossiness)
     uint occlusionTextureChannelAlphaModeUnlitFlagAndWorkflow;
+    float alphaCutoff;
 } pcs;
 
 layout(location = 0) in vec3 frag_color;

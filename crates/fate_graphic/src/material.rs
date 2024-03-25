@@ -7,6 +7,11 @@ use gltf::{
 const ALPHA_MODE_OPAQUE: u32 = 0;
 const ALPHA_MODE_MASK: u32 = 1;
 const ALPHA_MODE_BLEND: u32 = 2;
+const NO_TEXTURE: u32 = std::u8::MAX as u32;
+const UNLIT_FLAG_LIT: u32 = 0;
+const UNLIT_FLAG_UNLIT: u32 = 1;
+const METALLIC_ROUGHNESS_WORKFLOW: u32 = 0;
+const SPECULAR_GLOSSINESS_WORKFLOW: u32 = 1;
 
 #[derive(Clone, Copy, Debug)]
 pub struct TextureInfo {
@@ -100,7 +105,9 @@ pub struct MaterialUniform {
     pub base_color: Vec4,
     pub emissive_and_roughness_glossiness: Vec4,
     pub metallic_specular_and_occlusion: Vec4,
-    pub workflow: u32,
+    pub color_material_emissive_normal_texture_channels: u32,
+    pub occlusion_texture_channel_alpha_mode_unlit_flag_and_workflow: u32,
+    pub alpha_cutoff: f32,
 }
 
 impl From<Material> for MaterialUniform {
@@ -135,19 +142,52 @@ impl From<Material> for MaterialUniform {
             occlusion,
         );
 
-        const METALLIC_ROUGHNESS_WORKFLOW: u32 = 0;
-        const SPECULAR_GLOSSINESS_WORKFLOW: u32 = 1;
+        let color_texture_id = material
+            .albedo_texture()
+            .map_or(NO_TEXTURE, |info| info.channel());
+
+        let metallic_roughness_texture_id = match material.workflow() {
+            PBRWorkflow::MetallicRoughness(workflow) => workflow.metallic_roughness_texture(),
+            PBRWorkflow::SpecularGlossiness(workflow) => workflow.specular_glossiness_texture(),
+        }
+        .map_or(NO_TEXTURE, |t| t.channel());
+        let emissive_texture_id = material
+            .emissive_texture()
+            .map_or(NO_TEXTURE, |info| info.channel());
+        let normal_texture_id = material
+            .normal_texture()
+            .map_or(NO_TEXTURE, |info| info.channel());
+        let color_material_emissive_normal_texture_channels = (color_texture_id << 24)
+            | (metallic_roughness_texture_id << 16)
+            | (emissive_texture_id << 8)
+            | normal_texture_id;
+
+        let occlusion_texture_id = material
+            .ao_texture()
+            .map_or(NO_TEXTURE, |info| info.channel());
+        let alpha_mode = material.alpha_mode();
+        let unlit_flag = if material.is_unlit() {
+            UNLIT_FLAG_UNLIT
+        } else {
+            UNLIT_FLAG_LIT
+        };
         let workflow = if let PBRWorkflow::MetallicRoughness { .. } = workflow {
             METALLIC_ROUGHNESS_WORKFLOW
         } else {
             SPECULAR_GLOSSINESS_WORKFLOW
         };
+        let occlusion_texture_channel_alpha_mode_unlit_flag_and_workflow =
+            (occlusion_texture_id << 24) | (alpha_mode << 16) | (unlit_flag << 8) | workflow;
+
+        let alpha_cutoff = material.alpha_cutoff();
 
         MaterialUniform {
             base_color,
             emissive_and_roughness_glossiness,
             metallic_specular_and_occlusion,
-            workflow,
+            color_material_emissive_normal_texture_channels,
+            occlusion_texture_channel_alpha_mode_unlit_flag_and_workflow,
+            alpha_cutoff,
         }
     }
 }

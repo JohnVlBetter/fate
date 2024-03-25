@@ -101,7 +101,7 @@ impl App {
         data.depth_attachment = DepthAttachment::new(&instance, &device, &data.swapchain)?;
         create_framebuffers(&device.device, &mut data)?;
         let model = Model::new(
-            "res/model/Duck/glTF/Duck.gltf",
+            "res/model/BarramundiFish/glTF/BarramundiFish.gltf",
             &instance,
             &device,
         )?;
@@ -680,10 +680,11 @@ unsafe fn create_light_pass_pipeline(device: &VkDevice, data: &mut AppData) -> R
         .offset(0)
         .size(64);
 
+    let size = size_of::<MaterialUniform>() as u32;
     let frag_push_constant_range = vk::PushConstantRange::builder()
         .stage_flags(vk::ShaderStageFlags::FRAGMENT)
         .offset(64)
-        .size(52);
+        .size(size);
 
     // Layout
     let set_layouts = &[data.descriptor_set_layout];
