@@ -9,6 +9,7 @@ pub mod material;
 pub mod mesh;
 pub mod mikktspace;
 pub mod model;
+pub mod node;
 pub mod pipeline;
 pub mod render_pass;
 pub mod shader;
