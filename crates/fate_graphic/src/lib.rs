@@ -1,3 +1,4 @@
+pub mod aabb;
 pub mod buffer;
 pub mod camera;
 pub mod cubemap;

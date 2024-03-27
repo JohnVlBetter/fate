@@ -101,7 +101,7 @@ impl App {
         data.depth_attachment = DepthAttachment::new(&instance, &device, &data.swapchain)?;
         create_framebuffers(&device.device, &mut data)?;
         let model = Model::new(
-            "res/model/BarramundiFish/glTF/BarramundiFish.gltf",
+            "res/model/DamagedHelmet/glTF/DamagedHelmet.gltf",
             &instance,
             &device,
         )?;
@@ -291,7 +291,15 @@ impl App {
 
         let time = self.start.elapsed().as_secs_f32();
 
-        let model = self.model.transform.local_to_world_matrix();
+        //let model = self.model.transform.local_to_world_matrix();
+        let mesh_nodes = self.model
+                .nodes()
+                .nodes()
+                .iter()
+                .filter(|n| n.mesh_index().is_some());
+        let p_index = self.model.meshes[0].primitives()[0].index();
+        let transforms = mesh_nodes.map(|n| n.transform()).collect::<Vec<_>>();
+        let model = transforms[p_index];
 
         let model_bytes = &*slice_from_raw_parts(
             &model as *const Mat4 as *const u8,

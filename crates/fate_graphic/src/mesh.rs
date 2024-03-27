@@ -1,9 +1,9 @@
-use crate::{material::Material, mikktspace::generate_tangents, vertex::Vertex};
+use crate::{aabb::Aabb, material::Material, mikktspace::generate_tangents, vertex::Vertex};
 use anyhow::Result;
-use cgmath::{vec2, vec3, vec4};
+use cgmath::{vec2, vec3, vec4, Vector3};
 use gltf::{
     buffer::{Buffer as GltfBuffer, Data},
-    mesh::{Reader, Semantic},
+    mesh::{Bounds, Reader, Semantic},
     Document,
 };
 use std::mem::size_of;
@@ -119,6 +119,15 @@ impl Hash for Vertex {
 #[derive(Clone, Debug)]
 pub struct Mesh {
     pub primitives: Vec<Primitive>,
+    aabb: Aabb<f32>,
+}
+
+impl Mesh {
+    fn new(primitives: Vec<Primitive>) -> Self {
+        let aabbs = primitives.iter().map(|p| p.aabb()).collect::<Vec<_>>();
+        let aabb = Aabb::union(&aabbs).unwrap();
+        Mesh { primitives, aabb }
+    }
 }
 
 impl Mesh {
@@ -129,6 +138,10 @@ impl Mesh {
     pub fn primitive_count(&self) -> usize {
         self.primitives.len()
     }
+
+    pub fn aabb(&self) -> Aabb<f32> {
+        self.aabb
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -138,6 +151,7 @@ pub struct Primitive {
     pub vertex_buffer: Buffer,
     pub index_buffer: Buffer,
     material: Material,
+    aabb: Aabb<f32>,
 }
 
 impl Primitive {
@@ -157,6 +171,10 @@ impl Primitive {
         self.material
     }
 
+    pub fn aabb(&self) -> Aabb<f32> {
+        self.aabb
+    }
+
     pub unsafe fn destory(&mut self, device: &mut VkDevice) {
         self.indices.clear();
         device.destory_buffer(&self.index_buffer);
@@ -171,12 +189,14 @@ pub unsafe fn create_meshes_from_gltf(
     device: &VkDevice,
 ) -> Vec<Mesh> {
     let mut meshes: Vec<Mesh> = Vec::new();
+    let mut primitive_count = 0;
     for mesh in document.meshes() {
         let mut primitives: Vec<Primitive> = Vec::new();
         for primitive in mesh.primitives() {
             let reader = primitive.reader(|buffer| Some(&buffers[buffer.index()]));
 
             if let Some(_accessor) = primitive.get(&Semantic::Positions) {
+                let aabb = read_aabb(&primitive.bounding_box());
                 let positions = read_positions(&reader);
                 let normals = read_normals(&reader);
                 let tex_coords_0 = read_tex_coords(&reader, 0);
@@ -220,16 +240,20 @@ pub unsafe fn create_meshes_from_gltf(
 
                 let material = primitive.material().into();
 
+                let index = primitive_count;
+                primitive_count += 1;
+
                 primitives.push(Primitive {
-                    index: 1,
+                    index,
                     indices,
                     vertex_buffer,
                     index_buffer,
                     material,
+                    aabb,
                 })
             }
         }
-        meshes.push(Mesh { primitives })
+        meshes.push(Mesh::new(primitives))
     }
     meshes
 }
@@ -349,6 +373,16 @@ where
     reader
         .read_indices()
         .map(|indices| indices.into_u32().collect::<Vec<_>>())
+}
+
+fn read_aabb(bounds: &Bounds<[f32; 3]>) -> Aabb<f32> {
+    let min = bounds.min;
+    let min = Vector3::new(min[0], min[1], min[2]);
+
+    let max = bounds.max;
+    let max = Vector3::new(max[0], max[1], max[2]);
+
+    Aabb::new(min, max)
 }
 
 fn read_positions<'a, 's, F>(reader: &Reader<'a, 's, F>) -> Vec<[f32; 3]>
