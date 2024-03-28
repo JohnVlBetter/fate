@@ -18,6 +18,7 @@ pub mod skybox;
 pub mod swapchain;
 pub mod texture;
 pub mod tools;
+pub mod input_system;
 pub mod transform;
 pub mod uniform_buffer;
 pub mod vertex;

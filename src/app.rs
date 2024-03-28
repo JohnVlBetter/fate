@@ -6,10 +6,12 @@
     clippy::unnecessary_wraps
 )]
 
+use cgmath::{perspective, Deg, EuclideanSpace, Matrix4, SquareMatrix, Vector3};
 use cgmath::{point3, vec3};
 use fate_graphic::camera::Camera;
 use fate_graphic::device::*;
 use fate_graphic::frame_buffer::*;
+use fate_graphic::input_system::InputState;
 use fate_graphic::light::Light;
 use fate_graphic::material::PBRWorkflow;
 use fate_graphic::material::MaterialUniform;
@@ -46,7 +48,7 @@ use vulkanalia::vk::KhrSwapchainExtension;
 
 const MAX_FRAMES_IN_FLIGHT: usize = 2;
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct App {
     pub entry: Entry,
     pub instance: Instance,
@@ -111,14 +113,7 @@ impl App {
         create_descriptor_sets(&device.device, &mut data, &model, &dummy_texture)?;
         create_command_buffers(&mut device, &mut data)?;
         create_sync_objects(&device.device, &mut data)?;
-        let camera = Camera::new(
-            point3::<f32>(0.0, -5.0, 2.0),
-            point3::<f32>(0.0, 0.0, 0.0),
-            vec3(0.0, 0.0, 1.0),
-            45.0,
-            0.1,
-            10.0,
-        )?;
+        let mut camera = Camera::default();
         let main_light = Light::new(
             mesh::Vec4::new(1.0, -1.0, -1.0, 1.0),
             mesh::Vec4::new(1.0, 1.0, 1.0, 1.0),
@@ -138,7 +133,9 @@ impl App {
         })
     }
 
-    pub unsafe fn render(&mut self, window: &Window) -> Result<()> {
+    pub unsafe fn render(&mut self, window: &Window, input_state: &InputState) -> Result<()> {
+        self.camera.update(&input_state);
+
         let in_flight_fence = self.data.in_flight_fences[self.frame];
 
         self.device
@@ -356,32 +353,28 @@ impl App {
 
     unsafe fn update_uniform_buffer(&self, image_index: usize) -> Result<()> {
         // MVP
-
-        let view = self.camera.get_view_mat();
-
-        #[rustfmt::skip]
-        let correction = Mat4::new(
-            1.0,  0.0,       0.0, 0.0,
-            0.0, -1.0,       0.0, 0.0,
-            0.0,  0.0, 1.0 / 2.0, 0.0,
-            0.0,  0.0, 1.0 / 2.0, 1.0,
+        let view = Matrix4::look_at_rh(
+            self.camera.position(),
+            self.camera.target(),
+            Vector3::new(0.0, 1.0, 0.0),
         );
 
-        let proj = correction
-            * self.camera.get_proj_mat(
-                self.data.swapchain.swapchain_extent.width as f32,
-                self.data.swapchain.swapchain_extent.height as f32,
-            );
+        const Z_NEAR: f32 = 0.01;
+        const Z_FAR: f32 = 100.0;
+        let extent = self.data.swapchain.swapchain_extent;
+        let aspect = extent.width as f32 / extent.height as f32;
+        let proj = perspective(Deg(45.0), aspect, Z_NEAR, Z_FAR);
+        let inverted_proj = proj.invert().unwrap();
 
         let color = Vec4::new(1.0, 0.0, 0.0, 1.0);
-
+        let eye_pos = self.camera.position().to_vec();
         let ubo = UniformBufferObject {
             view,
             proj,
             color,
             main_light_direction: self.main_light.direction,
             main_light_color: self.main_light.color,
-            camera_pos: Vec4::new(self.camera.eye.x, self.camera.eye.y, self.camera.eye.z, 1.0),
+            camera_pos: Vec4::new(eye_pos.x, eye_pos.y, eye_pos.z, 1.0),
         };
 
         self.data.uniform_buffers[image_index].update(&ubo, &self.device)?;

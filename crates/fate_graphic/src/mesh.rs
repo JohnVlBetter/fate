@@ -208,7 +208,7 @@ pub unsafe fn create_meshes_from_gltf(
                     .iter()
                     .enumerate()
                     .map(|(index, position)| {
-                        let position = *position;
+                        let position = position;//[(*position)[0], -(*position)[1], (*position)[2]];
                         let normal = *normals.get(index).unwrap_or(&[1.0, 1.0, 1.0]);
                         let tex_coords_0 = *tex_coords_0.get(index).unwrap_or(&[0.0, 0.0]);
                         let _tex_coords_1 = *tex_coords_1.get(index).unwrap_or(&[0.0, 0.0]);

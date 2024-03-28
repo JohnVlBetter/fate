@@ -3,6 +3,7 @@ mod app;
 use app::App;
 
 use anyhow::Result;
+use fate_graphic::input_system::InputState;
 use fate_rt::renderer::Renderer;
 use std::path::Path;
 use winit::dpi::LogicalSize;
@@ -29,10 +30,13 @@ fn main() -> Result<()> {
 
     let renderer = Renderer::new()?;
 
+    let mut input_state = InputState::default();
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Poll;
+        input_state = input_state.update(&event);
+
         match event {
-            Event::MainEventsCleared if !destroying && !minimized => unsafe { app.render(&window) }.unwrap(),
+            Event::MainEventsCleared if !destroying && !minimized => unsafe { app.render(&window, &input_state) }.unwrap(),
             
             Event::WindowEvent { event: WindowEvent::Resized(size), .. } => {
                 if size.width == 0 || size.height == 0 {
