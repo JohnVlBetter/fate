@@ -56,8 +56,6 @@ fn main() -> Result<()> {
             Event::WindowEvent { event: WindowEvent::KeyboardInput { input, .. }, .. } => {
                 if input.state == ElementState::Pressed {
                     match input.virtual_keycode {
-                        Some(VirtualKeyCode::Left) if app.models > 1 => app.models -= 1,
-                        Some(VirtualKeyCode::Right) if app.models < 9 => app.models += 1,
                         Some(VirtualKeyCode::Space) => {
                             let _ = renderer.render(WIDTH, HEIGHT, Path::new("output.ppm"));
                         }

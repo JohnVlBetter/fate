@@ -7,14 +7,13 @@
 )]
 
 use cgmath::{perspective, Deg, EuclideanSpace, Matrix4, SquareMatrix, Vector3};
-use cgmath::{point3, vec3};
 use fate_graphic::camera::Camera;
 use fate_graphic::device::*;
 use fate_graphic::frame_buffer::*;
 use fate_graphic::input_system::InputState;
 use fate_graphic::light::Light;
-use fate_graphic::material::PBRWorkflow;
 use fate_graphic::material::MaterialUniform;
+use fate_graphic::material::PBRWorkflow;
 use fate_graphic::mesh;
 use fate_graphic::mesh::Mat4;
 use fate_graphic::mesh::ModelVertex;
@@ -42,9 +41,9 @@ use vulkanalia::prelude::v1_0::*;
 use vulkanalia::window as vk_window;
 use winit::window::Window;
 
-use vulkanalia::vk::ExtDebugUtilsExtension;
 use vulkanalia::vk::KhrSurfaceExtension;
 use vulkanalia::vk::KhrSwapchainExtension;
+use vulkanalia::vk::{CommandBuffer, ExtDebugUtilsExtension};
 
 const MAX_FRAMES_IN_FLIGHT: usize = 2;
 
@@ -57,7 +56,6 @@ pub struct App {
     pub frame: usize,
     pub resized: bool,
     pub start: Instant,
-    pub models: usize,
     pub camera: Camera,
     pub main_light: Light,
     pub model: Model,
@@ -103,17 +101,18 @@ impl App {
         data.depth_attachment = DepthAttachment::new(&instance, &device, &data.swapchain)?;
         create_framebuffers(&device.device, &mut data)?;
         let model = Model::new(
-            "res/model/DamagedHelmet/glTF/DamagedHelmet.gltf",
+            "res/model/ABeautifulGame/glTF/ABeautifulGame.gltf",
             &instance,
             &device,
         )?;
         create_uniform_buffers(&instance, &device, &mut data)?;
         create_descriptor_pool(&device.device, &mut data)?;
-        let dummy_texture = Texture::from_rgba(1, 1, &[std::u8::MAX; 4], true, &instance, &device).unwrap();
+        let dummy_texture =
+            Texture::from_rgba(1, 1, &[std::u8::MAX; 4], true, &instance, &device).unwrap();
         create_descriptor_sets(&device.device, &mut data, &model, &dummy_texture)?;
         create_command_buffers(&mut device, &mut data)?;
         create_sync_objects(&device.device, &mut data)?;
-        let mut camera = Camera::default();
+        let camera = Camera::default();
         let main_light = Light::new(
             mesh::Vec4::new(1.0, -1.0, -1.0, 1.0),
             mesh::Vec4::new(1.0, 1.0, 1.0, 1.0),
@@ -126,7 +125,6 @@ impl App {
             frame: 0,
             resized: false,
             start: Instant::now(),
-            models: 1,
             camera,
             main_light,
             model,
@@ -248,9 +246,91 @@ impl App {
 
         self.device.device.cmd_begin_render_pass(command_buffer, &info, vk::SubpassContents::SECONDARY_COMMAND_BUFFERS);
 
-        let secondary_command_buffers = (0..self.models)
+        let mut secondary_command_buffers: Vec<CommandBuffer> = vec![];
+        for (index, node) in self.model
+            .nodes()
+            .nodes()
+            .iter()
+            .filter(|n| n.mesh_index().is_some())
+            .enumerate()
+        {
+            let mesh = self.model.mesh(node.mesh_index().unwrap());
+            for primitive in mesh.primitives().iter()/*.filter(primitive_filter) */ {
+                let primitive_index = primitive.index();
+
+                let command_buffers = &mut self.device.secondary_command_buffers[image_index];
+                while index >= command_buffers.len() {
+                    let allocate_info = vk::CommandBufferAllocateInfo::builder()
+                        .command_pool(self.device.command_pools[image_index])
+                        .level(vk::CommandBufferLevel::SECONDARY)
+                        .command_buffer_count(1);
+    
+                    let command_buffer = self.device.device.allocate_command_buffers(&allocate_info)?[0];
+                    command_buffers.push(command_buffer);
+                }
+
+                let command_buffer = command_buffers[index];
+                let mesh_nodes = self.model
+                    .nodes()
+                    .nodes()
+                    .iter()
+                    .filter(|n| n.mesh_index().is_some());
+                let transforms = mesh_nodes.map(|n| n.transform()).collect::<Vec<_>>();
+                let model = transforms[primitive_index];
+                    
+                let model_bytes = &*slice_from_raw_parts(
+                    &model as *const Mat4 as *const u8,
+                    size_of::<Mat4>()
+                );
+            
+                let mat_uniform = MaterialUniform::from(self.model.meshes[0].primitives()[0].material());
+                let material_bytes = any_as_u8_slice(&mat_uniform);
+            
+                let inheritance_info = vk::CommandBufferInheritanceInfo::builder()
+                    .render_pass(self.data.render_pass.render_pass)
+                    .subpass(0)
+                    .framebuffer(self.data.framebuffers[image_index].frame_buffer);
+            
+                let info = vk::CommandBufferBeginInfo::builder()
+                    .flags(vk::CommandBufferUsageFlags::RENDER_PASS_CONTINUE)
+                    .inheritance_info(&inheritance_info);
+            
+                self.device.device.begin_command_buffer(command_buffer, &info)?;
+            
+                self.device.device.cmd_bind_pipeline(command_buffer, vk::PipelineBindPoint::GRAPHICS, self.data.pipeline);
+                self.device.device.cmd_bind_vertex_buffers(command_buffer, 0, &[primitive.vertex_buffer.buffer], &[0]);
+                self.device.device.cmd_bind_index_buffer(command_buffer, primitive.index_buffer.buffer, 0, vk::IndexType::UINT32);
+                self.device.device.cmd_bind_descriptor_sets(
+                    command_buffer,
+                    vk::PipelineBindPoint::GRAPHICS,
+                    self.data.pipeline_layout,
+                    0,
+                    &[self.data.descriptor_sets[image_index]],
+                    &[],
+                );
+                self.device.device.cmd_push_constants(
+                    command_buffer,
+                    self.data.pipeline_layout,
+                    vk::ShaderStageFlags::VERTEX,
+                    0,
+                    model_bytes,
+                );
+                self.device.device.cmd_push_constants(
+                    command_buffer,
+                    self.data.pipeline_layout,
+                    vk::ShaderStageFlags::FRAGMENT,
+                    model_bytes.len() as u32,
+                    material_bytes,
+                );
+                self.device.device.cmd_draw_indexed(command_buffer, primitive.indices.len() as u32, 1, 0, 0, 0);
+            
+                self.device.device.end_command_buffer(command_buffer)?;
+                secondary_command_buffers.push(command_buffer);
+            }
+        }
+        /*let secondary_command_buffers = (0..self.models)
             .map(|i| self.update_secondary_command_buffer(image_index, i))
-            .collect::<Result<Vec<_>, _>>()?;
+            .collect::<Result<Vec<_>, _>>()?;*/
         self.device.device.cmd_execute_commands(command_buffer, &secondary_command_buffers[..]);
 
         self.device.device.cmd_end_render_pass(command_buffer);
@@ -260,7 +340,7 @@ impl App {
         Ok(())
     }
 
-    #[rustfmt::skip]
+    /* #[rustfmt::skip]
     unsafe fn update_secondary_command_buffer(
         &mut self,
         image_index: usize,
@@ -268,88 +348,10 @@ impl App {
     ) -> Result<vk::CommandBuffer> {
         // Allocate
 
-        let command_buffers = &mut self.device.secondary_command_buffers[image_index];
-        while model_index >= command_buffers.len() {
-            let allocate_info = vk::CommandBufferAllocateInfo::builder()
-                .command_pool(self.device.command_pools[image_index])
-                .level(vk::CommandBufferLevel::SECONDARY)
-                .command_buffer_count(1);
 
-            let command_buffer = self.device.device.allocate_command_buffers(&allocate_info)?[0];
-            command_buffers.push(command_buffer);
-        }
-
-        let command_buffer = command_buffers[model_index];
-
-        // Model
-
-        let y = (((model_index % 3) as f32) * 1.5) - 1.25;
-        let z = (((model_index / 3) as f32) * -1.0) + 1.0;
-
-        let time = self.start.elapsed().as_secs_f32();
-
-        //let model = self.model.transform.local_to_world_matrix();
-        let mesh_nodes = self.model
-                .nodes()
-                .nodes()
-                .iter()
-                .filter(|n| n.mesh_index().is_some());
-        let p_index = self.model.meshes[0].primitives()[0].index();
-        let transforms = mesh_nodes.map(|n| n.transform()).collect::<Vec<_>>();
-        let model = transforms[p_index];
-
-        let model_bytes = &*slice_from_raw_parts(
-            &model as *const Mat4 as *const u8,
-            size_of::<Mat4>()
-        );
-        
-        let mat_uniform = MaterialUniform::from(self.model.meshes[0].primitives()[0].material());
-        let material_bytes = any_as_u8_slice(&mat_uniform);
-        
-        // Commands
-
-        let inheritance_info = vk::CommandBufferInheritanceInfo::builder()
-            .render_pass(self.data.render_pass.render_pass)
-            .subpass(0)
-            .framebuffer(self.data.framebuffers[image_index].frame_buffer);
-
-        let info = vk::CommandBufferBeginInfo::builder()
-            .flags(vk::CommandBufferUsageFlags::RENDER_PASS_CONTINUE)
-            .inheritance_info(&inheritance_info);
-
-        self.device.device.begin_command_buffer(command_buffer, &info)?;
-
-        self.device.device.cmd_bind_pipeline(command_buffer, vk::PipelineBindPoint::GRAPHICS, self.data.pipeline);
-        self.device.device.cmd_bind_vertex_buffers(command_buffer, 0, &[self.model.meshes[0].primitives()[0].vertex_buffer.buffer], &[0]);
-        self.device.device.cmd_bind_index_buffer(command_buffer, self.model.meshes[0].primitives()[0].index_buffer.buffer, 0, vk::IndexType::UINT32);
-        self.device.device.cmd_bind_descriptor_sets(
-            command_buffer,
-            vk::PipelineBindPoint::GRAPHICS,
-            self.data.pipeline_layout,
-            0,
-            &[self.data.descriptor_sets[image_index]],
-            &[],
-        );
-        self.device.device.cmd_push_constants(
-            command_buffer,
-            self.data.pipeline_layout,
-            vk::ShaderStageFlags::VERTEX,
-            0,
-            model_bytes,
-        );
-        self.device.device.cmd_push_constants(
-            command_buffer,
-            self.data.pipeline_layout,
-            vk::ShaderStageFlags::FRAGMENT,
-            model_bytes.len() as u32,
-            material_bytes,
-        );
-        self.device.device.cmd_draw_indexed(command_buffer, self.model.meshes[0].primitives()[0].indices.len() as u32, 1, 0, 0, 0);
-
-        self.device.device.end_command_buffer(command_buffer)?;
 
         Ok(command_buffer)
-    }
+    }*/
 
     unsafe fn update_uniform_buffer(&self, image_index: usize) -> Result<()> {
         // MVP
@@ -709,7 +711,7 @@ unsafe fn create_light_pass_pipeline(device: &VkDevice, data: &mut AppData) -> R
             render_pass: data.render_pass.render_pass,
         },
     );
-    
+
     Ok(())
 }
 
@@ -767,8 +769,12 @@ unsafe fn create_descriptor_pool(device: &Device, data: &mut AppData) -> Result<
     Ok(())
 }
 
-unsafe fn create_descriptor_sets(device: &Device, data: &mut AppData, model: &Model,
-    dummy_texture: &Texture) -> Result<()> {
+unsafe fn create_descriptor_sets(
+    device: &Device,
+    data: &mut AppData,
+    model: &Model,
+    dummy_texture: &Texture,
+) -> Result<()> {
     // Allocate
 
     let layouts = vec![data.descriptor_set_layout; data.swapchain.swapchain_images.len()];
@@ -799,13 +805,13 @@ unsafe fn create_descriptor_sets(device: &Device, data: &mut AppData, model: &Mo
         let albedo_info = create_descriptor_image_info(
             &model.textures,
             material.albedo_texture_index(),
-            dummy_texture
+            dummy_texture,
         );
 
         let normal_info = create_descriptor_image_info(
             &model.textures,
             material.normal_texture_index(),
-            dummy_texture
+            dummy_texture,
         );
 
         let material_texture = match material.workflow() {
@@ -815,19 +821,19 @@ unsafe fn create_descriptor_sets(device: &Device, data: &mut AppData, model: &Mo
         let material_info = create_descriptor_image_info(
             &model.textures,
             material_texture.map(|t| t.index()),
-            dummy_texture
+            dummy_texture,
         );
 
         let ao_info = create_descriptor_image_info(
             &model.textures,
             material.ao_texture_index(),
-            dummy_texture
+            dummy_texture,
         );
 
         let emissive_info = create_descriptor_image_info(
             &model.textures,
             material.emissive_texture_index(),
-            dummy_texture
+            dummy_texture,
         );
 
         let albedo_sampler_write = vk::WriteDescriptorSet::builder()
@@ -877,11 +883,13 @@ fn create_descriptor_image_info(
     texture_idx: Option<usize>,
     dummy_texture: &Texture,
 ) -> [vk::DescriptorImageInfo; 1] {
-    let (texture_image_view, texture_sampler) = texture_idx
-        .map(|i| &textures[i])
-        .map_or((dummy_texture.texture_image_view, dummy_texture.texture_sampler), |t| {
-            (t.texture_image_view, t.texture_sampler)
-        });
+    let (texture_image_view, texture_sampler) = texture_idx.map(|i| &textures[i]).map_or(
+        (
+            dummy_texture.texture_image_view,
+            dummy_texture.texture_sampler,
+        ),
+        |t| (t.texture_image_view, t.texture_sampler),
+    );
     [vk::DescriptorImageInfo::builder()
         .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
         .image_view(texture_image_view)

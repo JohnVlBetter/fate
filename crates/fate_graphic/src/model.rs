@@ -47,6 +47,10 @@ impl Model {
     pub fn nodes(&self) -> &Nodes {
         &self.nodes
     }
+    
+    pub fn mesh(&self, index: usize) -> &Mesh {
+        &self.meshes[index]
+    }
 
     pub unsafe fn destory(&mut self, device: &mut VkDevice) {
         for texture in self.textures.iter_mut() {
