@@ -106,7 +106,7 @@ impl App {
             &device,
         )?;
         create_uniform_buffers(&instance, &device, &mut data)?;
-        create_descriptor_pool(&device.device, &mut data)?;
+        create_descriptor_pool(&device.device, &mut data, &model)?;
         let dummy_texture =
             Texture::from_rgba(1, 1, &[std::u8::MAX; 4], true, &instance, &device).unwrap();
         create_descriptor_sets(&device.device, &mut data, &model, &dummy_texture)?;
@@ -396,7 +396,7 @@ impl App {
         self.data.depth_attachment = DepthAttachment::new(&self.instance, &self.device, &self.data.swapchain)?;
         create_framebuffers(&self.device.device, &mut self.data)?;
         create_uniform_buffers(&self.instance, &self.device, &mut self.data)?;
-        create_descriptor_pool(&self.device.device, &mut self.data)?;
+        create_descriptor_pool(&self.device.device, &mut self.data, &self.model)?;
         let dummy_texture = Texture::from_rgba(1, 1, &[std::u8::MAX; 4], true, &self.instance, &self.device).unwrap();
         create_descriptor_sets(&self.device.device, &mut self.data, &self.model, &dummy_texture)?;
         create_command_buffers(&mut self.device, &mut self.data)?;
@@ -750,14 +750,17 @@ unsafe fn create_uniform_buffers(
     Ok(())
 }
 
-unsafe fn create_descriptor_pool(device: &Device, data: &mut AppData) -> Result<()> {
+unsafe fn create_descriptor_pool(device: &Device, data: &mut AppData, model: &Model) -> Result<()> {
+    let primitive_count = model.primitive_count() as u32;
+    let textures_desc_count = primitive_count * 5;
+
     let ubo_size = vk::DescriptorPoolSize::builder()
         .type_(vk::DescriptorType::UNIFORM_BUFFER)
         .descriptor_count(data.swapchain.swapchain_images.len() as u32);
 
     let sampler_size = vk::DescriptorPoolSize::builder()
         .type_(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
-        .descriptor_count(data.swapchain.swapchain_images.len() as u32 * 5);
+        .descriptor_count(data.swapchain.swapchain_images.len() as u32 * textures_desc_count);
 
     let pool_sizes = &[ubo_size, sampler_size];
     let info = vk::DescriptorPoolCreateInfo::builder()
@@ -775,104 +778,105 @@ unsafe fn create_descriptor_sets(
     model: &Model,
     dummy_texture: &Texture,
 ) -> Result<()> {
-    // Allocate
-
-    let layouts = vec![data.descriptor_set_layout; data.swapchain.swapchain_images.len()];
+    let primitive_count = model.primitive_count() as usize;
+    let layouts = vec![data.descriptor_set_layout; data.swapchain.swapchain_images.len() * primitive_count];
     let info = vk::DescriptorSetAllocateInfo::builder()
         .descriptor_pool(data.descriptor_pool)
         .set_layouts(&layouts);
 
     data.descriptor_sets = device.allocate_descriptor_sets(&info)?;
 
-    // Update
-
     for i in 0..data.swapchain.swapchain_images.len() {
-        let info = vk::DescriptorBufferInfo::builder()
-            .buffer(data.uniform_buffers[i].buffer.buffer)
-            .offset(0)
-            .range(size_of::<UniformBufferObject>() as u64);
+        let mut primitive_index = 0;
+        for mesh in model.meshes() {
+            for primitive in mesh.primitives() {
+                let material = primitive.material();
+                let info = vk::DescriptorBufferInfo::builder()
+                    .buffer(data.uniform_buffers[i].buffer.buffer)
+                    .offset(0)
+                    .range(size_of::<UniformBufferObject>() as u64);
 
-        let buffer_info = &[info];
-        let ubo_write = vk::WriteDescriptorSet::builder()
-            .dst_set(data.descriptor_sets[i])
-            .dst_binding(0)
-            .dst_array_element(0)
-            .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
-            .buffer_info(buffer_info);
+                let buffer_info = &[info];
+                let ubo_write = vk::WriteDescriptorSet::builder()
+                    .dst_set(data.descriptor_sets[i])
+                    .dst_binding(0)
+                    .dst_array_element(0)
+                    .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
+                    .buffer_info(buffer_info);
 
-        let material = model.meshes[0].primitives()[0].material();
-
-        let albedo_info = create_descriptor_image_info(
-            &model.textures,
-            material.albedo_texture_index(),
-            dummy_texture,
-        );
-
-        let normal_info = create_descriptor_image_info(
-            &model.textures,
-            material.normal_texture_index(),
-            dummy_texture,
-        );
-
-        let material_texture = match material.workflow() {
-            PBRWorkflow::MetallicRoughness(workflow) => workflow.metallic_roughness_texture(),
-            PBRWorkflow::SpecularGlossiness(workflow) => workflow.specular_glossiness_texture(),
-        };
-        let material_info = create_descriptor_image_info(
-            &model.textures,
-            material_texture.map(|t| t.index()),
-            dummy_texture,
-        );
-
-        let ao_info = create_descriptor_image_info(
-            &model.textures,
-            material.ao_texture_index(),
-            dummy_texture,
-        );
-
-        let emissive_info = create_descriptor_image_info(
-            &model.textures,
-            material.emissive_texture_index(),
-            dummy_texture,
-        );
-
-        let albedo_sampler_write = vk::WriteDescriptorSet::builder()
-            .dst_set(data.descriptor_sets[i])
-            .dst_binding(1)
-            .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
-            .image_info(&albedo_info);
-        let normal_sampler_write = vk::WriteDescriptorSet::builder()
-            .dst_set(data.descriptor_sets[i])
-            .dst_binding(2)
-            .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
-            .image_info(&normal_info);
-        let material_sampler_write = vk::WriteDescriptorSet::builder()
-            .dst_set(data.descriptor_sets[i])
-            .dst_binding(3)
-            .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
-            .image_info(&material_info);
-        let ao_sampler_write = vk::WriteDescriptorSet::builder()
-            .dst_set(data.descriptor_sets[i])
-            .dst_binding(4)
-            .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
-            .image_info(&ao_info);
-        let emissive_sampler_write = vk::WriteDescriptorSet::builder()
-            .dst_set(data.descriptor_sets[i])
-            .dst_binding(5)
-            .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
-            .image_info(&emissive_info);
-
-        device.update_descriptor_sets(
-            &[
-                ubo_write,
-                albedo_sampler_write,
-                normal_sampler_write,
-                material_sampler_write,
-                ao_sampler_write,
-                emissive_sampler_write,
-            ],
-            &[] as &[vk::CopyDescriptorSet],
-        );
+                let albedo_info = create_descriptor_image_info(
+                    &model.textures,
+                    material.albedo_texture_index(),
+                    dummy_texture,
+                );
+            
+                let normal_info = create_descriptor_image_info(
+                    &model.textures,
+                    material.normal_texture_index(),
+                    dummy_texture,
+                );
+            
+                let material_texture = match material.workflow() {
+                    PBRWorkflow::MetallicRoughness(workflow) => workflow.metallic_roughness_texture(),
+                    PBRWorkflow::SpecularGlossiness(workflow) => workflow.specular_glossiness_texture(),
+                };
+                let material_info = create_descriptor_image_info(
+                    &model.textures,
+                    material_texture.map(|t| t.index()),
+                    dummy_texture,
+                );
+            
+                let ao_info = create_descriptor_image_info(
+                    &model.textures,
+                    material.ao_texture_index(),
+                    dummy_texture,
+                );
+            
+                let emissive_info = create_descriptor_image_info(
+                    &model.textures,
+                    material.emissive_texture_index(),
+                    dummy_texture,
+                );
+            
+                let albedo_sampler_write = vk::WriteDescriptorSet::builder()
+                    .dst_set(data.descriptor_sets[i])
+                    .dst_binding(1)
+                    .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
+                    .image_info(&albedo_info);
+                let normal_sampler_write = vk::WriteDescriptorSet::builder()
+                    .dst_set(data.descriptor_sets[i])
+                    .dst_binding(2)
+                    .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
+                    .image_info(&normal_info);
+                let material_sampler_write = vk::WriteDescriptorSet::builder()
+                    .dst_set(data.descriptor_sets[i])
+                    .dst_binding(3)
+                    .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
+                    .image_info(&material_info);
+                let ao_sampler_write = vk::WriteDescriptorSet::builder()
+                    .dst_set(data.descriptor_sets[i])
+                    .dst_binding(4)
+                    .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
+                    .image_info(&ao_info);
+                let emissive_sampler_write = vk::WriteDescriptorSet::builder()
+                    .dst_set(data.descriptor_sets[i])
+                    .dst_binding(5)
+                    .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
+                    .image_info(&emissive_info);
+            
+                device.update_descriptor_sets(
+                    &[
+                        ubo_write,
+                        albedo_sampler_write,
+                        normal_sampler_write,
+                        material_sampler_write,
+                        ao_sampler_write,
+                        emissive_sampler_write,
+                    ],
+                    &[] as &[vk::CopyDescriptorSet],
+                );
+            }
+        }
     }
 
     Ok(())

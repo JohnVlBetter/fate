@@ -47,9 +47,17 @@ impl Model {
     pub fn nodes(&self) -> &Nodes {
         &self.nodes
     }
-    
+
     pub fn mesh(&self, index: usize) -> &Mesh {
         &self.meshes[index]
+    }
+
+    pub fn meshes(&self) -> &[Mesh] {
+        &self.meshes
+    }
+
+    pub fn primitive_count(&self) -> usize {
+        self.meshes.iter().map(Mesh::primitive_count).sum()
     }
 
     pub unsafe fn destory(&mut self, device: &mut VkDevice) {
