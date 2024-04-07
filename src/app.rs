@@ -101,7 +101,7 @@ impl App {
         data.depth_attachment = DepthAttachment::new(&instance, &device, &data.swapchain)?;
         create_framebuffers(&device.device, &mut data)?;
         let model = Model::new(
-            "res/model/ABeautifulGame/glTF/ABeautifulGame.gltf",
+            "res/model/ToyCar/glTF/ToyCar.gltf",
             &instance,
             &device,
         )?;
@@ -756,7 +756,7 @@ unsafe fn create_descriptor_pool(device: &Device, data: &mut AppData, model: &Mo
 
     let ubo_size = vk::DescriptorPoolSize::builder()
         .type_(vk::DescriptorType::UNIFORM_BUFFER)
-        .descriptor_count(data.swapchain.swapchain_images.len() as u32);
+        .descriptor_count(data.swapchain.swapchain_images.len() as u32 * primitive_count);
 
     let sampler_size = vk::DescriptorPoolSize::builder()
         .type_(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
@@ -765,7 +765,7 @@ unsafe fn create_descriptor_pool(device: &Device, data: &mut AppData, model: &Mo
     let pool_sizes = &[ubo_size, sampler_size];
     let info = vk::DescriptorPoolCreateInfo::builder()
         .pool_sizes(pool_sizes)
-        .max_sets(data.swapchain.swapchain_images.len() as u32);
+        .max_sets(data.swapchain.swapchain_images.len() as u32 * primitive_count);
 
     data.descriptor_pool = device.create_descriptor_pool(&info, None)?;
 
