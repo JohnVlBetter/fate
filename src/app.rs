@@ -101,7 +101,7 @@ impl App {
         data.depth_attachment = DepthAttachment::new(&instance, &device, &data.swapchain)?;
         create_framebuffers(&device.device, &mut data)?;
         let model = Model::new(
-            "res/model/ToyCar/glTF/ToyCar.gltf",
+            "res/model/FlightHelmet/glTF/FlightHelmet.gltf",
             &instance,
             &device,
         )?;
@@ -796,9 +796,12 @@ unsafe fn create_descriptor_sets(
                     .offset(0)
                     .range(size_of::<UniformBufferObject>() as u64);
 
+                let set = data.descriptor_sets[i * primitive_count + primitive_index];
+                primitive_index += 1;
+
                 let buffer_info = &[info];
                 let ubo_write = vk::WriteDescriptorSet::builder()
-                    .dst_set(data.descriptor_sets[i])
+                    .dst_set(set)
                     .dst_binding(0)
                     .dst_array_element(0)
                     .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
@@ -839,27 +842,27 @@ unsafe fn create_descriptor_sets(
                 );
             
                 let albedo_sampler_write = vk::WriteDescriptorSet::builder()
-                    .dst_set(data.descriptor_sets[i])
+                    .dst_set(set)
                     .dst_binding(1)
                     .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
                     .image_info(&albedo_info);
                 let normal_sampler_write = vk::WriteDescriptorSet::builder()
-                    .dst_set(data.descriptor_sets[i])
+                    .dst_set(set)
                     .dst_binding(2)
                     .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
                     .image_info(&normal_info);
                 let material_sampler_write = vk::WriteDescriptorSet::builder()
-                    .dst_set(data.descriptor_sets[i])
+                    .dst_set(set)
                     .dst_binding(3)
                     .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
                     .image_info(&material_info);
                 let ao_sampler_write = vk::WriteDescriptorSet::builder()
-                    .dst_set(data.descriptor_sets[i])
+                    .dst_set(set)
                     .dst_binding(4)
                     .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
                     .image_info(&ao_info);
                 let emissive_sampler_write = vk::WriteDescriptorSet::builder()
-                    .dst_set(data.descriptor_sets[i])
+                    .dst_set(set)
                     .dst_binding(5)
                     .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
                     .image_info(&emissive_info);
@@ -887,6 +890,7 @@ fn create_descriptor_image_info(
     texture_idx: Option<usize>,
     dummy_texture: &Texture,
 ) -> [vk::DescriptorImageInfo; 1] {
+    //println!("{}",texture_idx.unwrap_or(999));
     let (texture_image_view, texture_sampler) = texture_idx.map(|i| &textures[i]).map_or(
         (
             dummy_texture.texture_image_view,
