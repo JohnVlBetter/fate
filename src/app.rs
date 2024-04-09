@@ -255,6 +255,7 @@ impl App {
             .enumerate()
         {
             let mesh = self.model.mesh(node.mesh_index().unwrap());
+            let primitive_count = mesh.primitive_count() as usize;
             for primitive in mesh.primitives().iter()/*.filter(primitive_filter) */ {
                 let primitive_index = primitive.index();
 
@@ -305,7 +306,7 @@ impl App {
                     vk::PipelineBindPoint::GRAPHICS,
                     self.data.pipeline_layout,
                     0,
-                    &[self.data.descriptor_sets[image_index]],
+                    &[self.data.descriptor_sets[/*image_index * primitive_count + */primitive_index]],
                     &[],
                 );
                 self.device.device.cmd_push_constants(
@@ -796,7 +797,7 @@ unsafe fn create_descriptor_sets(
                     .offset(0)
                     .range(size_of::<UniformBufferObject>() as u64);
 
-                let set = data.descriptor_sets[i * primitive_count + primitive_index];
+                let set = data.descriptor_sets[/*i * primitive_count + */primitive_index];
                 primitive_index += 1;
 
                 let buffer_info = &[info];
