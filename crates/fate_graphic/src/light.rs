@@ -1,25 +1,85 @@
-use anyhow::Result;
+use gltf::iter::Lights;
+use gltf::khr_lights_punctual::{Kind, Light as GltfLight};
+use gltf::Document;
 
-use crate::mesh::Vec4;
+#[derive(Copy, Clone, Debug)]
+pub enum LightType {
+    DirectionalLight,
+    PointLight,
+    SpotLight {
+        inner_cone_angle: f32,
+        outer_cone_angle: f32,
+    },
+}
 
 #[derive(Copy, Clone, Debug)]
 pub struct Light {
-    //intensity放在dir的w分量
-    pub direction: Vec4,
-    //pub intensity: f32,
-    pub color: Vec4,
+    color: [f32; 3],
+    intensity: f32,
+    range: Option<f32>,
+    light_type: LightType,
 }
 
 impl Light {
     pub unsafe fn new(
-        direction: Vec4,
-        color: Vec4,
-        //intensity: f32
-    ) -> Result<Self> {
-        Ok(Self {
-            direction,
+        color: [f32; 3],
+        intensity: f32,
+        range: Option<f32>,
+        light_type: LightType,
+    ) -> Self {
+        Self {
             color,
-            //intensity
-        })
+            intensity,
+            range,
+            light_type,
+        }
     }
+
+    pub fn light_type(&self) -> LightType {
+        self.light_type
+    }
+
+    pub fn color(&self) -> [f32; 3] {
+        self.color
+    }
+
+    pub fn intensity(&self) -> f32 {
+        self.intensity
+    }
+
+    pub fn range(&self) -> Option<f32> {
+        self.range
+    }
+}
+
+fn map_gltf_lights(lights: Lights) -> Vec<Light> {
+    lights
+        .map(|light: GltfLight| -> Light {
+            let light_type = match light.kind() {
+                Kind::Directional => LightType::DirectionalLight,
+                Kind::Point => LightType::PointLight,
+                Kind::Spot {
+                    inner_cone_angle,
+                    outer_cone_angle,
+                } => LightType::SpotLight {
+                    inner_cone_angle,
+                    outer_cone_angle,
+                },
+            };
+            let color = light.color();
+            let intensity = light.intensity();
+            let range = light.range();
+
+            Light {
+                color,
+                intensity,
+                range,
+                light_type,
+            }
+        })
+        .collect()
+}
+
+pub fn create_lights_from_gltf(document: &Document) -> Vec<Light> {
+    document.lights().map_or(vec![], map_gltf_lights)
 }
