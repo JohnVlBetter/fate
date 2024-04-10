@@ -208,7 +208,7 @@ pub unsafe fn create_meshes_from_gltf(
                     .iter()
                     .enumerate()
                     .map(|(index, position)| {
-                        let position = position;//[(*position)[0], -(*position)[1], (*position)[2]];
+                        let position = position; //[(*position)[0], -(*position)[1], (*position)[2]];
                         let normal = *normals.get(index).unwrap_or(&[1.0, 1.0, 1.0]);
                         let tex_coords_0 = *tex_coords_0.get(index).unwrap_or(&[0.0, 0.0]);
                         let _tex_coords_1 = *tex_coords_1.get(index).unwrap_or(&[0.0, 0.0]);
@@ -292,17 +292,14 @@ unsafe fn create_vertex_buffer(
         vk::MemoryPropertyFlags::DEVICE_LOCAL,
     )?;
 
-    let buffer: Buffer = Buffer {
-        buffer: vertex_buffer,
-        buffer_memory: vertex_buffer_memory,
-    };
+    let buffer: Buffer = Buffer::new(vertex_buffer, vertex_buffer_memory);
 
     copy_buffer(
         &device.device,
         device.graphics_queue,
         device.command_pool,
         staging_buffer,
-        buffer.buffer,
+        buffer.buffer(),
         size,
     )?;
 
@@ -346,17 +343,14 @@ unsafe fn create_index_buffer(
         vk::MemoryPropertyFlags::DEVICE_LOCAL,
     )?;
 
-    let buffer: Buffer = Buffer {
-        buffer: index_buffer,
-        buffer_memory: index_buffer_memory,
-    };
+    let buffer: Buffer = Buffer::new(index_buffer, index_buffer_memory);
 
     copy_buffer(
         &device.device,
         device.graphics_queue,
         device.command_pool,
         staging_buffer,
-        buffer.buffer,
+        buffer.buffer(),
         size,
     )?;
 

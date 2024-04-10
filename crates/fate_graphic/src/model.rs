@@ -1,4 +1,5 @@
 use crate::aabb::Aabb;
+use crate::light::{create_lights_from_gltf, Light};
 use crate::mesh::create_meshes_from_gltf;
 use crate::node::Nodes;
 use crate::texture::create_textures_from_gltf;
@@ -11,9 +12,10 @@ use crate::device::VkDevice;
 
 #[derive(Clone, Debug)]
 pub struct Model {
-    pub meshes: Vec<Mesh>,
-    pub textures: Vec<Texture>,
+    meshes: Vec<Mesh>,
+    textures: Vec<Texture>,
     nodes: Nodes,
+    lights: Vec<Light>,
     global_transform: Matrix4<f32>,
 }
 
@@ -36,10 +38,13 @@ impl Model {
             transform
         };
 
+        let lights = create_lights_from_gltf(&document);
+
         Ok(Self {
             meshes,
             textures,
             nodes,
+            lights,
             global_transform,
         })
     }
@@ -54,6 +59,14 @@ impl Model {
 
     pub fn meshes(&self) -> &[Mesh] {
         &self.meshes
+    }
+
+    pub fn textures(&self) -> &[Texture] {
+        &self.textures
+    }
+
+    pub fn lights(&self) -> &[Light] {
+        &self.lights
     }
 
     pub fn primitive_count(&self) -> usize {

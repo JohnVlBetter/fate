@@ -189,12 +189,12 @@ pub(crate) unsafe fn create_skybox_cubemap<P: AsRef<Path>>(
         device.device.cmd_bind_vertex_buffers(
             command_buffer,
             0,
-            &[skybox_model.vertices_buffer().buffer],
+            &[skybox_model.vertices_buffer().buffer()],
             &[0],
         );
         device.device.cmd_bind_index_buffer(
             command_buffer,
-            skybox_model.indices_buffer().buffer,
+            skybox_model.indices_buffer().buffer(),
             0,
             vk::IndexType::UINT32,
         );

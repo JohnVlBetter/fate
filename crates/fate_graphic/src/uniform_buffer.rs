@@ -37,16 +37,13 @@ impl UniformBuffer {
         )?;
 
         Ok(UniformBuffer {
-            buffer: Buffer {
-                buffer: uniform_buffer,
-                buffer_memory: uniform_buffer_memory,
-            },
+            buffer: Buffer::new(uniform_buffer, uniform_buffer_memory),
         })
     }
 
     pub unsafe fn update(&self, ubo: &UniformBufferObject, device: &VkDevice) -> Result<()> {
         let memory = device.device.map_memory(
-            self.buffer.buffer_memory,
+            self.buffer.buffer_memory(),
             0,
             size_of::<UniformBufferObject>() as u64,
             vk::MemoryMapFlags::empty(),
@@ -54,12 +51,12 @@ impl UniformBuffer {
 
         memcpy(ubo, memory.cast(), 1);
 
-        device.device.unmap_memory(self.buffer.buffer_memory);
+        device.device.unmap_memory(self.buffer.buffer_memory());
         Ok(())
     }
 
     pub unsafe fn destory(&mut self, device: &VkDevice) {
-        device.device.free_memory(self.buffer.buffer_memory, None);
-        device.device.destroy_buffer(self.buffer.buffer, None);
+        device.device.free_memory(self.buffer.buffer_memory(), None);
+        device.device.destroy_buffer(self.buffer.buffer(), None);
     }
 }

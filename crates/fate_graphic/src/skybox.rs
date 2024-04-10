@@ -123,17 +123,14 @@ unsafe fn create_vertex_buffer(
         vk::MemoryPropertyFlags::DEVICE_LOCAL,
     )?;
 
-    let buffer: Buffer = Buffer {
-        buffer: vertex_buffer,
-        buffer_memory: vertex_buffer_memory,
-    };
+    let buffer: Buffer = Buffer::new(vertex_buffer, vertex_buffer_memory);
 
     copy_buffer(
         &device.device,
         device.graphics_queue,
         device.command_pool,
         staging_buffer,
-        buffer.buffer,
+        buffer.buffer(),
         size,
     )?;
 
@@ -177,17 +174,14 @@ unsafe fn create_index_buffer(
         vk::MemoryPropertyFlags::DEVICE_LOCAL,
     )?;
 
-    let buffer: Buffer = Buffer {
-        buffer: index_buffer,
-        buffer_memory: index_buffer_memory,
-    };
+    let buffer: Buffer = Buffer::new(index_buffer, index_buffer_memory);
 
     copy_buffer(
         &device.device,
         device.graphics_queue,
         device.command_pool,
         staging_buffer,
-        buffer.buffer,
+        buffer.buffer(),
         size,
     )?;
 

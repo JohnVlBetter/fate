@@ -6,15 +6,14 @@
     clippy::unnecessary_wraps
 )]
 
+use cgmath::Vector4;
 use cgmath::{perspective, Deg, EuclideanSpace, Matrix4, SquareMatrix, Vector3};
 use fate_graphic::camera::Camera;
 use fate_graphic::device::*;
 use fate_graphic::frame_buffer::*;
 use fate_graphic::input_system::InputState;
-use fate_graphic::light::Light;
 use fate_graphic::material::MaterialUniform;
 use fate_graphic::material::PBRWorkflow;
-use fate_graphic::mesh;
 use fate_graphic::mesh::Mat4;
 use fate_graphic::mesh::ModelVertex;
 use fate_graphic::mesh::Vec4;
@@ -57,7 +56,6 @@ pub struct App {
     pub resized: bool,
     pub start: Instant,
     pub camera: Camera,
-    pub main_light: Light,
     pub model: Model,
 }
 
@@ -113,10 +111,6 @@ impl App {
         create_command_buffers(&mut device, &mut data)?;
         create_sync_objects(&device.device, &mut data)?;
         let camera = Camera::default();
-        let main_light = Light::new(
-            mesh::Vec4::new(1.0, -1.0, -1.0, 1.0),
-            mesh::Vec4::new(1.0, 1.0, 1.0, 1.0),
-        )?;
         Ok(Self {
             entry,
             instance,
@@ -126,7 +120,6 @@ impl App {
             resized: false,
             start: Instant::now(),
             camera,
-            main_light,
             model,
         })
     }
@@ -284,7 +277,7 @@ impl App {
                     size_of::<Mat4>()
                 );
             
-                let mat_uniform = MaterialUniform::from(self.model.meshes[0].primitives()[0].material());
+                let mat_uniform = MaterialUniform::from(primitive.material());
                 let material_bytes = any_as_u8_slice(&mat_uniform);
             
                 let inheritance_info = vk::CommandBufferInheritanceInfo::builder()
@@ -299,8 +292,8 @@ impl App {
                 self.device.device.begin_command_buffer(command_buffer, &info)?;
             
                 self.device.device.cmd_bind_pipeline(command_buffer, vk::PipelineBindPoint::GRAPHICS, self.data.pipeline);
-                self.device.device.cmd_bind_vertex_buffers(command_buffer, 0, &[primitive.vertex_buffer.buffer], &[0]);
-                self.device.device.cmd_bind_index_buffer(command_buffer, primitive.index_buffer.buffer, 0, vk::IndexType::UINT32);
+                self.device.device.cmd_bind_vertex_buffers(command_buffer, 0, &[primitive.vertex_buffer.buffer()], &[0]);
+                self.device.device.cmd_bind_index_buffer(command_buffer, primitive.index_buffer.buffer(), 0, vk::IndexType::UINT32);
                 self.device.device.cmd_bind_descriptor_sets(
                     command_buffer,
                     vk::PipelineBindPoint::GRAPHICS,
@@ -341,19 +334,6 @@ impl App {
         Ok(())
     }
 
-    /* #[rustfmt::skip]
-    unsafe fn update_secondary_command_buffer(
-        &mut self,
-        image_index: usize,
-        model_index: usize,
-    ) -> Result<vk::CommandBuffer> {
-        // Allocate
-
-
-
-        Ok(command_buffer)
-    }*/
-
     unsafe fn update_uniform_buffer(&self, image_index: usize) -> Result<()> {
         // MVP
         let view = Matrix4::look_at_rh(
@@ -371,12 +351,13 @@ impl App {
 
         let color = Vec4::new(1.0, 0.0, 0.0, 1.0);
         let eye_pos = self.camera.position().to_vec();
+        //let light: Light = self.model.lights().iter().for_each(|light| {});
         let ubo = UniformBufferObject {
             view,
             proj,
             color,
-            main_light_direction: self.main_light.direction,
-            main_light_color: self.main_light.color,
+            main_light_direction: Vector4::new(45.0, 45.0, 0.0, 1.0),
+            main_light_color: Vector4::new(1.0, 1.0, 1.0, 1.0),
             camera_pos: Vec4::new(eye_pos.x, eye_pos.y, eye_pos.z, 1.0),
         };
 
@@ -443,29 +424,19 @@ impl App {
 
 #[derive(Clone, Debug, Default)]
 pub struct AppData {
-    // Debug
     messenger: vk::DebugUtilsMessengerEXT,
-    // Surface
     surface: vk::SurfaceKHR,
-    // Pipeline
-    pub render_pass: RenderPass,
+    render_pass: RenderPass,
     descriptor_set_layout: vk::DescriptorSetLayout,
     pipeline_layout: vk::PipelineLayout,
     pipeline: vk::Pipeline,
-    // Framebuffers
     framebuffers: Vec<FrameBuffer>,
-    // Color
-    pub color_attachment: ColorAttachment,
-    // Depth
-    pub depth_attachment: DepthAttachment,
-    //Buffer
+    color_attachment: ColorAttachment,
+    depth_attachment: DepthAttachment,
     uniform_buffers: Vec<UniformBuffer>,
-    //Swapchain
-    pub swapchain: Swapchain,
-    // Descriptors
+    swapchain: Swapchain,
     descriptor_pool: vk::DescriptorPool,
     descriptor_sets: Vec<vk::DescriptorSet>,
-    // Sync Objects
     image_available_semaphores: Vec<vk::Semaphore>,
     render_finished_semaphores: Vec<vk::Semaphore>,
     in_flight_fences: Vec<vk::Fence>,
@@ -793,7 +764,7 @@ unsafe fn create_descriptor_sets(
             for primitive in mesh.primitives() {
                 let material = primitive.material();
                 let info = vk::DescriptorBufferInfo::builder()
-                    .buffer(data.uniform_buffers[i].buffer.buffer)
+                    .buffer(data.uniform_buffers[i].buffer.buffer())
                     .offset(0)
                     .range(size_of::<UniformBufferObject>() as u64);
 
@@ -809,13 +780,13 @@ unsafe fn create_descriptor_sets(
                     .buffer_info(buffer_info);
 
                 let albedo_info = create_descriptor_image_info(
-                    &model.textures,
+                    &model.textures(),
                     material.albedo_texture_index(),
                     dummy_texture,
                 );
             
                 let normal_info = create_descriptor_image_info(
-                    &model.textures,
+                    &model.textures(),
                     material.normal_texture_index(),
                     dummy_texture,
                 );
@@ -825,19 +796,19 @@ unsafe fn create_descriptor_sets(
                     PBRWorkflow::SpecularGlossiness(workflow) => workflow.specular_glossiness_texture(),
                 };
                 let material_info = create_descriptor_image_info(
-                    &model.textures,
+                    &model.textures(),
                     material_texture.map(|t| t.index()),
                     dummy_texture,
                 );
             
                 let ao_info = create_descriptor_image_info(
-                    &model.textures,
+                    &model.textures(),
                     material.ao_texture_index(),
                     dummy_texture,
                 );
             
                 let emissive_info = create_descriptor_image_info(
-                    &model.textures,
+                    &model.textures(),
                     material.emissive_texture_index(),
                     dummy_texture,
                 );

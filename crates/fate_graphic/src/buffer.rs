@@ -4,8 +4,25 @@ use vulkanalia::prelude::v1_0::*;
 
 #[derive(Clone, Debug, Default)]
 pub struct Buffer {
-    pub buffer: vk::Buffer,
-    pub buffer_memory: vk::DeviceMemory,
+    buffer: vk::Buffer,
+    buffer_memory: vk::DeviceMemory,
+}
+
+impl Buffer {
+    pub fn new(buffer: vk::Buffer, buffer_memory: vk::DeviceMemory) -> Self {
+        Self {
+            buffer,
+            buffer_memory,
+        }
+    }
+
+    pub fn buffer(&self) -> vk::Buffer {
+        self.buffer
+    }
+
+    pub fn buffer_memory(&self) -> vk::DeviceMemory {
+        self.buffer_memory
+    }
 }
 
 pub unsafe fn create_buffer(

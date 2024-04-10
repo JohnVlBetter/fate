@@ -79,8 +79,8 @@ impl VkDevice {
     }
 
     pub unsafe fn destory_buffer(&mut self, buffer: &Buffer) -> () {
-        self.device.free_memory(buffer.buffer_memory, None);
-        self.device.destroy_buffer(buffer.buffer, None);
+        self.device.free_memory(buffer.buffer_memory(), None);
+        self.device.destroy_buffer(buffer.buffer(), None);
     }
 }
 
