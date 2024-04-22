@@ -1,0 +1,17 @@
+[package]
+name = "fate_renderer"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+vulkan.workspace = true
+rendering.workspace = true
+
+log.workspace = true
+env_logger.workspace = true
+serde.workspace = true
+serde_yaml.workspace = true
+clap.workspace = true
+egui.workspace = true
+egui-winit.workspace = true
+egui-ash-renderer.workspace = true

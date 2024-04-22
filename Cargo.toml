@@ -1,25 +1,32 @@
-[package]
+[workspace]
+members = ["crates/fate_renderer", "crates/libs/*"]
+resolver = "2"
+
+[workspace.package]
 name = "fate"
 version = "0.1.0"
 edition = "2021"
 
-[workspace]
-members = ["crates/fate_graphic/", "crates/fate_rt/"]
-[workspace.package]
-version = "0.1.0"
+[workspace.dependencies]
+vulkan = { path = "crates/libs/vulkan" }
+rendering = { path = "crates/libs/rendering" }
 
-[dependencies]
-fate_graphic = { path = "./crates/fate_graphic", version = "0.1.0" }
-fate_rt = { path = "./crates/fate_rt", version = "0.1.0" }
-anyhow = "1"
 log = "0.4"
+env_logger = "0.11"
+serde = { version = "1.0", features = ["derive"] }
+serde_yaml = "0.9"
+clap = "3.1"
 cgmath = "0.18"
-png = "0.17"
-pretty_env_logger = "0.4"
-thiserror = "1"
-vulkanalia = { version = "=0.22.0", features = [
-    "libloading",
-    "provisional",
-    "window",
-] }
-winit = "0.28"
+rand = "0.8"
+lerp = "0.5"
+byteorder = "1.4"
+mikktspace = "0.3"
+image = "0.24"
+ash = { version = "0.37", features = ["loaded"] }
+ash-window = "0.12"
+raw-window-handle = "0.5"
+winit = { version = "0.29", default-features = false, features = ["rwh_05"] }
+gltf = "1.3"
+egui = "0.27"
+egui-winit = "0.27"
+egui-ash-renderer = { version = "0.2.0", features = ["dynamic-rendering"] }

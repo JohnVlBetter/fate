@@ -4,7 +4,6 @@ version.workspace = true
 edition = "2021"
 
 [dependencies]
-fate_graphic = { path = "../fate_graphic", version = "0.1.0" }
 anyhow = "1"
 cgmath = "0.18"
 image = "0.24.8"

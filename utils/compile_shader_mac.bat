@@ -1,4 +1,4 @@
 cd ..
-cd shaders
-glslc shader.vert -o shader.vert.spv
-glslc shader.frag -o shader.frag.spv
+cd crates/viewer/shaders
+glslc.exe model.vert -o model.vert.spv
+glslc.exe model.frag -o model.frag.spv

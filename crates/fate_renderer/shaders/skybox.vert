@@ -1,0 +1,30 @@
+#version 450
+
+layout(location = 0) in vec3 vPositions;
+
+layout(binding = 0) uniform CameraUBO {
+    mat4 view;
+    mat4 proj;
+    mat4 invertedProj;
+    vec4 eye;
+    float zNear;
+    float zFar;
+} cameraUBO;
+
+layout(location = 0) out vec3 oPositions;
+
+mat4 getViewAtOrigin() {
+    mat4 view = mat4(cameraUBO.view);
+    view[3][0] = 0;
+    view[3][1] = 0;
+    view[3][2] = 0;
+    return view;
+}
+
+void main() {
+    oPositions = vPositions;
+
+    mat4 view = getViewAtOrigin();
+
+    gl_Position = cameraUBO.proj * view * vec4(vPositions, 1.0);
+}
