@@ -4,9 +4,11 @@ mod gui;
 mod inputsystem;
 mod loader;
 mod renderer;
+mod transform;
 
 use crate::{camera::*, config::Config, gui::Gui, inputsystem::*, loader::*, renderer::*};
 use log::LevelFilter;
+use rendering::cgmath::{Matrix4, Vector3};
 use rendering::environment::Environment;
 use rendering::{animation::PlaybackMode, model::Model};
 use std::{cell::RefCell, error::Error, path::PathBuf, rc::Rc, sync::Arc, time::Instant};
@@ -94,6 +96,11 @@ fn run(config: Config, enable_debug: bool, path: Option<PathBuf>) {
 
                     if let Some(model) = model.as_ref() {
                         let mut model = model.borrow_mut();
+
+                        if input_state.is_control_w_clicked() {
+                            println!("eeee");
+                            model.transform(Some(Matrix4::from_translation(Vector3::new(0.0,0.0,0.01))));
+                        }
 
                         if gui.should_toggle_animation() {
                             model.toggle_animation();
