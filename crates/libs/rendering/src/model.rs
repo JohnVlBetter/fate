@@ -180,6 +180,10 @@ impl Model {
             animations.reset();
         }
     }
+
+    pub fn transform(&mut self, transform: Option<Matrix4<f32>>){
+        self.nodes.transform(transform);
+    }
 }
 
 /// Getters

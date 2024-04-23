@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/fate_renderer", "crates/libs/*"]
+members = ["crates/fate_renderer", "crates/fate_rt", "crates/libs/*"]
 resolver = "2"
 
 [workspace.package]
