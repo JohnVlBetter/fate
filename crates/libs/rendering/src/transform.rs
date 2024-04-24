@@ -1,5 +1,6 @@
 use cgmath::{Deg, Euler, Matrix4, SquareMatrix, Vector3, Zero};
 
+#[derive(Clone, Copy, Debug)]
 pub struct Transform {
     position: Vector3<f32>,
     rotation: Vector3<f32>,

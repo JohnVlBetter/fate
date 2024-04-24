@@ -1,4 +1,5 @@
-use cgmath::{Matrix4, Transform};
+use crate::transform::Transform;
+use cgmath::{Vector3, Zero};
 use metadata::Metadata;
 use std::{error::Error, path::Path, result::Result, sync::Arc};
 use vulkan::ash::vk;
@@ -23,12 +24,11 @@ pub struct Model {
     metadata: Metadata,
     meshes: Vec<Mesh>,
     nodes: Nodes,
-    global_transform: Matrix4<f32>,
     animations: Option<Animations>,
     skins: Vec<Skin>,
     textures: Textures,
     lights: Vec<Light>,
-    pub transform: crate::transform::Transform,
+    transform: Transform,
 }
 
 impl Model {
@@ -37,20 +37,18 @@ impl Model {
         command_buffer: vk::CommandBuffer,
         path: P,
     ) -> Result<PreLoadedResource<Model, ModelStagingResources>, Box<dyn Error>> {
-        log::debug!("Importing gltf file");
         let (document, buffers, images) = gltf::import(&path)?;
 
         let metadata = Metadata::new(path, &document);
 
-        log::debug!("Creating the model");
         if document.scenes().len() == 0 {
-            return Err(Box::new(ModelLoadingError::new("There is no scene")));
+            return Err(Box::new(ModelLoadingError::new("没有场景")));
         }
 
         let meshes = create_meshes_from_gltf(&context, command_buffer, &document, &buffers);
         if meshes.is_none() {
             return Err(Box::new(ModelLoadingError::new(
-                "Could not find any renderable primitives",
+                "没有可渲染的mesh",
             )));
         }
 
@@ -70,10 +68,10 @@ impl Model {
 
         let mut nodes = Nodes::from_gltf_nodes(document.nodes(), &scene);
 
-        let global_transform = {
+        let transform = {
             let aabb = compute_aabb(&nodes, &meshes);
-            let transform = compute_unit_cube_at_origin_transform(aabb);
-            nodes.transform(Some(transform));
+            let mut transform = compute_unit_cube_at_origin_transform(aabb);
+            nodes.transform(Some(transform.local_to_world_matrix()));
             nodes
                 .get_skins_transform()
                 .iter()
@@ -98,12 +96,11 @@ impl Model {
             metadata,
             meshes,
             nodes,
-            global_transform,
+            transform,
             animations,
             skins,
             textures,
             lights,
-            transform: Default::default(),
         };
 
         let model_staging_res = ModelStagingResources {
@@ -130,7 +127,8 @@ impl Model {
         };
 
         if updated {
-            self.nodes.transform(Some(self.global_transform));
+            self.nodes
+                .transform(Some(self.transform.local_to_world_matrix()));
             self.nodes
                 .get_skins_transform()
                 .iter()
@@ -144,7 +142,6 @@ impl Model {
     }
 }
 
-/// Animations methods
 impl Model {
     pub fn get_animation_playback_state(&self) -> Option<PlaybackState> {
         self.animations
@@ -183,7 +180,7 @@ impl Model {
         }
     }
 
-    pub fn transform(&mut self) {
+    pub fn update_transform(&mut self) {
         self.nodes
             .transform(Some(self.transform.local_to_world_matrix()));
     }
@@ -222,6 +219,26 @@ impl Model {
     pub fn lights(&self) -> &[Light] {
         &self.lights
     }
+
+    pub fn translate(&mut self, position: Vector3<f32>) {
+        self.transform.translate(position);
+    }
+
+    pub fn rotate(&mut self, rotation: Vector3<f32>) {
+        self.transform.rotate(rotation);
+    }
+
+    pub fn set_position(&mut self, position: Vector3<f32>) {
+        self.transform.set_position(position);
+    }
+
+    pub fn set_rotation(&mut self, rotation: Vector3<f32>) {
+        self.transform.set_rotation(rotation);
+    }
+
+    pub fn set_scale(&mut self, scale: Vector3<f32>) {
+        self.transform.set_scale(scale);
+    }
 }
 
 fn compute_aabb(nodes: &Nodes, meshes: &[Mesh]) -> Aabb<f32> {
@@ -237,14 +254,20 @@ fn compute_aabb(nodes: &Nodes, meshes: &[Mesh]) -> Aabb<f32> {
     Aabb::union(&aabbs).unwrap()
 }
 
-fn compute_unit_cube_at_origin_transform(aabb: Aabb<f32>) -> Matrix4<f32> {
+fn compute_unit_cube_at_origin_transform(aabb: Aabb<f32>) -> Transform {
     let larger_side = aabb.get_larger_side_size();
     let scale_factor = (1.0_f32 / larger_side) * 10.0;
 
     let aabb = aabb * scale_factor;
     let center = aabb.get_center();
 
-    let translation = Matrix4::from_translation(-center);
-    let scale = Matrix4::from_scale(scale_factor);
-    translation * scale
+    //let translation = Matrix4::from_translation(-center);
+    //let scale = Matrix4::from_scale(scale_factor);
+    let transform = Transform::new(
+        -center,
+        Vector3::<f32>::zero(),
+        Vector3::new(scale_factor, scale_factor, scale_factor),
+    );
+    //translation * scale
+    transform
 }

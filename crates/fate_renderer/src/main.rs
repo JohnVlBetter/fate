@@ -7,7 +7,7 @@ mod renderer;
 
 use crate::{camera::*, config::Config, gui::Gui, inputsystem::*, loader::*, renderer::*};
 use log::LevelFilter;
-use rendering::cgmath::{Matrix4, Vector3};
+use rendering::cgmath::Vector3;
 use rendering::environment::Environment;
 use rendering::{animation::PlaybackMode, model::Model};
 use std::{cell::RefCell, error::Error, path::PathBuf, rc::Rc, sync::Arc, time::Instant};
@@ -97,9 +97,12 @@ fn run(config: Config, enable_debug: bool, path: Option<PathBuf>) {
                         let mut model = model.borrow_mut();
 
                         if input_state.is_control_w_clicked() {
-                            println!("eeee");
-                            model.transform.translate(Vector3::new(0.0,0.0,0.01));
-                            model.transform();
+                            model.translate(Vector3::new(0.0,0.0,-0.01));
+                            model.update_transform();
+                        }
+                        if input_state.is_control_s_clicked() {
+                            model.translate(Vector3::new(0.0,0.0,0.01));
+                            model.update_transform();
                         }
 
                         if gui.should_toggle_animation() {
