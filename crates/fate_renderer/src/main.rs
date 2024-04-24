@@ -4,7 +4,6 @@ mod gui;
 mod inputsystem;
 mod loader;
 mod renderer;
-mod transform;
 
 use crate::{camera::*, config::Config, gui::Gui, inputsystem::*, loader::*, renderer::*};
 use log::LevelFilter;
@@ -99,7 +98,8 @@ fn run(config: Config, enable_debug: bool, path: Option<PathBuf>) {
 
                         if input_state.is_control_w_clicked() {
                             println!("eeee");
-                            model.transform(Some(Matrix4::from_translation(Vector3::new(0.0,0.0,0.01))));
+                            model.transform.translate(Vector3::new(0.0,0.0,0.01));
+                            model.transform();
                         }
 
                         if gui.should_toggle_animation() {

@@ -1,4 +1,4 @@
-use cgmath::Matrix4;
+use cgmath::{Matrix4, Transform};
 use metadata::Metadata;
 use std::{error::Error, path::Path, result::Result, sync::Arc};
 use vulkan::ash::vk;
@@ -28,6 +28,7 @@ pub struct Model {
     skins: Vec<Skin>,
     textures: Textures,
     lights: Vec<Light>,
+    pub transform: crate::transform::Transform,
 }
 
 impl Model {
@@ -102,6 +103,7 @@ impl Model {
             skins,
             textures,
             lights,
+            transform: Default::default(),
         };
 
         let model_staging_res = ModelStagingResources {
@@ -181,8 +183,9 @@ impl Model {
         }
     }
 
-    pub fn transform(&mut self, transform: Option<Matrix4<f32>>){
-        self.nodes.transform(transform);
+    pub fn transform(&mut self) {
+        self.nodes
+            .transform(Some(self.transform.local_to_world_matrix()));
     }
 }
 

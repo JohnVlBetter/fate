@@ -1,4 +1,4 @@
-use rendering::cgmath::{Deg, Euler, Matrix4, SquareMatrix, Vector3, Zero};
+use cgmath::{Deg, Euler, Matrix4, SquareMatrix, Vector3, Zero};
 
 pub struct Transform {
     position: Vector3<f32>,
@@ -42,6 +42,16 @@ impl Transform {
 
     pub fn scale(&self) -> Vector3<f32> {
         self.scale
+    }
+
+    pub fn translate(&mut self, position: Vector3<f32>) {
+        self.position += position;
+        self.dirty = true;
+    }
+
+    pub fn rotate(&mut self, rotation: Vector3<f32>) {
+        self.rotation += rotation;
+        self.dirty = true;
     }
 
     pub fn set_position(&mut self, position: Vector3<f32>) {

@@ -17,6 +17,7 @@ pub mod pre_filtered;
 pub mod skin;
 pub mod texture;
 pub mod util;
+pub mod transform;
 pub mod vertex;
 
 pub use aabb::*;
