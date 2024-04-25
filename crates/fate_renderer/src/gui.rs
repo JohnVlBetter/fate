@@ -3,7 +3,7 @@ use crate::renderer::{OutputMode, RendererSettings, ToneMapMode, DEFAULT_BLOOM_S
 use egui::{ClippedPrimitive, Context, TexturesDelta, Ui, ViewportId, Widget};
 use egui_winit::State as EguiWinit;
 use rendering::animation::PlaybackState;
-use rendering::metadata::Metadata;
+use rendering::metadata::{Metadata, Node};
 use vulkan::winit::event::WindowEvent;
 use vulkan::winit::window::Window as WinitWindow;
 
@@ -55,6 +55,11 @@ impl Gui {
             egui::Window::new("菜单")
                 .default_open(false)
                 .show(ctx, |ui| {
+                    if let Some(metadata) = self.model_metadata.as_ref() {
+                        if metadata.node_count() > 0 {
+                            build_model_hierarchy(ui, &mut self.state, metadata.nodes());
+                        }
+                    }
                     build_camera_details_window(ui, &mut self.state, self.camera);
                     ui.separator();
                     build_renderer_settings_window(ui, &mut self.state);
@@ -314,6 +319,30 @@ fn build_renderer_settings_window(ui: &mut Ui, state: &mut State) {
                 );
             }
         });
+}
+
+fn build_model_hierarchy(ui: &mut Ui, state: &mut State, nodes: &[Node]) {
+    egui::CollapsingHeader::new("Hierachy")
+        .default_open(true)
+        .show(ui, |ui| {
+            for node in nodes {
+                build_model_hierarchy_tree(ui, state, node);
+            }
+        });
+}
+
+fn build_model_hierarchy_tree(ui: &mut Ui, state: &mut State, node: &Node) {
+    egui::CollapsingHeader::new(format!(
+        "Name: {}, Kind: {}",
+        node.name().unwrap_or("Unknown"),
+        node.kind()
+    ))
+    .default_open(false)
+    .show(ui, |ui| {
+        for child in node.children() {
+            build_model_hierarchy_tree(ui, state, child);
+        }
+    });
 }
 
 #[derive(Clone, Copy)]
