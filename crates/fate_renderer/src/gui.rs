@@ -3,7 +3,7 @@ use crate::renderer::{OutputMode, RendererSettings, ToneMapMode, DEFAULT_BLOOM_S
 use egui::{ClippedPrimitive, Context, TexturesDelta, Ui, ViewportId, Widget};
 use egui_winit::State as EguiWinit;
 use rendering::animation::PlaybackState;
-use rendering::metadata::{Metadata, Node};
+use rendering::metadata::{Metadata, Node, NodeKind};
 use vulkan::winit::event::WindowEvent;
 use vulkan::winit::window::Window as WinitWindow;
 
@@ -13,16 +13,17 @@ pub struct RenderData {
     pub clipped_primitives: Vec<ClippedPrimitive>,
 }
 
-pub struct Gui {
+pub struct Gui<'a> {
     egui: Context,
     egui_winit: EguiWinit,
     model_metadata: Option<Metadata>,
     animation_playback_state: Option<PlaybackState>,
     camera: Option<Camera>,
+    select_node: Option<&'a Node>,
     state: State,
 }
 
-impl Gui {
+impl<'a> Gui<'a> {
     pub fn new(window: &WinitWindow, renderer_settings: RendererSettings) -> Self {
         let (egui, egui_winit) = init_egui(window);
 
@@ -33,6 +34,7 @@ impl Gui {
             animation_playback_state: None,
             camera: None,
             state: State::new(renderer_settings),
+            select_node: None,
         }
     }
 
@@ -55,11 +57,6 @@ impl Gui {
             egui::Window::new("菜单")
                 .default_open(false)
                 .show(ctx, |ui| {
-                    if let Some(metadata) = self.model_metadata.as_ref() {
-                        if metadata.node_count() > 0 {
-                            build_model_hierarchy(ui, &mut self.state, metadata.nodes());
-                        }
-                    }
                     build_camera_details_window(ui, &mut self.state, self.camera);
                     ui.separator();
                     build_renderer_settings_window(ui, &mut self.state);
@@ -72,6 +69,16 @@ impl Gui {
                                 self.model_metadata.as_ref(),
                                 self.animation_playback_state,
                             );
+                        }
+                    }
+                });
+
+            egui::Window::new("Hierarchy")
+                .default_open(false)
+                .show(ctx, |ui| {
+                    if let Some(metadata) = self.model_metadata.as_ref() {
+                        if metadata.node_count() > 0 {
+                            Self::build_model_hierarchy(ui, &mut self.state, metadata.nodes());
                         }
                     }
                 });
@@ -159,6 +166,38 @@ impl Gui {
 
     pub fn is_hovered(&self) -> bool {
         self.state.hovered
+    }
+
+    fn build_model_hierarchy(ui: &mut Ui, state: &mut State, nodes: &[Node]) {
+        for node in nodes {
+            Self::build_model_hierarchy_tree(ui, state, node);
+        }
+    }
+    
+    fn build_model_hierarchy_tree(ui: &mut Ui, state: &mut State, node: &Node) {
+        let name = match node.kind() {
+            NodeKind::Scene => format!("Scene: {}", node.name().unwrap_or("Unknown")),
+            NodeKind::Node(node_data) => {
+                let mut t_name = String::new();
+                if let Some(..) = node_data.light {
+                    t_name.push_str("Light");
+                };
+                if let Some(..) = node_data.mesh {
+                    t_name.push_str("Mesh");
+                };
+                format!("{}: {}", t_name, node.name().unwrap_or("Unknown"))
+            }
+        };
+        let resp = egui::CollapsingHeader::new(name)
+            .default_open(false)
+            .show(ui, |ui| {
+                for child in node.children() {
+                    Self::build_model_hierarchy_tree(ui, state, child);
+                }
+            });
+        if resp.header_response.clicked() {
+            println!("{}", node.name().unwrap_or("test"));
+        }
     }
 }
 
@@ -319,30 +358,6 @@ fn build_renderer_settings_window(ui: &mut Ui, state: &mut State) {
                 );
             }
         });
-}
-
-fn build_model_hierarchy(ui: &mut Ui, state: &mut State, nodes: &[Node]) {
-    egui::CollapsingHeader::new("Hierachy")
-        .default_open(true)
-        .show(ui, |ui| {
-            for node in nodes {
-                build_model_hierarchy_tree(ui, state, node);
-            }
-        });
-}
-
-fn build_model_hierarchy_tree(ui: &mut Ui, state: &mut State, node: &Node) {
-    egui::CollapsingHeader::new(format!(
-        "Name: {}, Kind: {}",
-        node.name().unwrap_or("Unknown"),
-        node.kind()
-    ))
-    .default_open(false)
-    .show(ui, |ui| {
-        for child in node.children() {
-            build_model_hierarchy_tree(ui, state, child);
-        }
-    });
 }
 
 #[derive(Clone, Copy)]
