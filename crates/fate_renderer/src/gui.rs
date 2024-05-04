@@ -1,6 +1,6 @@
 use crate::camera::Camera;
 use crate::renderer::{OutputMode, RendererSettings, ToneMapMode, DEFAULT_BLOOM_STRENGTH};
-use egui::{ClippedPrimitive, Context, TexturesDelta, Ui, ViewportId, Widget};
+use egui::{ClippedPrimitive, Context, Label, Sense, TexturesDelta, Ui, ViewportId, Widget};
 use egui_winit::State as EguiWinit;
 use rendering::animation::PlaybackState;
 use rendering::metadata::{Metadata, Node, NodeKind};
@@ -13,17 +13,16 @@ pub struct RenderData {
     pub clipped_primitives: Vec<ClippedPrimitive>,
 }
 
-pub struct Gui<'a> {
+pub struct Gui {
     egui: Context,
     egui_winit: EguiWinit,
     model_metadata: Option<Metadata>,
     animation_playback_state: Option<PlaybackState>,
     camera: Option<Camera>,
-    select_node: Option<&'a Node>,
     state: State,
 }
 
-impl<'a> Gui<'a> {
+impl Gui {
     pub fn new(window: &WinitWindow, renderer_settings: RendererSettings) -> Self {
         let (egui, egui_winit) = init_egui(window);
 
@@ -34,7 +33,6 @@ impl<'a> Gui<'a> {
             animation_playback_state: None,
             camera: None,
             state: State::new(renderer_settings),
-            select_node: None,
         }
     }
 
@@ -45,7 +43,7 @@ impl<'a> Gui<'a> {
     pub fn render(&mut self, window: &WinitWindow) -> RenderData {
         let raw_input = self.egui_winit.take_egui_input(window);
 
-        let previous_state = self.state;
+        let previous_state = self.state.clone();
 
         let egui::FullOutput {
             platform_output,
@@ -55,7 +53,7 @@ impl<'a> Gui<'a> {
             ..
         } = self.egui.run(raw_input, |ctx: &Context| {
             egui::Window::new("菜单")
-                .default_open(false)
+                .default_open(true)
                 .show(ctx, |ui| {
                     build_camera_details_window(ui, &mut self.state, self.camera);
                     ui.separator();
@@ -74,13 +72,19 @@ impl<'a> Gui<'a> {
                 });
 
             egui::Window::new("Hierarchy")
-                .default_open(false)
+                .default_open(true)
                 .show(ctx, |ui| {
                     if let Some(metadata) = self.model_metadata.as_ref() {
                         if metadata.node_count() > 0 {
-                            Self::build_model_hierarchy(ui, &mut self.state, metadata.nodes());
+                            build_model_hierarchy(ui, &mut self.state, metadata.nodes());
                         }
                     }
+                });
+
+            egui::Window::new("Inspector")
+                .default_open(true)
+                .show(ctx, |ui| {
+                    build_inspector_window(ui, &mut self.state);
                 });
         });
 
@@ -167,38 +171,6 @@ impl<'a> Gui<'a> {
     pub fn is_hovered(&self) -> bool {
         self.state.hovered
     }
-
-    fn build_model_hierarchy(ui: &mut Ui, state: &mut State, nodes: &[Node]) {
-        for node in nodes {
-            Self::build_model_hierarchy_tree(ui, state, node);
-        }
-    }
-    
-    fn build_model_hierarchy_tree(ui: &mut Ui, state: &mut State, node: &Node) {
-        let name = match node.kind() {
-            NodeKind::Scene => format!("Scene: {}", node.name().unwrap_or("Unknown")),
-            NodeKind::Node(node_data) => {
-                let mut t_name = String::new();
-                if let Some(..) = node_data.light {
-                    t_name.push_str("Light");
-                };
-                if let Some(..) = node_data.mesh {
-                    t_name.push_str("Mesh");
-                };
-                format!("{}: {}", t_name, node.name().unwrap_or("Unknown"))
-            }
-        };
-        let resp = egui::CollapsingHeader::new(name)
-            .default_open(false)
-            .show(ui, |ui| {
-                for child in node.children() {
-                    Self::build_model_hierarchy_tree(ui, state, child);
-                }
-            });
-        if resp.header_response.clicked() {
-            println!("{}", node.name().unwrap_or("test"));
-        }
-    }
 }
 
 fn init_egui(window: &WinitWindow) -> (Context, EguiWinit) {
@@ -214,7 +186,7 @@ fn load_global_font(context: &Context) {
     let mut fonts = egui::FontDefinitions::default();
 
     fonts.font_data.insert(
-        "msyh".to_owned(),
+        "chinese_song".to_owned(),
         egui::FontData::from_static(include_bytes!("../../../assets/fonts/chinese_song.ttf")),
     );
 
@@ -222,15 +194,64 @@ fn load_global_font(context: &Context) {
         .families
         .get_mut(&egui::FontFamily::Proportional)
         .unwrap()
-        .insert(0, "msyh".to_owned());
+        .insert(0, "chinese_song".to_owned());
 
     fonts
         .families
         .get_mut(&egui::FontFamily::Monospace)
         .unwrap()
-        .push("msyh".to_owned());
+        .push("chinese_song".to_owned());
 
     context.set_fonts(fonts);
+}
+
+fn build_model_hierarchy(ui: &mut Ui, state: &mut State, nodes: &[Node]) {
+    for node in nodes {
+        build_model_hierarchy_tree(ui, state, node);
+    }
+}
+
+fn build_model_hierarchy_tree(ui: &mut Ui, state: &mut State, node: &Node) {
+    let name = match node.kind() {
+        NodeKind::Scene => format!("Scene: {}", node.name().unwrap_or("Unknown")),
+        NodeKind::Node(..) => format!("{}", node.name().unwrap_or("Unknown")),
+    };
+    match node.kind() {
+        NodeKind::Scene => {
+            if egui::CollapsingHeader::new(name)
+                .default_open(false)
+                .show(ui, |ui| {
+                    for child in node.children() {
+                        build_model_hierarchy_tree(ui, state, child);
+                    }
+                })
+                .header_response
+                .clicked()
+            {
+                state.select_node = Some(node.clone());
+            }
+        }
+        NodeKind::Node(node_data) => {
+            if node_data.leaf {
+                if ui.add(Label::new(name).sense(Sense::click())).clicked() {
+                    state.select_node = Some(node.clone());
+                }
+            } else {
+                if egui::CollapsingHeader::new(name)
+                    .default_open(false)
+                    .show(ui, |ui| {
+                        for child in node.children() {
+                            build_model_hierarchy_tree(ui, state, child);
+                        }
+                    })
+                    .header_response
+                    .clicked()
+                {
+                    state.select_node = Some(node.clone());
+                }
+            }
+        }
+    };
 }
 
 fn build_animation_player_window(
@@ -303,6 +324,31 @@ fn build_camera_details_window(ui: &mut Ui, state: &mut State, camera: Option<Ca
         });
 }
 
+fn build_inspector_window(ui: &mut Ui, state: &mut State) {
+    if let Some(node) = &state.select_node {
+        ui.label(format!("ID: {}", node.uid()));
+        ui.label(format!("Index: {}", node.index()));
+        ui.label(format!("Name: {}", node.name().unwrap_or("Unknown")));
+        let type_name = match node.kind() {
+            NodeKind::Scene => format!("Scene"),
+            NodeKind::Node(node_data) => {
+                let mut t_name = String::new();
+                if let Some(..) = node_data.light {
+                    t_name.push_str("Light");
+                };
+                if let Some(..) = node_data.mesh {
+                    t_name.push_str("Mesh");
+                };
+                if t_name.len() <= 0 {
+                    t_name.push_str("Node");
+                }
+                format!("{}", t_name)
+            }
+        };
+        ui.label(format!("Type: {}", type_name));
+    }
+}
+
 fn build_renderer_settings_window(ui: &mut Ui, state: &mut State) {
     egui::CollapsingHeader::new("渲染设置")
         .default_open(true)
@@ -360,7 +406,7 @@ fn build_renderer_settings_window(ui: &mut Ui, state: &mut State) {
         });
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 struct State {
     selected_animation: usize,
     infinite_animation: bool,
@@ -382,6 +428,8 @@ struct State {
     renderer_settings_changed: bool,
 
     hovered: bool,
+
+    select_node: Option<Node>,
 }
 
 impl State {
@@ -446,6 +494,7 @@ impl Default for State {
             renderer_settings_changed: false,
 
             hovered: false,
+            select_node: None,
         }
     }
 }
