@@ -4,6 +4,10 @@ use egui::{ClippedPrimitive, Context, Label, Sense, TexturesDelta, Ui, ViewportI
 use egui_winit::State as EguiWinit;
 use rendering::animation::PlaybackState;
 use rendering::metadata::{Metadata, Node, NodeKind};
+use rendering::model::Model;
+use std::cell::RefCell;
+use std::fmt::format;
+use std::rc::{Rc, Weak};
 use vulkan::winit::event::WindowEvent;
 use vulkan::winit::window::Window as WinitWindow;
 
@@ -17,6 +21,7 @@ pub struct Gui {
     egui: Context,
     egui_winit: EguiWinit,
     model_metadata: Option<Metadata>,
+    model: Weak<RefCell<Model>>,
     animation_playback_state: Option<PlaybackState>,
     camera: Option<Camera>,
     state: State,
@@ -30,6 +35,7 @@ impl Gui {
             egui,
             egui_winit,
             model_metadata: None,
+            model: Weak::new(),
             animation_playback_state: None,
             camera: None,
             state: State::new(renderer_settings),
@@ -58,17 +64,6 @@ impl Gui {
                     build_camera_details_window(ui, &mut self.state, self.camera);
                     ui.separator();
                     build_renderer_settings_window(ui, &mut self.state);
-                    ui.separator();
-                    if let Some(metadata) = self.model_metadata.as_ref() {
-                        if metadata.animation_count() > 0 {
-                            build_animation_player_window(
-                                ui,
-                                &mut self.state,
-                                self.model_metadata.as_ref(),
-                                self.animation_playback_state,
-                            );
-                        }
-                    }
                 });
 
             egui::Window::new("Hierarchy")
@@ -84,7 +79,30 @@ impl Gui {
             egui::Window::new("Inspector")
                 .default_open(true)
                 .show(ctx, |ui| {
-                    build_inspector_window(ui, &mut self.state);
+                    if let Some(metadata) = self.model_metadata.as_ref() {
+                        if metadata.node_count() > 0 {
+                            let model = &self.model.upgrade().expect("模型已被释放！");
+                            let model = model.borrow();
+                            let mesh_nodes = model.nodes().nodes();
+                            build_inspector_window(ui, &mut self.state, mesh_nodes);
+                        }
+                        if metadata.animation_count() > 0 {
+                            if let Some(node) = &self.state.select_node {
+                                match node.kind() {
+                                    NodeKind::Scene => {
+                                        ui.separator();
+                                        build_animation_player_window(
+                                            ui,
+                                            &mut self.state,
+                                            self.model_metadata.as_ref(),
+                                            self.animation_playback_state,
+                                        );
+                                    }
+                                    _ => {}
+                                };
+                            }
+                        }
+                    }
                 });
         });
 
@@ -108,6 +126,10 @@ impl Gui {
         self.model_metadata.replace(metadata);
         self.animation_playback_state = None;
         self.state = self.state.reset();
+    }
+
+    pub fn set_model(&mut self, model: &Rc<RefCell<Model>>) {
+        self.model = Rc::downgrade(model);
     }
 
     pub fn set_animation_playback_state(
@@ -215,6 +237,7 @@ fn build_model_hierarchy_tree(ui: &mut Ui, state: &mut State, node: &Node) {
     let name = match node.kind() {
         NodeKind::Scene => format!("Scene: {}", node.name().unwrap_or("Unknown")),
         NodeKind::Node(..) => format!("{}", node.name().unwrap_or("Unknown")),
+        _ => format!(""),
     };
     match node.kind() {
         NodeKind::Scene => {
@@ -251,6 +274,7 @@ fn build_model_hierarchy_tree(ui: &mut Ui, state: &mut State, node: &Node) {
                 }
             }
         }
+        _ => {}
     };
 }
 
@@ -260,48 +284,48 @@ fn build_animation_player_window(
     model_metadata: Option<&Metadata>,
     animation_playback_state: Option<PlaybackState>,
 ) {
-    egui::CollapsingHeader::new("动画播放器")
-        .default_open(false)
+    egui::CollapsingHeader::new("Animator")
+        .default_open(true)
         .show(ui, |ui| {
             if let Some(metadata) = model_metadata {
                 let animations_labels = metadata
                     .animations()
                     .iter()
                     .map(|a| {
-                        let name = a.name.as_ref().map_or("未知名字", |n| n);
+                        let name = a.name.as_ref().map_or("Unknown", |n| n);
                         format!("{}: {}", a.index, name)
                     })
                     .collect::<Vec<_>>();
 
-                egui::ComboBox::from_label("动画").show_index(
-                    ui,
-                    &mut state.selected_animation,
-                    metadata.animation_count(),
-                    |i| animations_labels[i].clone(),
-                );
+                ui.horizontal(|ui| {
+                    egui::ComboBox::from_label("").show_index(
+                        ui,
+                        &mut state.selected_animation,
+                        metadata.animation_count(),
+                        |i| animations_labels[i].clone(),
+                    );
+                    ui.checkbox(&mut state.infinite_animation, "Loop");
+                });
             }
 
             if let Some(playback_state) = animation_playback_state {
                 let toggle_text = if playback_state.paused {
-                    "恢复"
+                    "Resume"
                 } else {
-                    "暂停"
+                    "Pause"
                 };
 
                 ui.horizontal(|ui| {
                     state.toggle_animation = ui.button(toggle_text).clicked();
-                    state.stop_animation = ui.button("停止").clicked();
-                    state.reset_animation = ui.button("重置").clicked();
-                    ui.checkbox(&mut state.infinite_animation, "循环");
+                    state.stop_animation = ui.button("Stop").clicked();
+                    state.reset_animation = ui.button("Reset").clicked();
                 });
 
                 ui.horizontal(|ui| {
-                    ui.add(
-                        egui::Slider::new(&mut state.animation_speed, 0.05..=3.0).text("播放速度"),
-                    );
-                    if ui.button("默认").clicked() {
+                    if ui.button("Speed").clicked() {
                         state.animation_speed = 1.0;
                     }
+                    ui.add(egui::Slider::new(&mut state.animation_speed, 0.05..=10.0));
                 });
 
                 let progress = playback_state.time / playback_state.total_time;
@@ -311,7 +335,7 @@ fn build_animation_player_window(
 }
 
 fn build_camera_details_window(ui: &mut Ui, state: &mut State, camera: Option<Camera>) {
-    egui::CollapsingHeader::new("相机")
+    egui::CollapsingHeader::new("Camera")
         .default_open(false)
         .show(ui, |ui| {
             if let Some(camera) = camera {
@@ -319,18 +343,21 @@ fn build_camera_details_window(ui: &mut Ui, state: &mut State, camera: Option<Ca
                 let t = camera.target();
                 ui.label(format!("Position: {:.3}, {:.3}, {:.3}", p.x, p.y, p.z));
                 ui.label(format!("Target: {:.3}, {:.3}, {:.3}", t.x, t.y, t.z));
-                state.reset_camera = ui.button("重置").clicked();
+                state.reset_camera = ui.button("Reset").clicked();
             }
         });
 }
 
-fn build_inspector_window(ui: &mut Ui, state: &mut State) {
+fn build_inspector_window(ui: &mut Ui, state: &mut State, mesh_nodes: &[rendering::node::Node]) {
     if let Some(node) = &state.select_node {
-        ui.label(format!("ID: {}", node.uid()));
-        ui.label(format!("Index: {}", node.index()));
-        ui.label(format!("Name: {}", node.name().unwrap_or("Unknown")));
+        ui.label(format!(
+            "ID: {} Name: {}",
+            node.uid(),
+            node.name().unwrap_or("Unknown")
+        ));
         let type_name = match node.kind() {
             NodeKind::Scene => format!("Scene"),
+            NodeKind::Camera => format!("Camera"),
             NodeKind::Node(node_data) => {
                 let mut t_name = String::new();
                 if let Some(..) = node_data.light {
@@ -346,6 +373,22 @@ fn build_inspector_window(ui: &mut Ui, state: &mut State) {
             }
         };
         ui.label(format!("Type: {}", type_name));
+
+        let real_node = &mesh_nodes[node.index()];
+        let local_transform = real_node.local_transform().clone();
+        let (position, rotation, scale) = local_transform.decomposed();
+        ui.label(format!(
+            "Position: {:.3}, {:.3}, {:.3}",
+            position[0], position[1], position[2]
+        ));
+        ui.label(format!(
+            "Rotation: {:.3}, {:.3}, {:.3}, {:.3}",
+            rotation[0], rotation[1], rotation[2], rotation[3]
+        ));
+        ui.label(format!(
+            "Scale: {:.3}, {:.3}, {:.3}",
+            scale[0], scale[1], scale[2]
+        ));
     }
 }
 

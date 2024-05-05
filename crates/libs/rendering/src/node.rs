@@ -23,6 +23,10 @@ impl Node {
         self.global_transform_matrix
     }
 
+    pub fn local_transform(&self) -> &Transform {
+        &self.local_transform
+    }
+
     pub fn mesh_index(&self) -> Option<usize> {
         self.mesh_index
     }

@@ -181,6 +181,7 @@ impl Node {
 #[derive(Clone, Debug)]
 pub enum NodeKind {
     Scene,
+    Camera,
     Node(NodeData),
 }
 
@@ -188,6 +189,7 @@ impl fmt::Display for NodeKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let name = match self {
             NodeKind::Scene => "Scene",
+            NodeKind::Camera => "Camera",
             NodeKind::Node(..) => "Node",
         };
         write!(f, "{}", name)

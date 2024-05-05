@@ -90,18 +90,19 @@ fn run(config: Config, enable_debug: bool, path: Option<PathBuf>) {
                         context.graphics_queue_wait_idle();
                         let loaded_model = Rc::new(RefCell::new(loaded_model));
                         renderer.set_model(&loaded_model);
+                        gui.set_model(&loaded_model);
                         model = Some(loaded_model);
                     }
 
                     if let Some(model) = model.as_ref() {
-                        let mut model = model.borrow_mut();
+                        let mut model: std::cell::RefMut<'_, Model> = model.borrow_mut();
 
                         if input_state.is_control_w_clicked() {
-                            model.translate(Vector3::new(0.0,0.0,-0.01));
+                            model.translate(Vector3::new(0.0, 0.0, -0.01));
                             model.update_transform();
                         }
                         if input_state.is_control_s_clicked() {
-                            model.translate(Vector3::new(0.0,0.0,0.01));
+                            model.translate(Vector3::new(0.0, 0.0, 0.01));
                             model.update_transform();
                         }
 
