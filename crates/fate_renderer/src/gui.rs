@@ -6,7 +6,6 @@ use rendering::animation::PlaybackState;
 use rendering::metadata::{Metadata, Node, NodeKind};
 use rendering::model::Model;
 use std::cell::RefCell;
-use std::fmt::format;
 use std::rc::{Rc, Weak};
 use vulkan::winit::event::WindowEvent;
 use vulkan::winit::window::Window as WinitWindow;
@@ -84,7 +83,8 @@ impl Gui {
                             let model = &self.model.upgrade().expect("模型已被释放！");
                             let model = model.borrow();
                             let mesh_nodes = model.nodes().nodes();
-                            build_inspector_window(ui, &mut self.state, mesh_nodes);
+                            let mesh_meshes = model.meshes();
+                            build_inspector_window(ui, &mut self.state, mesh_nodes, mesh_meshes);
                         }
                         if metadata.animation_count() > 0 {
                             if let Some(node) = &self.state.select_node {
@@ -348,13 +348,19 @@ fn build_camera_details_window(ui: &mut Ui, state: &mut State, camera: Option<Ca
         });
 }
 
-fn build_inspector_window(ui: &mut Ui, state: &mut State, mesh_nodes: &[rendering::node::Node]) {
+fn build_inspector_window(
+    ui: &mut Ui,
+    state: &mut State,
+    model_nodes: &[rendering::node::Node],
+    model_meshes: &[rendering::mesh::Mesh],
+) {
     if let Some(node) = &state.select_node {
         ui.label(format!(
             "ID: {} Name: {}",
             node.uid(),
             node.name().unwrap_or("Unknown")
         ));
+        let mut is_mesh = false;
         let type_name = match node.kind() {
             NodeKind::Scene => format!("Scene"),
             NodeKind::Camera => format!("Camera"),
@@ -365,6 +371,7 @@ fn build_inspector_window(ui: &mut Ui, state: &mut State, mesh_nodes: &[renderin
                 };
                 if let Some(..) = node_data.mesh {
                     t_name.push_str("Mesh");
+                    is_mesh = true;
                 };
                 if t_name.len() <= 0 {
                     t_name.push_str("Node");
@@ -374,7 +381,7 @@ fn build_inspector_window(ui: &mut Ui, state: &mut State, mesh_nodes: &[renderin
         };
         ui.label(format!("Type: {}", type_name));
 
-        let real_node = &mesh_nodes[node.index()];
+        let real_node = &model_nodes[node.index()];
         let local_transform = real_node.local_transform().clone();
         let (position, rotation, scale) = local_transform.decomposed();
         ui.label(format!(
@@ -389,6 +396,43 @@ fn build_inspector_window(ui: &mut Ui, state: &mut State, mesh_nodes: &[renderin
             "Scale: {:.3}, {:.3}, {:.3}",
             scale[0], scale[1], scale[2]
         ));
+
+        if is_mesh {
+            let mesh = &model_meshes[real_node.mesh_index().unwrap()];
+            for primitive in mesh.primitives().iter() {
+                let material = primitive.material();
+                ui.separator();
+                ui.label(format!(
+                    "Workflow: {}",
+                    match material.get_workflow() {
+                        rendering::material::PBRWorkflow::MetallicRoughness(_) => {
+                            "MetallicRoughness"
+                        }
+                        rendering::material::PBRWorkflow::SpecularGlossiness(_) => {
+                            "SpecularGlossiness"
+                        }
+                    }
+                ));
+                ui.label(format!(
+                    "Color: {:.3}, {:.3}, {:.3}, {:.3}",
+                    material.get_color()[0],
+                    material.get_color()[1],
+                    material.get_color()[2],
+                    material.get_color()[3]
+                ));
+                ui.label(format!(
+                    "Emissive: {:.3}, {:.3}, {:.3}",
+                    material.get_emissive()[0],
+                    material.get_emissive()[1],
+                    material.get_emissive()[2]
+                ));
+                ui.label(format!("Occlusion: {:.3}", material.get_occlusion()));
+                ui.label(format!("Alpha Mode: {}", material.get_alpha_mode()));
+                ui.label(format!("Alpha Cutoff: {:.3}", material.get_alpha_cutoff()));
+                ui.label(format!("Double Sided: {}", material.is_double_sided()));
+                ui.label(format!("Is Unlit: {}", material.is_unlit()));
+            }
+        }
     }
 }
 
