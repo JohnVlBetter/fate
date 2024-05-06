@@ -9,6 +9,7 @@ use self::attachments::Attachments;
 use self::fullscreen::QuadModel;
 use self::model::gbufferpass::GBufferPass;
 pub use self::model::lightpass::{LightPass, OutputMode};
+use self::model::shadowcasterpass::ShadowCasterPass;
 use self::model::{ModelData, ModelRenderer};
 use self::ssao::*;
 pub use self::{postprocess::*, skybox::*};
@@ -576,6 +577,103 @@ impl Renderer {
                 .cmd_draw(command_buffer, &self.attachments, &self.quad_model);
         }
 
+        //shadow caster pass
+        {
+            cmd_transition_images_layouts(
+                command_buffer,
+                &[
+                    LayoutTransition {
+                        image: &self.attachments.shadow_caster_color.image,
+                        old_layout: vk::ImageLayout::UNDEFINED,
+                        new_layout: vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
+                        mips_range: MipsRange::All,
+                    },
+                    LayoutTransition {
+                        image: &self.attachments.shadow_caster_depth.image,
+                        old_layout: vk::ImageLayout::UNDEFINED,
+                        new_layout: vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+                        mips_range: MipsRange::All,
+                    },
+                ],
+            );
+
+            let extent = vk::Extent2D {
+                width: self.attachments.shadow_caster_color.image.extent.width,
+                height: self.attachments.shadow_caster_color.image.extent.height,
+            };
+
+            unsafe {
+                self.context.device().cmd_set_viewport(
+                    command_buffer,
+                    0,
+                    &[vk::Viewport {
+                        width: extent.width as _,
+                        height: extent.height as _,
+                        max_depth: 1.0,
+                        ..Default::default()
+                    }],
+                );
+                self.context.device().cmd_set_scissor(
+                    command_buffer,
+                    0,
+                    &[vk::Rect2D {
+                        extent,
+                        ..Default::default()
+                    }],
+                )
+            }
+
+            let color_attachment_info = RenderingAttachmentInfo::builder()
+                .clear_value(vk::ClearValue {
+                    color: vk::ClearColorValue {
+                        float32: [0.0, 0.0, 0.0, 1.0],
+                    },
+                })
+                .image_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
+                .image_view(self.attachments.shadow_caster_color.view)
+                .load_op(vk::AttachmentLoadOp::CLEAR)
+                .store_op(vk::AttachmentStoreOp::STORE);
+
+            let depth_attachment_info = RenderingAttachmentInfo::builder()
+                .clear_value(vk::ClearValue {
+                    depth_stencil: vk::ClearDepthStencilValue {
+                        depth: 1.0,
+                        stencil: 0,
+                    },
+                })
+                .image_layout(vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
+                .image_view(self.attachments.shadow_caster_depth.view)
+                .load_op(vk::AttachmentLoadOp::CLEAR)
+                .store_op(vk::AttachmentStoreOp::STORE);
+
+            let rendering_info = RenderingInfo::builder()
+                .color_attachments(std::slice::from_ref(&color_attachment_info))
+                .depth_attachment(&depth_attachment_info)
+                .layer_count(1)
+                .render_area(vk::Rect2D {
+                    offset: vk::Offset2D { x: 0, y: 0 },
+                    extent,
+                });
+
+            unsafe {
+                self.context
+                    .dynamic_rendering()
+                    .cmd_begin_rendering(command_buffer, &rendering_info)
+            };
+
+            if let Some(renderer) = self.model_renderer.as_ref() {
+                renderer
+                    .shadow_caster_pass
+                    .cmd_draw(command_buffer, frame_index, &renderer.data);
+            }
+
+            unsafe {
+                self.context
+                    .dynamic_rendering()
+                    .cmd_end_rendering(command_buffer)
+            };
+        }
+
         let mut transitions = vec![
             LayoutTransition {
                 image: &self.attachments.get_scene_resolved_color().image,
@@ -792,6 +890,10 @@ impl Renderer {
                 .gbuffer_pass
                 .set_model(&model_data, &self.camera_uniform_buffers);
 
+            model_renderer
+                .shadow_caster_pass
+                .set_model(&model_data, &self.camera_uniform_buffers);
+
             model_renderer.light_pass.set_model(
                 &model_data,
                 &self.camera_uniform_buffers,
@@ -802,6 +904,13 @@ impl Renderer {
             model_renderer.data = model_data;
         } else {
             let gbuffer_pass = GBufferPass::create(
+                Arc::clone(&self.context),
+                &model_data,
+                &self.camera_uniform_buffers,
+                self.depth_format,
+            );
+
+            let shadow_caster_pass = ShadowCasterPass::create(
                 Arc::clone(&self.context),
                 &model_data,
                 &self.camera_uniform_buffers,
@@ -822,6 +931,7 @@ impl Renderer {
             self.model_renderer = Some(ModelRenderer {
                 data: model_data,
                 gbuffer_pass,
+                shadow_caster_pass,
                 light_pass,
             });
         }

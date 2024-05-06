@@ -1,5 +1,6 @@
 pub mod gbufferpass;
 pub mod lightpass;
+pub mod shadowcasterpass;
 
 mod uniform;
 
@@ -12,6 +13,8 @@ use std::rc::Weak;
 use std::sync::Arc;
 use uniform::*;
 use vulkan::{mem_copy, mem_copy_aligned, Buffer, Context};
+
+use self::shadowcasterpass::ShadowCasterPass;
 
 type JointsBuffer = [Matrix4<f32>; MAX_JOINTS_PER_MESH];
 
@@ -27,14 +30,13 @@ pub struct ModelData {
 pub struct ModelRenderer {
     pub data: ModelData,
     pub gbuffer_pass: GBufferPass,
+    pub shadow_caster_pass: ShadowCasterPass,
     pub light_pass: LightPass,
 }
 
 impl ModelData {
     pub fn create(context: Arc<Context>, model: Weak<RefCell<Model>>, image_count: u32) -> Self {
-        let model_rc = model
-            .upgrade()
-            .expect("模型已被释放！");
+        let model_rc = model.upgrade().expect("模型已被释放！");
 
         let transform_ubos = create_transform_ubos(&context, &model_rc.borrow(), image_count);
         let (skin_ubos, skin_matrices) =
@@ -52,10 +54,7 @@ impl ModelData {
     }
 
     pub fn update_buffers(&mut self, frame_index: usize) {
-        let model = &self
-            .model
-            .upgrade()
-            .expect("模型已被释放！");
+        let model = &self.model.upgrade().expect("模型已被释放！");
         let model = model.borrow();
 
         {

@@ -11,6 +11,8 @@ pub const BLOOM_MIP_LEVELS: u32 = 5;
 pub struct Attachments {
     pub gbuffer_normals: Texture,
     pub gbuffer_depth: Texture,
+    pub shadow_caster_color: Texture,
+    pub shadow_caster_depth: Texture,
     pub ssao: Texture,
     pub ssao_blur: Texture,
     pub scene_color: Texture,
@@ -49,6 +51,8 @@ impl Attachments {
         let gbuffer_depth = create_gbuffer_depth(context, depth_format, extent);
         let ssao = create_ssao(context, extent);
         let ssao_blur = create_ssao_blur(context, extent);
+        let shadow_caster_color = create_gbuffer_normals(context, extent);
+        let shadow_caster_depth = create_gbuffer_depth(context, depth_format, extent);
         let scene_color = create_scene_color(context, extent, msaa_samples);
         let scene_depth = create_scene_depth(context, depth_format, extent, msaa_samples);
         let scene_resolve = match msaa_samples {
@@ -60,6 +64,8 @@ impl Attachments {
         Self {
             gbuffer_normals,
             gbuffer_depth,
+            shadow_caster_color,
+            shadow_caster_depth,
             ssao,
             ssao_blur,
             scene_color,
