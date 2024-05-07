@@ -20,7 +20,7 @@ use super::gui::Gui;
 use ash::{vk, Device};
 use egui::{ClippedPrimitive, TextureId};
 use egui_ash_renderer::{DynamicRendering, Options, Renderer as GuiRenderer};
-use rendering::cgmath::{Deg, Matrix4, SquareMatrix, Vector3};
+use rendering::cgmath::{Deg, Matrix4, Point3, SquareMatrix, Vector3};
 use rendering::environment::Environment;
 use rendering::model::Model;
 use std::cell::RefCell;
@@ -79,6 +79,7 @@ pub struct Renderer {
     in_flight_frames: InFlightFrames,
     environment: Environment,
     camera_uniform_buffers: Vec<Buffer>,
+    light_uniform_buffers: Vec<Buffer>,
     attachments: Attachments,
     skybox_renderer: SkyboxRenderer,
     model_renderer: Option<ModelRenderer>,
@@ -127,6 +128,9 @@ impl Renderer {
         let in_flight_frames = create_sync_objects(&context);
 
         let camera_uniform_buffers =
+            create_camera_uniform_buffers(&context, swapchain.image_count() as u32);
+
+        let light_uniform_buffers =
             create_camera_uniform_buffers(&context, swapchain.image_count() as u32);
 
         let attachments = Attachments::new(
@@ -190,6 +194,7 @@ impl Renderer {
             in_flight_frames,
             environment,
             camera_uniform_buffers,
+            light_uniform_buffers,
             attachments,
             skybox_renderer,
             model_renderer: None,
@@ -910,7 +915,7 @@ impl Renderer {
 
             model_renderer
                 .shadow_caster_pass
-                .set_model(&model_data, &self.camera_uniform_buffers);
+                .set_model(&model_data, &self.light_uniform_buffers);
 
             model_renderer.light_pass.set_model(
                 &model_data,
@@ -931,7 +936,7 @@ impl Renderer {
             let shadow_caster_pass = ShadowCasterPass::create(
                 Arc::clone(&self.context),
                 &model_data,
-                &self.camera_uniform_buffers,
+                &self.light_uniform_buffers,
                 self.depth_format,
             );
 
@@ -1106,27 +1111,61 @@ impl Renderer {
     }
 
     pub fn update_ubos(&mut self, frame_index: usize, camera: Camera) {
-        {
-            let extent = self.swapchain.properties().extent;
-            let aspect = extent.width as f32 / extent.height as f32;
+        let extent = self.swapchain.properties().extent;
+        let aspect = extent.width as f32 / extent.height as f32;
 
-            let view = Matrix4::look_at_rh(
-                camera.position(),
-                camera.target(),
-                Vector3::new(0.0, 1.0, 0.0),
-            );
+        //camera
+        let camera_view = Matrix4::look_at_rh(
+            camera.position(),
+            camera.target(),
+            Vector3::new(0.0, 1.0, 0.0),
+        );
 
-            const Z_NEAR: f32 = 0.01;
-            const Z_FAR: f32 = 100.0;
-            let proj = rendering::math::perspective(Deg(45.0), aspect, Z_NEAR, Z_FAR);
-            let inverted_proj = proj.invert().unwrap();
+        const Z_NEAR: f32 = 0.01;
+        const Z_FAR: f32 = 100.0;
+        let camera_proj = rendering::math::perspective(Deg(45.0), aspect, Z_NEAR, Z_FAR);
+        let camera_inverted_proj = camera_proj.invert().unwrap();
 
-            let ubo = CameraUBO::new(view, proj, inverted_proj, camera.position(), Z_NEAR, Z_FAR);
-            let buffer = &mut self.camera_uniform_buffers[frame_index];
-            unsafe {
-                let data_ptr = buffer.map_memory();
-                mem_copy(data_ptr, &[ubo]);
-            }
+        let camera_ubo = CameraUBO::new(
+            camera_view,
+            camera_proj,
+            camera_inverted_proj,
+            camera.position(),
+            Z_NEAR,
+            Z_FAR,
+        );
+        let buffer = &mut self.camera_uniform_buffers[frame_index];
+        unsafe {
+            let data_ptr = buffer.map_memory();
+            mem_copy(data_ptr, &[camera_ubo]);
+        }
+
+        //main light
+        let light_view = Matrix4::look_at_rh(
+            Point3::new(
+                camera.position().x - 5.0,
+                camera.position().y + 15.0,
+                camera.position().z,
+            ),
+            camera.target(),
+            Vector3::new(0.0, 1.0, 0.0),
+        );
+
+        let light_proj = rendering::math::perspective(Deg(50.0), aspect, Z_NEAR, Z_FAR);
+        let light_inverted_proj = light_proj.invert().unwrap();
+
+        let light_ubo = CameraUBO::new(
+            light_view,
+            light_proj,
+            light_inverted_proj,
+            camera.position(),
+            Z_NEAR,
+            Z_FAR,
+        );
+        let buffer = &mut self.light_uniform_buffers[frame_index];
+        unsafe {
+            let data_ptr = buffer.map_memory();
+            mem_copy(data_ptr, &[light_ubo]);
         }
 
         if let Some(renderer) = self.model_renderer.as_mut() {

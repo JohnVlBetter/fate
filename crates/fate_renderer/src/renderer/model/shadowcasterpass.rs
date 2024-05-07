@@ -33,20 +33,17 @@ impl ShadowCasterPass {
     pub fn create(
         context: Arc<Context>,
         model_data: &ModelData,
-        camera_buffers: &[Buffer],
+        light_buffers: &[Buffer],
         depth_format: vk::Format,
     ) -> Self {
         let dummy_texture = VulkanTexture::from_rgba(&context, 1, 1, &[std::u8::MAX; 4], true);
 
-        let model_rc = model_data
-            .model
-            .upgrade()
-            .expect("模型已被释放！");
+        let model_rc = model_data.model.upgrade().expect("模型已被释放！");
 
         let descriptors = create_descriptors(
             &context,
             DescriptorsResources {
-                camera_buffers,
+                light_buffers,
                 model_transform_buffers: &model_data.transform_ubos,
                 model_skin_buffers: &model_data.skin_ubos,
                 model: &model_rc.borrow(),
@@ -70,16 +67,13 @@ impl ShadowCasterPass {
 }
 
 impl ShadowCasterPass {
-    pub fn set_model(&mut self, model_data: &ModelData, camera_buffers: &[Buffer]) {
-        let model_rc = model_data
-            .model
-            .upgrade()
-            .expect("模型已被释放！");
+    pub fn set_model(&mut self, model_data: &ModelData, light_buffers: &[Buffer]) {
+        let model_rc = model_data.model.upgrade().expect("模型已被释放！");
 
         self.descriptors = create_descriptors(
             &self.context,
             DescriptorsResources {
-                camera_buffers,
+                light_buffers,
                 model_transform_buffers: &model_data.transform_ubos,
                 model_skin_buffers: &model_data.skin_ubos,
                 model: &model_rc.borrow(),
@@ -95,10 +89,7 @@ impl ShadowCasterPass {
         model_data: &ModelData,
     ) {
         let device = self.context.device();
-        let model = model_data
-            .model
-            .upgrade()
-            .expect("模型已被释放！");
+        let model = model_data.model.upgrade().expect("模型已被释放！");
         let model = model.borrow();
 
         unsafe {
@@ -153,7 +144,7 @@ impl Drop for ShadowCasterPass {
 
 #[derive(Copy, Clone)]
 struct DescriptorsResources<'a> {
-    camera_buffers: &'a [Buffer],
+    light_buffers: &'a [Buffer],
     model_transform_buffers: &'a [Buffer],
     model_skin_buffers: &'a [Buffer],
     model: &'a Model,
@@ -205,7 +196,7 @@ fn create_descriptor_pool(
     device: &Device,
     descriptors_resources: DescriptorsResources,
 ) -> vk::DescriptorPool {
-    let descriptor_count = descriptors_resources.camera_buffers.len() as u32;
+    let descriptor_count = descriptors_resources.light_buffers.len() as u32;
     let primitive_count = descriptors_resources.model.primitive_count() as u32;
 
     let pool_sizes = [
@@ -270,7 +261,7 @@ fn create_dynamic_data_descriptor_sets(
     layout: vk::DescriptorSetLayout,
     resources: DescriptorsResources,
 ) -> Vec<vk::DescriptorSet> {
-    let layouts = (0..resources.camera_buffers.len())
+    let layouts = (0..resources.light_buffers.len())
         .map(|_| layout)
         .collect::<Vec<_>>();
 
@@ -285,7 +276,7 @@ fn create_dynamic_data_descriptor_sets(
     };
 
     sets.iter().enumerate().for_each(|(i, set)| {
-        let camera_ubo = &resources.camera_buffers[i];
+        let camera_ubo = &resources.light_buffers[i];
         let model_transform_ubo = &resources.model_transform_buffers[i];
         let model_skin_ubo = &resources.model_skin_buffers[i];
 
