@@ -22,7 +22,9 @@ use egui::{ClippedPrimitive, TextureId};
 use egui_ash_renderer::{DynamicRendering, Options, Renderer as GuiRenderer};
 use rendering::cgmath::{Deg, Matrix4, Point3, SquareMatrix, Vector3};
 use rendering::environment::Environment;
+use rendering::light::Light;
 use rendering::model::Model;
+use rendering::transform::Transform;
 use std::cell::RefCell;
 use std::mem::size_of;
 use std::rc::Rc;
@@ -1141,34 +1143,56 @@ impl Renderer {
         }
 
         //main light
-        let light_view = Matrix4::look_at_rh(
-            Point3::new(
-                camera.position().x - 5.0,
-                camera.position().y + 15.0,
-                camera.position().z,
-            ),
-            camera.target(),
-            Vector3::new(0.0, 1.0, 0.0),
-        );
-
-        let light_proj = rendering::math::perspective(Deg(50.0), aspect, Z_NEAR, Z_FAR);
-        let light_inverted_proj = light_proj.invert().unwrap();
-
-        let light_ubo = CameraUBO::new(
-            light_view,
-            light_proj,
-            light_inverted_proj,
-            camera.position(),
-            Z_NEAR,
-            Z_FAR,
-        );
-        let buffer = &mut self.light_uniform_buffers[frame_index];
-        unsafe {
-            let data_ptr = buffer.map_memory();
-            mem_copy(data_ptr, &[light_ubo]);
-        }
-
+        //TODO: 这块写的好像是有bug，找不到光，后面有时间查下
         if let Some(renderer) = self.model_renderer.as_mut() {
+            let model = renderer.data.model();
+            let model = model.borrow();
+            let lights = model
+                .nodes()
+                .nodes()
+                .iter()
+                .filter(|n| n.light_index().is_some())
+                .map(|n| (n.local_transform(), n.light_index().unwrap()))
+                .map(|(t, i)| (t, model.lights()[i]))
+                .collect::<Vec<_>>();
+            let directional_lights = lights
+                .iter()
+                .filter(|(_, l)| match l.light_type() {
+                    rendering::light::LightType::DirectionalLight => true,
+                    rendering::light::LightType::PointLight => false,
+                    rendering::light::LightType::SpotLight { .. } => false,
+                })
+                .collect::<Vec<_>>();
+            let main_light_pos = if directional_lights.len() > 0 {
+                directional_lights[0].0.clone().decomposed().0
+            } else {
+                //println!("场景中没找到方向光，自己临时建一个");
+                [20.0, 15.0, 20.0]
+            };
+
+            let light_view = Matrix4::look_at_rh(
+                Point3::new(main_light_pos[0], main_light_pos[1], main_light_pos[2]),
+                camera.target(),
+                Vector3::new(0.0, 1.0, 0.0),
+            );
+
+            let light_proj = rendering::math::perspective(Deg(45.0), aspect, Z_NEAR, 1000.0);
+            let light_inverted_proj = light_proj.invert().unwrap();
+
+            let light_ubo = CameraUBO::new(
+                light_view,
+                light_proj,
+                light_inverted_proj,
+                camera.position(),
+                Z_NEAR,
+                Z_FAR,
+            );
+            let buffer = &mut self.light_uniform_buffers[frame_index];
+            unsafe {
+                let data_ptr = buffer.map_memory();
+                mem_copy(data_ptr, &[light_ubo]);
+            }
+
             renderer.data.update_buffers(frame_index);
         }
     }

@@ -21,6 +21,15 @@ pub struct Light {
 }
 
 impl Light {
+    pub fn new() -> Self {
+        Light {
+            color: [1.0, 1.0, 1.0],
+            intensity: 1.0,
+            range: Some(1.0),
+            light_type: LightType::DirectionalLight,
+        }
+    }
+
     pub fn light_type(&self) -> LightType {
         self.light_type
     }

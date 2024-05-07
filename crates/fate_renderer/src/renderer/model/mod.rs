@@ -53,6 +53,10 @@ impl ModelData {
         }
     }
 
+    pub fn model(&mut self) -> std::rc::Rc<std::cell::RefCell<Model>> {
+        self.model.upgrade().expect("模型已被释放！")
+    }
+
     pub fn update_buffers(&mut self, frame_index: usize) {
         let model = &self.model.upgrade().expect("模型已被释放！");
         let model = model.borrow();
