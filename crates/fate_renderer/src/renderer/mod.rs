@@ -672,6 +672,24 @@ impl Renderer {
                     .dynamic_rendering()
                     .cmd_end_rendering(command_buffer)
             };
+
+            cmd_transition_images_layouts(
+                command_buffer,
+                &[
+                    LayoutTransition {
+                        image: &self.attachments.shadow_caster_color.image,
+                        old_layout: vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
+                        new_layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+                        mips_range: MipsRange::All,
+                    },
+                    LayoutTransition {
+                        image: &self.attachments.shadow_caster_depth.image,
+                        old_layout: vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+                        new_layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+                        mips_range: MipsRange::All,
+                    },
+                ],
+            );
         }
 
         let mut transitions = vec![

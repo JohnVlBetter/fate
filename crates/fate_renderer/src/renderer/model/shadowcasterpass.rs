@@ -479,8 +479,8 @@ fn create_pipeline(
     create_renderer_pipeline::<ModelVertex>(
         context,
         RendererPipelineParameters {
-            vertex_shader_name: "gbuffer",
-            fragment_shader_name: "gbuffer",
+            vertex_shader_name: "shadowcaster",
+            fragment_shader_name: "shadowcaster",
             vertex_shader_specialization: None,
             fragment_shader_specialization: None,
             msaa_samples: vk::SampleCountFlags::TYPE_1,

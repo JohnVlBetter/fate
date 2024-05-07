@@ -253,12 +253,18 @@ fn update_descriptor_set(
     set: vk::DescriptorSet,
     attachments: &Attachments,
 ) {
+    //TODO 临时测试debug用，后面改回去
     let input_image_info = [vk::DescriptorImageInfo::builder()
         .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
-        .image_view(attachments.get_scene_resolved_color().view)
+        .image_view(
+            attachments /*.get_scene_resolved_color()*/
+                .shadow_caster_color
+                .view,
+        )
         .sampler(
             attachments
-                .get_scene_resolved_color()
+                .shadow_caster_color
+                //.get_scene_resolved_color()
                 .sampler
                 .expect("后处理输入image没有采样器！"),
         )
