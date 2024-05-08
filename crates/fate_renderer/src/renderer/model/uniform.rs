@@ -22,6 +22,7 @@ const SPECULAR_GLOSSINESS_WORKFLOW: u32 = 1;
 #[derive(Copy, Clone, Debug)]
 #[repr(C)]
 pub struct LightUniform {
+    light_space_matrix: Matrix4<f32>,
     position: [f32; 4],
     direction: [f32; 4],
     color: [f32; 4],
@@ -68,7 +69,10 @@ impl From<(Matrix4<f32>, Light)> for LightUniform {
             LightType::SpotLight { .. } => SPOT_LIGHT_TYPE,
         };
 
+        let light_space_matrix = transform.invert().unwrap();
+
         Self {
+            light_space_matrix,
             position,
             direction,
             color,

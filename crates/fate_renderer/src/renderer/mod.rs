@@ -1143,7 +1143,6 @@ impl Renderer {
         }
 
         //main light
-        //TODO: 这块写的好像是有bug，找不到光，后面有时间查下
         if let Some(renderer) = self.model_renderer.as_mut() {
             let model = renderer.data.model();
             let model = model.borrow();

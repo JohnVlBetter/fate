@@ -43,6 +43,7 @@ struct TextureChannels {
 };
 
 struct Light {
+    mat4 lightSpaceMatrix;
     vec4 position;
     vec4 direction;
     vec4 color;
@@ -67,7 +68,6 @@ layout(location = 2) in vec2 oTexcoords1;
 layout(location = 3) in vec3 oPositions;
 layout(location = 4) in vec4 oColors;
 layout(location = 5) in mat3 oTBN;
-layout(location = 6) in vec4 oFragPosLightSpace;
 
 layout(push_constant) uniform MaterialUniform {
     vec4 color;
@@ -124,14 +124,16 @@ float linearDepth(vec2 uv) {
     return (near * far) / (far + depth * (near - far));
 }
 
-float ShadowCalculation(vec4 fragPosLightSpace)
+float ShadowCalculation()
 {
+    Light mainLight = lights.lights[0];
+    vec4 fragPosLightSpace = mainLight.lightSpaceMatrix * vec4(oPositions, 1.0);
     vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
     projCoords = projCoords * 0.5 + 0.5;
     float closestDepth = texture(shadowMapSampler, projCoords.xy).r; 
     float currentDepth = projCoords.z;
     vec3 normal = normalize(oNormals);
-    vec3 lightDir = normalize(lightPos - oPositions);
+    vec3 lightDir = mainLight.direction.xyz;
     float bias = max(0.05 * (1.0 - dot(normal, lightDir)), 0.005);
     float shadow = currentDepth - bias > closestDepth  ? 1.0 : 0.0;      
     
@@ -478,7 +480,10 @@ void main() {
 
     vec3 ambient = computeIBL(pbrInfo, v, n);
 
+    float shadow = ShadowCalculation();
+
     color += emissive + occludeAmbientColor(ambient, textureChannels);
+    color.rgb *= (1.0 - shadow);
 
     if (material.outputMode == OUTPUT_MODE_FINAL) {
         outColor = vec4(color, alpha);
