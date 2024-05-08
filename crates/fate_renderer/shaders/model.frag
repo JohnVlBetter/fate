@@ -67,6 +67,7 @@ layout(location = 2) in vec2 oTexcoords1;
 layout(location = 3) in vec3 oPositions;
 layout(location = 4) in vec4 oColors;
 layout(location = 5) in mat3 oTBN;
+layout(location = 6) in vec4 oFragPosLightSpace;
 
 layout(push_constant) uniform MaterialUniform {
     vec4 color;
@@ -111,9 +112,34 @@ layout(binding = 8, set = 2) uniform sampler2D normalsSampler;
 layout(binding = 9, set = 2) uniform sampler2D materialSampler;
 layout(binding = 10, set = 2) uniform sampler2D occlusionSampler;
 layout(binding = 11, set = 2) uniform sampler2D emissiveSampler;
-layout(binding = 12, set = 3) uniform sampler2D aoMapSampler;
+layout(binding = 12, set = 2) uniform sampler2D shadowMapSampler;
+layout(binding = 13, set = 3) uniform sampler2D aoMapSampler;
 
 layout(location = 0) out vec4 outColor;
+
+float linearDepth(vec2 uv) {
+    float near = cameraUBO.zNear;
+    float far = cameraUBO.zFar;
+    float depth = texture(shadowMapSampler, uv).r;
+    return (near * far) / (far + depth * (near - far));
+}
+
+float ShadowCalculation(vec4 fragPosLightSpace)
+{
+    vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
+    projCoords = projCoords * 0.5 + 0.5;
+    float closestDepth = texture(shadowMapSampler, projCoords.xy).r; 
+    float currentDepth = projCoords.z;
+    vec3 normal = normalize(oNormals);
+    vec3 lightDir = normalize(lightPos - oPositions);
+    float bias = max(0.05 * (1.0 - dot(normal, lightDir)), 0.005);
+    float shadow = currentDepth - bias > closestDepth  ? 1.0 : 0.0;      
+    
+    if(projCoords.z > 1.0)
+        shadow = 0.0;
+        
+    return shadow;
+}
 
 TextureChannels getTextureChannels() {
     return TextureChannels(

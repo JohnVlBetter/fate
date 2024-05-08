@@ -26,12 +26,17 @@ layout(binding = 3, set = 0) uniform SkinUBO {
     mat4 jointMatrices[512];
 } skin;
 
+layout(binding = 4, set = 0) uniform MainLightUBO {
+    mat4 lightSpaceMatrix;
+} mainLight;
+
 layout(location = 0) out vec3 oNormals;
 layout(location = 1) out vec2 oTexcoords0;
 layout(location = 2) out vec2 oTexcoords1;
 layout(location = 3) out vec3 oPositions;
 layout(location = 4) out vec4 oColors;
 layout(location = 5) out mat3 oTBN;
+layout(location = 6) out vec4 oFragPosLightSpace;
 
 void main() {
     mat4 world = transform.matrix;
@@ -53,5 +58,6 @@ void main() {
     oPositions = (world * vec4(vPositions, 1.0)).xyz;
     oTBN = mat3(tangent, bitangent, normal);
     oColors = vColors;
+    oFragPosLightSpace = mainLight.lightSpaceMatrix * vec4(oPositions, 1.0);
     gl_Position = cameraUBO.proj * cameraUBO.view * world * vec4(vPositions, 1.0);
 }
