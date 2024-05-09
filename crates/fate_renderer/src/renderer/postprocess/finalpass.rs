@@ -257,14 +257,12 @@ fn update_descriptor_set(
     let input_image_info = [vk::DescriptorImageInfo::builder()
         .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
         .image_view(
-            attachments /*.get_scene_resolved_color()*/
-                .shadow_caster_color
+            attachments .get_scene_resolved_color()
                 .view,
         )
         .sampler(
             attachments
-                .shadow_caster_color
-                //.get_scene_resolved_color()
+                .get_scene_resolved_color()
                 .sampler
                 .expect("后处理输入image没有采样器！"),
         )

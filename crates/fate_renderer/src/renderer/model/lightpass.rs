@@ -30,7 +30,8 @@ const NORMALS_SAMPLER_BINDING: u32 = 8;
 const MATERIAL_SAMPLER_BINDING: u32 = 9;
 const OCCLUSION_SAMPLER_BINDING: u32 = 10;
 const EMISSIVE_SAMPLER_BINDING: u32 = 11;
-const AO_MAP_SAMPLER_BINDING: u32 = 12;
+const SHADOW_MAP_SAMPLER_BINDING: u32 = 12;
+const AO_MAP_SAMPLER_BINDING: u32 = 13;
 
 const MAX_LIGHT_COUNT: u32 = 8;
 
@@ -105,16 +106,14 @@ impl LightPass {
         camera_buffers: &[Buffer],
         environment: &Environment,
         ao_map: Option<&VulkanTexture>,
+        shadow_map: Option<&VulkanTexture>,
         msaa_samples: vk::SampleCountFlags,
         depth_format: vk::Format,
         settings: RendererSettings,
     ) -> Self {
         let dummy_texture = VulkanTexture::from_rgba(&context, 1, 1, &[std::u8::MAX; 4], true);
 
-        let model_rc = model_data
-            .model
-            .upgrade()
-            .expect("模型已被释放！");
+        let model_rc = model_data.model.upgrade().expect("模型已被释放！");
 
         let descriptors = create_descriptors(
             &context,
@@ -129,6 +128,7 @@ impl LightPass {
                 model: &model_rc.borrow(),
             },
             ao_map.unwrap_or(&dummy_texture),
+            shadow_map.unwrap_or(&dummy_texture),
         );
 
         let pipeline_layout = create_pipeline_layout(context.device(), &descriptors);
@@ -159,11 +159,16 @@ impl LightPass {
         }
     }
 
-    pub fn set_ao_map(&mut self, ao_map: Option<&VulkanTexture>) {
+    pub fn set_map(
+        &mut self,
+        ao_map: Option<&VulkanTexture>,
+        shadow_map: Option<&VulkanTexture>,
+    ) {
         update_input_descriptor_set(
             &self.context,
             self.descriptors.input_set,
             ao_map.unwrap_or(&self.dummy_texture),
+            shadow_map.unwrap_or(&self.dummy_texture),
         );
     }
 
@@ -183,11 +188,9 @@ impl LightPass {
         camera_buffers: &[Buffer],
         environment: &Environment,
         ao_map: Option<&VulkanTexture>,
+        shadow_map: Option<&VulkanTexture>,
     ) {
-        let model_rc = model_data
-            .model
-            .upgrade()
-            .expect("模型已被释放！");
+        let model_rc = model_data.model.upgrade().expect("模型已被释放！");
 
         self.descriptors = create_descriptors(
             &self.context,
@@ -202,6 +205,7 @@ impl LightPass {
                 model: &model_rc.borrow(),
             },
             ao_map.unwrap_or(&self.dummy_texture),
+            shadow_map.unwrap_or(&self.dummy_texture),
         );
     }
 
@@ -212,10 +216,7 @@ impl LightPass {
         model_data: &ModelData,
     ) {
         let device = self.context.device();
-        let model = model_data
-            .model
-            .upgrade()
-            .expect("模型已被释放！");
+        let model = model_data.model.upgrade().expect("模型已被释放！");
         let model = model.borrow();
 
         unsafe {
@@ -271,7 +272,7 @@ impl LightPass {
                 self.transparent_pipeline,
             )
         };
-        
+
         self.register_model_draw_commands(command_buffer, frame_index, &model, |p| {
             p.material().is_transparent()
         });
@@ -459,6 +460,7 @@ fn create_descriptors(
     context: &Arc<Context>,
     resources: DescriptorsResources,
     ao_map: &VulkanTexture,
+    shadow_map: &VulkanTexture,
 ) -> Descriptors {
     let pool = create_descriptor_pool(context.device(), resources);
 
@@ -475,7 +477,7 @@ fn create_descriptors(
         create_per_primitive_descriptor_sets(context, pool, per_primitive_layout, resources);
 
     let input_layout = create_input_descriptor_set_layout(context.device());
-    let input_set = create_input_descriptor_set(context, pool, input_layout, ao_map);
+    let input_set = create_input_descriptor_set(context, pool, input_layout, ao_map, shadow_map);
 
     Descriptors {
         context: Arc::clone(context),
@@ -827,7 +829,9 @@ fn create_per_primitive_descriptor_sets(
             );
 
             let material_texture = match material.get_workflow() {
-                PBRWorkflow::MetallicRoughness(workflow) => workflow.get_metallic_roughness_texture(),
+                PBRWorkflow::MetallicRoughness(workflow) => {
+                    workflow.get_metallic_roughness_texture()
+                }
                 PBRWorkflow::SpecularGlossiness(workflow) => {
                     workflow.get_specular_glossiness_texture()
                 }
@@ -896,12 +900,20 @@ fn create_per_primitive_descriptor_sets(
 }
 
 fn create_input_descriptor_set_layout(device: &Device) -> vk::DescriptorSetLayout {
-    let bindings = [vk::DescriptorSetLayoutBinding::builder()
-        .binding(AO_MAP_SAMPLER_BINDING)
-        .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
-        .descriptor_count(1)
-        .stage_flags(vk::ShaderStageFlags::FRAGMENT)
-        .build()];
+    let bindings = [
+        vk::DescriptorSetLayoutBinding::builder()
+            .binding(AO_MAP_SAMPLER_BINDING)
+            .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
+            .descriptor_count(1)
+            .stage_flags(vk::ShaderStageFlags::FRAGMENT)
+            .build(),
+        vk::DescriptorSetLayoutBinding::builder()
+            .binding(SHADOW_MAP_SAMPLER_BINDING)
+            .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
+            .descriptor_count(1)
+            .stage_flags(vk::ShaderStageFlags::FRAGMENT)
+            .build(),
+    ];
 
     let layout_info = vk::DescriptorSetLayoutCreateInfo::builder().bindings(&bindings);
 
@@ -917,6 +929,7 @@ fn create_input_descriptor_set(
     pool: vk::DescriptorPool,
     layout: vk::DescriptorSetLayout,
     ao_map: &VulkanTexture,
+    shadow_map: &VulkanTexture,
 ) -> vk::DescriptorSet {
     let layouts = [layout];
     let allocate_info = vk::DescriptorSetAllocateInfo::builder()
@@ -929,7 +942,7 @@ fn create_input_descriptor_set(
             .unwrap()[0]
     };
 
-    update_input_descriptor_set(context, set, ao_map);
+    update_input_descriptor_set(context, set, ao_map, shadow_map);
 
     set
 }
@@ -938,6 +951,7 @@ fn update_input_descriptor_set(
     context: &Arc<Context>,
     set: vk::DescriptorSet,
     ao_map: &VulkanTexture,
+    shadow_map: &VulkanTexture,
 ) {
     let ao_map_info = [vk::DescriptorImageInfo::builder()
         .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
@@ -945,12 +959,26 @@ fn update_input_descriptor_set(
         .sampler(ao_map.sampler.unwrap())
         .build()];
 
-    let descriptor_writes = [vk::WriteDescriptorSet::builder()
-        .dst_set(set)
-        .dst_binding(AO_MAP_SAMPLER_BINDING)
-        .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
-        .image_info(&ao_map_info)
+    let shadow_map_info = [vk::DescriptorImageInfo::builder()
+        .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
+        .image_view(shadow_map.view)
+        .sampler(shadow_map.sampler.expect("shadowmap没有sampler"))
         .build()];
+
+    let descriptor_writes = [
+        vk::WriteDescriptorSet::builder()
+            .dst_set(set)
+            .dst_binding(AO_MAP_SAMPLER_BINDING)
+            .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
+            .image_info(&ao_map_info)
+            .build(),
+        vk::WriteDescriptorSet::builder()
+            .dst_set(set)
+            .dst_binding(SHADOW_MAP_SAMPLER_BINDING)
+            .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
+            .image_info(&shadow_map_info)
+            .build(),
+    ];
 
     unsafe {
         context

@@ -909,6 +909,7 @@ impl Renderer {
             .settings
             .ssao_enabled
             .then(|| &self.attachments.ssao_blur);
+        let shadow_map = Some(&self.attachments.shadow_caster_depth);
 
         if let Some(model_renderer) = self.model_renderer.as_mut() {
             model_renderer
@@ -924,6 +925,7 @@ impl Renderer {
                 &self.camera_uniform_buffers,
                 &self.environment,
                 ao_map,
+                shadow_map,
             );
 
             model_renderer.data = model_data;
@@ -948,6 +950,7 @@ impl Renderer {
                 &self.camera_uniform_buffers,
                 &self.environment,
                 ao_map,
+                shadow_map,
                 self.msaa_samples,
                 self.depth_format,
                 self.settings,
@@ -1024,7 +1027,8 @@ impl Renderer {
             } else {
                 None
             };
-            renderer.light_pass.set_ao_map(ao_map);
+            let shadow_map = Some(&self.attachments.shadow_caster_depth);
+            renderer.light_pass.set_map(ao_map, shadow_map);
         }
 
         self.bloom_pass.set_attachments(&self.attachments);
@@ -1087,7 +1091,8 @@ impl Renderer {
             self.settings.ssao_enabled = enable;
             if let Some(renderer) = self.model_renderer.as_mut() {
                 let ao_map = enable.then(|| &self.attachments.ssao_blur);
-                renderer.light_pass.set_ao_map(ao_map);
+                let shadow_map = Some(&self.attachments.shadow_caster_depth);
+                renderer.light_pass.set_map(ao_map, shadow_map);
             }
         }
     }
@@ -1175,7 +1180,7 @@ impl Renderer {
                 Vector3::new(0.0, 1.0, 0.0),
             );
 
-            let light_proj = rendering::math::perspective(Deg(45.0), aspect, Z_NEAR, 1000.0);
+            let light_proj = rendering::math::perspective(Deg(45.0), aspect, Z_NEAR, Z_FAR);
             let light_inverted_proj = light_proj.invert().unwrap();
 
             let light_ubo = CameraUBO::new(

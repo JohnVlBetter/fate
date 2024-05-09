@@ -112,17 +112,10 @@ layout(binding = 8, set = 2) uniform sampler2D normalsSampler;
 layout(binding = 9, set = 2) uniform sampler2D materialSampler;
 layout(binding = 10, set = 2) uniform sampler2D occlusionSampler;
 layout(binding = 11, set = 2) uniform sampler2D emissiveSampler;
-layout(binding = 12, set = 2) uniform sampler2D shadowMapSampler;
+layout(binding = 12, set = 3) uniform sampler2D shadowMapSampler;
 layout(binding = 13, set = 3) uniform sampler2D aoMapSampler;
 
 layout(location = 0) out vec4 outColor;
-
-float linearDepth(vec2 uv) {
-    float near = cameraUBO.zNear;
-    float far = cameraUBO.zFar;
-    float depth = texture(shadowMapSampler, uv).r;
-    return (near * far) / (far + depth * (near - far));
-}
 
 float ShadowCalculation()
 {
@@ -140,7 +133,8 @@ float ShadowCalculation()
     if(projCoords.z > 1.0)
         shadow = 0.0;
         
-    return shadow;
+    return closestDepth;
+    //return shadow;
 }
 
 TextureChannels getTextureChannels() {
@@ -481,8 +475,9 @@ void main() {
     vec3 ambient = computeIBL(pbrInfo, v, n);
 
     float shadow = ShadowCalculation();
+    outColor = vec4(shadow,shadow,shadow, 1.0);
 
-    color += emissive + occludeAmbientColor(ambient, textureChannels);
+    /*color += emissive + occludeAmbientColor(ambient, textureChannels);
     color.rgb *= (1.0 - shadow);
 
     if (material.outputMode == OUTPUT_MODE_FINAL) {
@@ -510,5 +505,5 @@ void main() {
     } else if (material.outputMode == OUTPUT_MODE_SSAO) {
         float ao = sampleAOMap();
         outColor = vec4(vec3(ao), 1.0);
-    }
+    }*/
 }
