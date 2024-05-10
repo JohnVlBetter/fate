@@ -25,6 +25,7 @@ pub struct ModelData {
     skin_ubos: Vec<Buffer>,
     skin_matrices: Vec<Vec<JointsBuffer>>,
     light_buffers: Vec<Buffer>,
+    main_light_buffers: Vec<Buffer>,
 }
 
 pub struct ModelRenderer {
@@ -42,6 +43,7 @@ impl ModelData {
         let (skin_ubos, skin_matrices) =
             create_skin_ubos(&context, &model_rc.borrow(), image_count);
         let light_buffers = create_lights_ubos(&context, &model_rc.borrow(), image_count);
+        let main_light_buffers = create_main_lights_ubos(&context, image_count);
 
         Self {
             context,
@@ -50,6 +52,7 @@ impl ModelData {
             skin_ubos,
             skin_matrices,
             light_buffers,
+            main_light_buffers,
         }
     }
 
@@ -113,6 +116,17 @@ impl ModelData {
                 let data_ptr = buffer.map_memory();
                 unsafe { mem_copy(data_ptr, &uniforms) };
             }
+        }
+
+        //mainlight ubo update
+        {
+            let uniforms = [MainLightUniform::new(
+                
+            )];
+
+            let buffer = &mut self.main_light_buffers[frame_index];
+            let data_ptr = buffer.map_memory();
+            unsafe { mem_copy(data_ptr, &uniforms) };
         }
     }
 }

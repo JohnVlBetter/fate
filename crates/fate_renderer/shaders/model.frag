@@ -104,16 +104,23 @@ layout(binding = 0, set = 0) uniform Camera {
 layout(binding = 1, set = 0) uniform Lights {
     Light lights[MAX_LIGHT_COUNT];
 } lights;
-layout(binding = 4, set = 1) uniform samplerCube irradianceMapSampler;
-layout(binding = 5, set = 1) uniform samplerCube preFilteredSampler;
-layout(binding = 6, set = 1) uniform sampler2D brdfLookupSampler;
-layout(binding = 7, set = 2) uniform sampler2D colorSampler;
-layout(binding = 8, set = 2) uniform sampler2D normalsSampler;
-layout(binding = 9, set = 2) uniform sampler2D materialSampler;
-layout(binding = 10, set = 2) uniform sampler2D occlusionSampler;
-layout(binding = 11, set = 2) uniform sampler2D emissiveSampler;
-layout(binding = 12, set = 3) uniform sampler2D shadowMapSampler;
-layout(binding = 13, set = 3) uniform sampler2D aoMapSampler;
+layout(binding = 4, set = 0) uniform MainLight {
+    mat4 lightSpaceMatrix;
+    vec4 position;
+    vec4 direction;
+    vec4 color;
+    float intensity;
+} mainlight;
+layout(binding = 5, set = 1) uniform samplerCube irradianceMapSampler;
+layout(binding = 6, set = 1) uniform samplerCube preFilteredSampler;
+layout(binding = 7, set = 1) uniform sampler2D brdfLookupSampler;
+layout(binding = 8, set = 2) uniform sampler2D colorSampler;
+layout(binding = 9, set = 2) uniform sampler2D normalsSampler;
+layout(binding = 10, set = 2) uniform sampler2D materialSampler;
+layout(binding = 11, set = 2) uniform sampler2D occlusionSampler;
+layout(binding = 12, set = 2) uniform sampler2D emissiveSampler;
+layout(binding = 13, set = 3) uniform sampler2D shadowMapSampler;
+layout(binding = 14, set = 3) uniform sampler2D aoMapSampler;
 
 layout(location = 0) out vec4 outColor;
 

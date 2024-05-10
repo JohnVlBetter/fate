@@ -86,6 +86,36 @@ impl From<(Matrix4<f32>, Light)> for LightUniform {
     }
 }
 
+#[derive(Copy, Clone, Debug)]
+#[repr(C)]
+pub struct MainLightUniform {
+    light_space_matrix: Matrix4<f32>,
+    position: [f32; 4],
+    direction: [f32; 4],
+    color: [f32; 4],
+    intensity: f32,
+    pad: [f32; 3],
+}
+
+impl MainLightUniform {
+    pub fn new(
+        light_space_matrix: Matrix4<f32>,
+        position: [f32; 4],
+        direction: [f32; 4],
+        color: [f32; 4],
+        intensity: f32,
+    ) -> Self {
+        Self {
+            light_space_matrix,
+            position,
+            direction,
+            color,
+            intensity,
+            pad: [0.0, 0.0, 0.0],
+        }
+    }
+}
+
 #[derive(Clone, Copy)]
 #[allow(dead_code)]
 pub struct MaterialUniform {
@@ -258,6 +288,22 @@ pub fn create_lights_ubos(context: &Arc<Context>, model: &Model, count: u32) -> 
 
     //灯的数量不能为0
     let buffer_size = std::cmp::max(1, light_count) * size_of::<LightUniform>();
+
+    (0..count)
+        .map(|_| {
+            Buffer::create(
+                Arc::clone(context),
+                buffer_size as vk::DeviceSize,
+                vk::BufferUsageFlags::UNIFORM_BUFFER,
+                vk::MemoryPropertyFlags::HOST_VISIBLE | vk::MemoryPropertyFlags::HOST_COHERENT,
+            )
+        })
+        .collect::<Vec<_>>()
+}
+
+pub fn create_main_lights_ubos(context: &Arc<Context>, count: u32) -> Vec<Buffer> {
+    //主光数量为1
+    let buffer_size = size_of::<MainLightUniform>() * 1;
 
     (0..count)
         .map(|_| {

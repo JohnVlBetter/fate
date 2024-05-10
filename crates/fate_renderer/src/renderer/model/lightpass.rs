@@ -22,16 +22,17 @@ const CAMERA_UBO_BINDING: u32 = 0;
 const LIGHT_UBO_BINDING: u32 = 1;
 const TRANSFORMS_UBO_BINDING: u32 = 2;
 const SKINS_UBO_BINDING: u32 = 3;
-const IRRADIANCE_SAMPLER_BINDING: u32 = 4;
-const PRE_FILTERED_SAMPLER_BINDING: u32 = 5;
-const BRDF_SAMPLER_BINDING: u32 = 6;
-const COLOR_SAMPLER_BINDING: u32 = 7;
-const NORMALS_SAMPLER_BINDING: u32 = 8;
-const MATERIAL_SAMPLER_BINDING: u32 = 9;
-const OCCLUSION_SAMPLER_BINDING: u32 = 10;
-const EMISSIVE_SAMPLER_BINDING: u32 = 11;
-const SHADOW_MAP_SAMPLER_BINDING: u32 = 12;
-const AO_MAP_SAMPLER_BINDING: u32 = 13;
+const MAIN_LIGHT_UBO_BINDING: u32 = 4;
+const IRRADIANCE_SAMPLER_BINDING: u32 = 5;
+const PRE_FILTERED_SAMPLER_BINDING: u32 = 6;
+const BRDF_SAMPLER_BINDING: u32 = 7;
+const COLOR_SAMPLER_BINDING: u32 = 8;
+const NORMALS_SAMPLER_BINDING: u32 = 9;
+const MATERIAL_SAMPLER_BINDING: u32 = 10;
+const OCCLUSION_SAMPLER_BINDING: u32 = 11;
+const EMISSIVE_SAMPLER_BINDING: u32 = 12;
+const SHADOW_MAP_SAMPLER_BINDING: u32 = 13;
+const AO_MAP_SAMPLER_BINDING: u32 = 14;
 
 const MAX_LIGHT_COUNT: u32 = 8;
 
@@ -122,6 +123,7 @@ impl LightPass {
                 model_transform_buffers: &model_data.transform_ubos,
                 model_skin_buffers: &model_data.skin_ubos,
                 light_buffers: &model_data.light_buffers,
+                main_light_buffers: &model_data.main_light_buffers,
                 dummy_texture: &dummy_texture,
                 environment,
 
@@ -159,11 +161,7 @@ impl LightPass {
         }
     }
 
-    pub fn set_map(
-        &mut self,
-        ao_map: Option<&VulkanTexture>,
-        shadow_map: Option<&VulkanTexture>,
-    ) {
+    pub fn set_map(&mut self, ao_map: Option<&VulkanTexture>, shadow_map: Option<&VulkanTexture>) {
         update_input_descriptor_set(
             &self.context,
             self.descriptors.input_set,
@@ -199,6 +197,7 @@ impl LightPass {
                 model_transform_buffers: &model_data.transform_ubos,
                 model_skin_buffers: &model_data.skin_ubos,
                 light_buffers: &model_data.light_buffers,
+                main_light_buffers: &model_data.main_light_buffers,
                 dummy_texture: &self.dummy_texture,
                 environment,
 
@@ -425,6 +424,7 @@ struct DescriptorsResources<'a> {
     model_transform_buffers: &'a [Buffer],
     model_skin_buffers: &'a [Buffer],
     light_buffers: &'a [Buffer],
+    main_light_buffers: &'a [Buffer],
     dummy_texture: &'a VulkanTexture,
     environment: &'a Environment,
     model: &'a Model,
@@ -554,6 +554,12 @@ fn create_dynamic_data_descriptor_set_layout(device: &Device) -> vk::DescriptorS
             .descriptor_count(1)
             .stage_flags(vk::ShaderStageFlags::VERTEX)
             .build(),
+        vk::DescriptorSetLayoutBinding::builder()
+            .binding(MAIN_LIGHT_UBO_BINDING)
+            .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
+            .descriptor_count(1)
+            .stage_flags(vk::ShaderStageFlags::FRAGMENT)
+            .build(),
     ];
 
     let layout_info = vk::DescriptorSetLayoutCreateInfo::builder().bindings(&bindings);
@@ -590,6 +596,7 @@ fn create_dynamic_data_descriptor_sets(
         let light_buffer = &resources.light_buffers[i];
         let model_transform_ubo = &resources.model_transform_buffers[i];
         let model_skin_ubo = &resources.model_skin_buffers[i];
+        let main_light_buffer = &resources.main_light_buffers[i];
 
         let camera_buffer_info = [vk::DescriptorBufferInfo::builder()
             .buffer(camera_ubo.buffer)
@@ -613,6 +620,12 @@ fn create_dynamic_data_descriptor_sets(
             .buffer(model_skin_ubo.buffer)
             .offset(0)
             .range(size_of::<JointsBuffer>() as _)
+            .build()];
+
+        let main_light_buffer_info = [vk::DescriptorBufferInfo::builder()
+            .buffer(main_light_buffer.buffer)
+            .offset(0)
+            .range(vk::WHOLE_SIZE)
             .build()];
 
         let descriptor_writes = [
@@ -639,6 +652,12 @@ fn create_dynamic_data_descriptor_sets(
                 .dst_binding(SKINS_UBO_BINDING)
                 .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER_DYNAMIC)
                 .buffer_info(&model_skin_buffer_info)
+                .build(),
+            vk::WriteDescriptorSet::builder()
+                .dst_set(*set)
+                .dst_binding(MAIN_LIGHT_UBO_BINDING)
+                .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
+                .buffer_info(&main_light_buffer_info)
                 .build(),
         ];
 
