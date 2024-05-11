@@ -60,7 +60,15 @@ impl ModelData {
         self.model.upgrade().expect("模型已被释放！")
     }
 
-    pub fn update_buffers(&mut self, frame_index: usize) {
+    pub fn update_buffers(
+        &mut self,
+        frame_index: usize,
+        light_space_matrix: Matrix4<f32>,
+        position: [f32; 4],
+        direction: [f32; 4],
+        color: [f32; 4],
+        intensity: f32,
+    ) {
         let model = &self.model.upgrade().expect("模型已被释放！");
         let model = model.borrow();
 
@@ -121,7 +129,11 @@ impl ModelData {
         //mainlight ubo update
         {
             let uniforms = [MainLightUniform::new(
-                
+                light_space_matrix,
+                position,
+                direction,
+                color,
+                intensity,
             )];
 
             let buffer = &mut self.main_light_buffers[frame_index];

@@ -20,7 +20,7 @@ use super::gui::Gui;
 use ash::{vk, Device};
 use egui::{ClippedPrimitive, TextureId};
 use egui_ash_renderer::{DynamicRendering, Options, Renderer as GuiRenderer};
-use rendering::cgmath::{Deg, Matrix4, Point3, SquareMatrix, Vector3};
+use rendering::cgmath::{Deg, EuclideanSpace, Matrix4, Point3, SquareMatrix, Vector3};
 use rendering::environment::Environment;
 use rendering::model::Model;
 use std::cell::RefCell;
@@ -907,7 +907,7 @@ impl Renderer {
             .settings
             .ssao_enabled
             .then(|| &self.attachments.ssao_blur);
-        let shadow_map = Some(&self.attachments.shadow_caster_depth);
+        let shadow_map = Some(&self.attachments.shadow_caster_color);
 
         if let Some(model_renderer) = self.model_renderer.as_mut() {
             model_renderer
@@ -1025,7 +1025,7 @@ impl Renderer {
             } else {
                 None
             };
-            let shadow_map = Some(&self.attachments.shadow_caster_depth);
+            let shadow_map = Some(&self.attachments.shadow_caster_color);
             renderer.light_pass.set_map(ao_map, shadow_map);
         }
 
@@ -1089,7 +1089,7 @@ impl Renderer {
             self.settings.ssao_enabled = enable;
             if let Some(renderer) = self.model_renderer.as_mut() {
                 let ao_map = enable.then(|| &self.attachments.ssao_blur);
-                let shadow_map = Some(&self.attachments.shadow_caster_depth);
+                let shadow_map = Some(&self.attachments.shadow_caster_color);
                 renderer.light_pass.set_map(ao_map, shadow_map);
             }
         }
@@ -1195,7 +1195,23 @@ impl Renderer {
                 mem_copy(data_ptr, &[light_ubo]);
             }
 
-            renderer.data.update_buffers(frame_index);
+            let light_space_matrix = light_proj * light_view;
+            let main_light_pos = [main_light_pos[0], main_light_pos[1], main_light_pos[2], 0.0];
+            let light_dir = [
+                camera.target().x - main_light_pos[0],
+                camera.target().y - main_light_pos[1],
+                camera.target().z - main_light_pos[2],
+                1.0,
+            ];
+
+            renderer.data.update_buffers(
+                frame_index,
+                light_space_matrix,
+                main_light_pos,
+                light_dir,
+                [1.0, 1.0, 1.0, 1.0],
+                1.0,
+            );
         }
     }
 }

@@ -124,23 +124,23 @@ layout(binding = 14, set = 3) uniform sampler2D aoMapSampler;
 
 layout(location = 0) out vec4 outColor;
 
-float ShadowCalculation()
+vec3 ShadowCalculation()
 {
-    Light mainLight = lights.lights[0];
-    vec4 fragPosLightSpace = mainLight.lightSpaceMatrix * vec4(oPositions, 1.0);
+    vec4 fragPosLightSpace = mainlight.lightSpaceMatrix * vec4(oPositions, 1.0);
     vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
     projCoords = projCoords * 0.5 + 0.5;
     float closestDepth = texture(shadowMapSampler, projCoords.xy).r; 
     float currentDepth = projCoords.z;
     vec3 normal = normalize(oNormals);
-    vec3 lightDir = mainLight.direction.xyz;
+    vec3 lightDir = mainlight.direction.xyz;
     float bias = max(0.05 * (1.0 - dot(normal, lightDir)), 0.005);
     float shadow = currentDepth - bias > closestDepth  ? 1.0 : 0.0;      
     
     if(projCoords.z > 1.0)
         shadow = 0.0;
         
-    return closestDepth;
+    vec3 c = texture(shadowMapSampler, projCoords.xy).rgb; 
+    return c;
     //return shadow;
 }
 
@@ -481,8 +481,8 @@ void main() {
 
     vec3 ambient = computeIBL(pbrInfo, v, n);
 
-    float shadow = ShadowCalculation();
-    outColor = vec4(shadow,shadow,shadow, 1.0);
+    vec3 shadow = ShadowCalculation();
+    outColor = vec4(shadow, 1.0);
 
     /*color += emissive + occludeAmbientColor(ambient, textureChannels);
     color.rgb *= (1.0 - shadow);

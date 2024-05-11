@@ -7,16 +7,72 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug unit tests in library 'fate_graphic'",
+            "name": "Debug executable 'fate_renderer'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=fate_renderer",
+                    "--package=fate_renderer"
+                ],
+                "filter": {
+                    "name": "fate_renderer",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in executable 'fate_renderer'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--bin=fate_renderer",
+                    "--package=fate_renderer"
+                ],
+                "filter": {
+                    "name": "fate_renderer",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in library 'rendering'",
             "cargo": {
                 "args": [
                     "test",
                     "--no-run",
                     "--lib",
-                    "--package=fate_graphic"
+                    "--package=rendering"
                 ],
                 "filter": {
-                    "name": "fate_graphic",
+                    "name": "rendering",
+                    "kind": "lib"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in library 'vulkan'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--lib",
+                    "--package=vulkan"
+                ],
+                "filter": {
+                    "name": "vulkan",
                     "kind": "lib"
                 }
             },
@@ -37,43 +93,6 @@
                 "filter": {
                     "name": "fate_rt",
                     "kind": "lib"
-                }
-            },
-            "args": [],
-            "cwd": "${workspaceFolder}"
-        },
-        {
-            "type": "lldb",
-            "request": "launch",
-            "name": "Debug executable 'fate'",
-            "cargo": {
-                "args": [
-                    "build",
-                    "--bin=fate",
-                    "--package=fate"
-                ],
-                "filter": {
-                    "name": "fate",
-                    "kind": "bin"
-                }
-            },
-            "args": [],
-            "cwd": "${workspaceFolder}"
-        },
-        {
-            "type": "lldb",
-            "request": "launch",
-            "name": "Debug unit tests in executable 'fate'",
-            "cargo": {
-                "args": [
-                    "test",
-                    "--no-run",
-                    "--bin=fate",
-                    "--package=fate"
-                ],
-                "filter": {
-                    "name": "fate",
-                    "kind": "bin"
                 }
             },
             "args": [],
