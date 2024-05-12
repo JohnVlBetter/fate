@@ -30,6 +30,7 @@ layout(binding = 2, set = 0) uniform SkinUBO {
 layout(location = 0) out vec2 oTexcoords0;
 layout(location = 1) out vec2 oTexcoords1;
 layout(location = 2) out float oAlpha;
+layout(location = 3) out vec4 clipPos;
 
 void main() {
     mat4 world = transform.matrix;
@@ -46,4 +47,5 @@ void main() {
     oAlpha = vColors.a;
 
     gl_Position = cameraUBO.proj * cameraUBO.view * world * vec4(vPositions, 1.0);
+    clipPos = gl_Position;
 }

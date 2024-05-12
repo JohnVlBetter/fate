@@ -8,6 +8,7 @@ const float ALPHA_CUTOFF_BIAS = 0.0000001;
 layout(location = 0) in vec2 oTexcoords0;
 layout(location = 1) in vec2 oTexcoords1;
 layout(location = 2) in float oAlpha;
+layout(location = 3) in vec4 clipPos;
 
 layout(push_constant) uniform MaterialUniform {
     float alpha;
@@ -37,6 +38,15 @@ float getAlpha(uint textureChannel) {
     return alpha * oAlpha;
 }
 
+vec3 getColor(uint textureChannel) {
+    vec3 color = vec3(1.0,1.0,1.0);
+    if(textureChannel != NO_TEXTURE_ID) {
+        vec2 uv = getUV(textureChannel);
+        color = texture(colorSampler, uv).rgb;
+    }
+    return color;
+}
+
 bool isMasked(float alpha) {
     return material.alphaMode == ALPHA_MODE_MASK && alpha + ALPHA_CUTOFF_BIAS < material.alphaCutoff;
 }
@@ -47,5 +57,7 @@ void main() {
         discard;
     }
 
-    outColor = vec4(1.0,0.0,1.0,1.0);
+    //测试用
+    vec3 color = getColor(material.colorTextureChannel);
+    outColor = vec4(clipPos.z,0.0,0.0,1.0);
 }

@@ -907,7 +907,7 @@ impl Renderer {
             .settings
             .ssao_enabled
             .then(|| &self.attachments.ssao_blur);
-        let shadow_map = Some(&self.attachments.shadow_caster_color);
+        let shadow_map = Some(&self.attachments.shadow_caster_depth);
 
         if let Some(model_renderer) = self.model_renderer.as_mut() {
             model_renderer
@@ -1025,7 +1025,7 @@ impl Renderer {
             } else {
                 None
             };
-            let shadow_map = Some(&self.attachments.shadow_caster_color);
+            let shadow_map = Some(&self.attachments.shadow_caster_depth);
             renderer.light_pass.set_map(ao_map, shadow_map);
         }
 
@@ -1089,7 +1089,7 @@ impl Renderer {
             self.settings.ssao_enabled = enable;
             if let Some(renderer) = self.model_renderer.as_mut() {
                 let ao_map = enable.then(|| &self.attachments.ssao_blur);
-                let shadow_map = Some(&self.attachments.shadow_caster_color);
+                let shadow_map = Some(&self.attachments.shadow_caster_depth);
                 renderer.light_pass.set_map(ao_map, shadow_map);
             }
         }

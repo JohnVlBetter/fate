@@ -124,7 +124,15 @@ layout(binding = 14, set = 3) uniform sampler2D aoMapSampler;
 
 layout(location = 0) out vec4 outColor;
 
-vec3 ShadowCalculation()
+float LinearizeDepth(float depth)
+{
+    float near_plane = 0.01;
+    float far_plane = 100.0;
+    float z = depth * 2.0 - 1.0; // Back to NDC 
+    return (2.0 * near_plane * far_plane) / (far_plane + near_plane - z * (far_plane - near_plane));	
+}
+
+float ShadowCalculation()
 {
     vec4 fragPosLightSpace = mainlight.lightSpaceMatrix * vec4(oPositions, 1.0);
     vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
@@ -139,8 +147,7 @@ vec3 ShadowCalculation()
     if(projCoords.z > 1.0)
         shadow = 0.0;
         
-    vec3 c = texture(shadowMapSampler, projCoords.xy).rgb; 
-    return c;
+    return LinearizeDepth(closestDepth);
     //return shadow;
 }
 
@@ -481,8 +488,8 @@ void main() {
 
     vec3 ambient = computeIBL(pbrInfo, v, n);
 
-    vec3 shadow = ShadowCalculation();
-    outColor = vec4(shadow, 1.0);
+    float shadow = ShadowCalculation();
+    outColor = vec4(0.0, 0.0, 0.0, 1.0);
 
     /*color += emissive + occludeAmbientColor(ambient, textureChannels);
     color.rgb *= (1.0 - shadow);

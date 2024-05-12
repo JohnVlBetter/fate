@@ -60,10 +60,19 @@ vec3 defaultToneMap(vec3 color) {
     return LINEARtoSRGB(color);
 }
 
+float linearDepth(vec2 uv) {
+    float near = 0.01;
+    float far = 100.0;
+    float depth = texture(inputImage, uv).r;
+    return (near * far) / (far + depth * (near - far));
+}
+
 void main() {
     vec3 color = texture(inputImage, oCoords).rgb;
     vec3 bloom = texture(bloomImage, oCoords).rgb;
     vec3 bloomed = mix(color, bloom, c.bloomStrength);
+    //float depth = linearDepth(oCoords);
+    //finalColor = vec4(depth,depth,depth, 1.0);
 
     if (TONE_MAP_MODE == TONE_MAP_MODE_DEFAULT) {
         color = defaultToneMap(bloomed);
