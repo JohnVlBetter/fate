@@ -68,7 +68,5 @@ void main() {
     }
     occlusion = 1.0 - (occlusion / float(SSAO_KERNEL_SIZE));
     
-    float depth11 = linearDepth(oCoords);
-    finalColor = depth11;
-    //finalColor = pow(occlusion, config.ssaoStrength);
+    finalColor = pow(occlusion, config.ssaoStrength);
 }

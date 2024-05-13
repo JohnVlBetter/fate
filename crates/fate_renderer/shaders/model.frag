@@ -132,7 +132,7 @@ float LinearizeDepth(float depth)
     return (2.0 * near_plane * far_plane) / (far_plane + near_plane - z * (far_plane - near_plane));	
 }
 
-float ShadowCalculation()
+vec3 ShadowCalculation()
 {
     vec4 fragPosLightSpace = mainlight.lightSpaceMatrix * vec4(oPositions, 1.0);
     vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
@@ -144,10 +144,12 @@ float ShadowCalculation()
     float bias = max(0.05 * (1.0 - dot(normal, lightDir)), 0.005);
     float shadow = currentDepth - bias > closestDepth  ? 1.0 : 0.0;      
     
-    if(projCoords.z > 1.0)
-        shadow = 0.0;
-        
-    return LinearizeDepth(closestDepth);
+    //if(projCoords.z > 1.0)
+    //    shadow = 0.0;
+    shadow = closestDepth;
+    return vec3(shadow,shadow,shadow)*0.01;  
+    //return abs(texture(shadowMapSampler, projCoords.xy).rgb);
+    //return LinearizeDepth(closestDepth);
     //return shadow;
 }
 
@@ -488,8 +490,8 @@ void main() {
 
     vec3 ambient = computeIBL(pbrInfo, v, n);
 
-    float shadow = ShadowCalculation();
-    outColor = vec4(0.0, 0.0, 0.0, 1.0);
+    vec3 shadow = ShadowCalculation();
+    outColor = vec4(shadow, 1.0);
 
     /*color += emissive + occludeAmbientColor(ambient, textureChannels);
     color.rgb *= (1.0 - shadow);

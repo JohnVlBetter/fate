@@ -59,5 +59,5 @@ void main() {
 
     //测试用
     vec3 color = getColor(material.colorTextureChannel);
-    outColor = vec4(clipPos.z,0.0,0.0,1.0);
+    outColor = vec4(clipPos.z,0.0,0.0, 1.0);
 }

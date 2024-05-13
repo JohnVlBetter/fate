@@ -258,12 +258,12 @@ fn update_descriptor_set(
         .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
         .image_view(attachments
             .get_scene_resolved_color()
-            //.gbuffer_depth
+            //.shadow_caster_color
             .view)
         .sampler(
             attachments
                 .get_scene_resolved_color()
-                //.gbuffer_depth
+                //.shadow_caster_color
                 .sampler
                 .expect("后处理输入image没有采样器！"),
         )

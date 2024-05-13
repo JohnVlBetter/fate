@@ -51,7 +51,7 @@ impl Attachments {
         let gbuffer_depth = create_gbuffer_depth(context, depth_format, extent);
         let ssao = create_ssao(context, extent);
         let ssao_blur = create_ssao_blur(context, extent);
-        let shadow_caster_color = create_gbuffer_normals(context, extent);
+        let shadow_caster_color = create_scene_color(context, extent, msaa_samples);
         let shadow_caster_depth = create_gbuffer_depth(context, depth_format, extent);
         let scene_color = create_scene_color(context, extent, msaa_samples);
         let scene_depth = create_scene_depth(context, depth_format, extent, msaa_samples);

@@ -67,14 +67,24 @@ float linearDepth(vec2 uv) {
     return (near * far) / (far + depth * (near - far));
 }
 
+float LinearizeDepth(float depth)
+{
+    float near_plane = 0.01;
+    float far_plane = 100.0;
+    float z = depth * 2.0 - 1.0; // Back to NDC 
+    return (2.0 * near_plane * far_plane) / (far_plane + near_plane - z * (far_plane - near_plane));	
+}
+
 void main() {
     vec3 color = texture(inputImage, oCoords).rgb;
     vec3 bloom = texture(bloomImage, oCoords).rgb;
     vec3 bloomed = mix(color, bloom, c.bloomStrength);
-    //float depth = linearDepth(oCoords);
-    //finalColor = vec4(depth,depth,depth, 1.0);
+    float depth = linearDepth(oCoords);
+    finalColor = vec4(depth,depth,depth, 1.0);
+    float d = LinearizeDepth(color.r);
+    finalColor = vec4(color.rgb, 1.0);
 
-    if (TONE_MAP_MODE == TONE_MAP_MODE_DEFAULT) {
+    /*if (TONE_MAP_MODE == TONE_MAP_MODE_DEFAULT) {
         color = defaultToneMap(bloomed);
     } else if (TONE_MAP_MODE == TONE_MAP_MODE_UNCHARTED) {
         color = toneMapUncharted(bloomed);
@@ -86,5 +96,5 @@ void main() {
         color = LINEARtoSRGB(bloomed);
     }
 
-    finalColor = vec4(color, 1.0);
+    finalColor = vec4(color, 1.0);*/
 }
