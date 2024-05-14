@@ -20,13 +20,14 @@ use super::gui::Gui;
 use ash::{vk, Device};
 use egui::{ClippedPrimitive, TextureId};
 use egui_ash_renderer::{DynamicRendering, Options, Renderer as GuiRenderer};
-use rendering::cgmath::{Deg, EuclideanSpace, Matrix4, Point3, SquareMatrix, Vector3};
+use rendering::cgmath::{Deg, Matrix4, Point3, SquareMatrix, Vector3};
 use rendering::environment::Environment;
 use rendering::model::Model;
 use std::cell::RefCell;
 use std::mem::size_of;
 use std::rc::Rc;
 use std::sync::Arc;
+use std::time::Instant;
 use vulkan::ash::vk::{RenderingAttachmentInfo, RenderingInfo};
 use vulkan::*;
 use winit::window::Window;
@@ -90,6 +91,7 @@ pub struct Renderer {
     final_pass: FinalPass,
     gui_renderer: GuiRenderer,
     context: Arc<Context>,
+    timer: Instant,
 }
 
 impl Renderer {
@@ -99,6 +101,7 @@ impl Renderer {
         settings: RendererSettings,
         environment: Environment,
     ) -> Self {
+        let timer: Instant = Instant::now();
         let swapchain_support_details = SwapchainSupportDetails::new(
             context.physical_device(),
             context.surface(),
@@ -204,6 +207,7 @@ impl Renderer {
             bloom_pass,
             final_pass,
             gui_renderer,
+            timer,
         }
     }
 }
@@ -1169,7 +1173,15 @@ impl Renderer {
                 directional_lights[0].0.clone().decomposed().0
             } else {
                 //println!("场景中没找到方向光，自己临时建一个");
-                [20.0, 15.0, 20.0]
+                //加上旋转每秒三十度
+                let sec = self.timer.elapsed().as_secs_f32();
+                let angle = sec * 30.0 % 360.0;
+                const NUM: f32 = std::f32::consts::PI / 180.0;
+                [
+                    20.0 * f32::cos(angle * NUM),
+                    15.0,
+                    20.0 * f32::sin(angle * NUM),
+                ]
             };
 
             let light_view = Matrix4::look_at_rh(
@@ -1209,7 +1221,7 @@ impl Renderer {
                 light_space_matrix,
                 main_light_pos,
                 light_dir,
-                [1.0, 1.0, 1.0, 1.0],
+                [1.0, 0.956, 0.839, 1.0],
                 1.0,
             );
         }

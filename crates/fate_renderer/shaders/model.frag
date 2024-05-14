@@ -124,14 +124,6 @@ layout(binding = 14, set = 3) uniform sampler2D aoMapSampler;
 
 layout(location = 0) out vec4 outColor;
 
-float LinearizeDepth(float depth)
-{
-    float near_plane = 0.01;
-    float far_plane = 100.0;
-    float z = depth * 2.0 - 1.0; // Back to NDC 
-    return (2.0 * near_plane * far_plane) / (far_plane + near_plane - z * (far_plane - near_plane));	
-}
-
 float ShadowCalculation()
 {
     vec4 fragPosLightSpace = mainlight.lightSpaceMatrix * vec4(oPositions, 1.0);
@@ -365,6 +357,12 @@ vec3 computeColor(
     return color;
 }
 
+vec3 computeMainLight(vec3 direction, vec3 color, float intensity, PbrInfo pbrInfo, vec3 n, vec3 v) {
+    vec3 l = -normalize(direction);
+    vec3 h = normalize(l + v);
+    return computeColor(pbrInfo, n, l, v, h, color, intensity);
+}
+
 vec3 computeDirectionalLight(Light light, PbrInfo pbrInfo, vec3 n, vec3 v) {
     vec3 l = -normalize(light.direction.xyz);
     vec3 h = normalize(l + v);
@@ -468,28 +466,29 @@ void main() {
     vec3 n = getNormal(textureChannels);
     vec3 v = normalize(cameraUBO.eye.xyz - oPositions);
 
-    vec3 color = vec3(0.0);
+    vec3 color = computeMainLight(mainlight.direction.xyz, mainlight.color.xyz, mainlight.intensity, pbrInfo, n, v);
+    float mainLightShadow = 1.0 - ShadowCalculation();
+    color *= mainLightShadow;
 
+    /*vec3 additionalLightColor = vec3(0.0);
     for (int i = 0; i < material.lightCount; i++) {
-
         Light light = lights.lights[i];
         uint lightType = light.type;
 
         if (lightType == DIRECTIONAL_LIGHT_TYPE) {
-            color += computeDirectionalLight(light, pbrInfo, n, v);
+            additionalLightColor += computeDirectionalLight(light, pbrInfo, n, v);
         } else if (lightType == POINT_LIGHT_TYPE) {
-            color += computePointLight(light, pbrInfo, n, v);
+            additionalLightColor += computePointLight(light, pbrInfo, n, v);
         } else if (lightType == SPOT_LIGHT_TYPE) {
-            color += computeSpotLight(light, pbrInfo, n, v);
+            additionalLightColor += computeSpotLight(light, pbrInfo, n, v);
         }
     }
+    color += additionalLightColor;*/
 
     vec3 ambient = computeIBL(pbrInfo, v, n);
-
-    float shadow = ShadowCalculation();
+    ambient *= clamp(mainLightShadow, 0.4, 1.0);
 
     color += emissive + occludeAmbientColor(ambient, textureChannels);
-    color.rgb *= (1.0 - shadow);
 
     if (material.outputMode == OUTPUT_MODE_FINAL) {
         outColor = vec4(color, alpha);
