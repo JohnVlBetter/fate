@@ -1174,7 +1174,7 @@ impl Renderer {
 
             let light_view = Matrix4::look_at_rh(
                 Point3::new(main_light_pos[0], main_light_pos[1], main_light_pos[2]),
-                camera.target(),
+                Point3::new(0.0, 0.0, 0.0),
                 Vector3::new(0.0, 1.0, 0.0),
             );
 

@@ -132,25 +132,21 @@ float LinearizeDepth(float depth)
     return (2.0 * near_plane * far_plane) / (far_plane + near_plane - z * (far_plane - near_plane));	
 }
 
-vec3 ShadowCalculation()
+float ShadowCalculation()
 {
     vec4 fragPosLightSpace = mainlight.lightSpaceMatrix * vec4(oPositions, 1.0);
+    float currentDepth = fragPosLightSpace.z;
     vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
     projCoords = projCoords * 0.5 + 0.5;
     float closestDepth = texture(shadowMapSampler, projCoords.xy).r; 
-    float currentDepth = projCoords.z;
     vec3 normal = normalize(oNormals);
     vec3 lightDir = mainlight.direction.xyz;
     float bias = max(0.05 * (1.0 - dot(normal, lightDir)), 0.005);
-    float shadow = currentDepth - bias > closestDepth  ? 1.0 : 0.0;      
+    float shadow = currentDepth - bias > closestDepth  ? 1.0 : 0.0;
     
-    //if(projCoords.z > 1.0)
-    //    shadow = 0.0;
-    shadow = closestDepth;
-    return vec3(shadow,shadow,shadow)*0.01;  
-    //return abs(texture(shadowMapSampler, projCoords.xy).rgb);
-    //return LinearizeDepth(closestDepth);
-    //return shadow;
+    if(projCoords.z > 1.0)
+        shadow = 0.0;
+    return shadow;
 }
 
 TextureChannels getTextureChannels() {
@@ -490,10 +486,9 @@ void main() {
 
     vec3 ambient = computeIBL(pbrInfo, v, n);
 
-    vec3 shadow = ShadowCalculation();
-    outColor = vec4(shadow, 1.0);
+    float shadow = ShadowCalculation();
 
-    /*color += emissive + occludeAmbientColor(ambient, textureChannels);
+    color += emissive + occludeAmbientColor(ambient, textureChannels);
     color.rgb *= (1.0 - shadow);
 
     if (material.outputMode == OUTPUT_MODE_FINAL) {
@@ -521,5 +516,5 @@ void main() {
     } else if (material.outputMode == OUTPUT_MODE_SSAO) {
         float ao = sampleAOMap();
         outColor = vec4(vec3(ao), 1.0);
-    }*/
+    }
 }

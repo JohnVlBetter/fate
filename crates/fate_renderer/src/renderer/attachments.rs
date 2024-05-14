@@ -5,6 +5,7 @@ use vulkan::{ash::vk, Context, Image, ImageParameters, Texture};
 pub const GBUFFER_NORMALS_FORMAT: vk::Format = vk::Format::R16G16B16A16_SFLOAT;
 pub const AO_MAP_FORMAT: vk::Format = vk::Format::R8_UNORM;
 pub const SCENE_COLOR_FORMAT: vk::Format = vk::Format::R32G32B32A32_SFLOAT;
+pub const SHADOW_CASTER_COLOR_FORMAT: vk::Format = vk::Format::R32_SFLOAT;
 pub const BLOOM_FORMAT: vk::Format = vk::Format::B10G11R11_UFLOAT_PACK32;
 pub const BLOOM_MIP_LEVELS: u32 = 5;
 
@@ -51,8 +52,8 @@ impl Attachments {
         let gbuffer_depth = create_gbuffer_depth(context, depth_format, extent);
         let ssao = create_ssao(context, extent);
         let ssao_blur = create_ssao_blur(context, extent);
-        let shadow_caster_color = create_scene_color(context, extent, msaa_samples);
-        let shadow_caster_depth = create_gbuffer_depth(context, depth_format, extent);
+        let shadow_caster_color = create_shadow_caster_depth(context, extent);
+        let shadow_caster_depth = create_scene_depth(context, depth_format, extent, msaa_samples);
         let scene_color = create_scene_color(context, extent, msaa_samples);
         let scene_depth = create_scene_depth(context, depth_format, extent, msaa_samples);
         let scene_resolve = match msaa_samples {
@@ -80,6 +81,34 @@ impl Attachments {
     pub fn get_scene_resolved_color(&self) -> &Texture {
         self.scene_resolve.as_ref().unwrap_or(&self.scene_color)
     }
+}
+
+fn create_shadow_caster_depth(context: &Arc<Context>, extent: vk::Extent2D) -> Texture {
+    let image = Image::create(
+        Arc::clone(context),
+        ImageParameters {
+            mem_properties: vk::MemoryPropertyFlags::DEVICE_LOCAL,
+            extent,
+            sample_count: vk::SampleCountFlags::TYPE_1,
+            format: SHADOW_CASTER_COLOR_FORMAT,
+            usage: vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::SAMPLED,
+            ..Default::default()
+        },
+    );
+
+    image.transition_image_layout(
+        vk::ImageLayout::UNDEFINED,
+        vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
+    );
+
+    let view = image.create_view(vk::ImageViewType::TYPE_2D, vk::ImageAspectFlags::COLOR);
+    let sampler = Some(create_sampler(
+        context,
+        vk::Filter::NEAREST,
+        vk::Filter::NEAREST,
+    ));
+
+    Texture::new(Arc::clone(context), image, view, sampler)
 }
 
 fn create_gbuffer_normals(context: &Arc<Context>, extent: vk::Extent2D) -> Texture {
