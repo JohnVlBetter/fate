@@ -103,7 +103,7 @@ fn cornell_box(path: &Path) {
     d_transform.update_matrix();
     let dragon = Arc::new(
         Model::new(
-            "res/model/DamagedHelmet/glTF/DamagedHelmet.gltf",
+            "res/model/FlightHelmet/glTF/FlightHelmet.gltf",
             100.0,
             d_transform,
         )

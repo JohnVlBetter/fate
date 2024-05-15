@@ -20,7 +20,7 @@ use super::gui::Gui;
 use ash::{vk, Device};
 use egui::{ClippedPrimitive, TextureId};
 use egui_ash_renderer::{DynamicRendering, Options, Renderer as GuiRenderer};
-use rendering::cgmath::{Deg, Matrix4, Point3, SquareMatrix, Vector3};
+use rendering::cgmath::{Deg, InnerSpace, Matrix4, Point3, SquareMatrix, Vector3};
 use rendering::environment::Environment;
 use rendering::model::Model;
 use std::cell::RefCell;
@@ -38,7 +38,7 @@ const DEFAULT_EMISSIVE_INTENSITY: f32 = 1.0;
 const DEFAULT_SSAO_KERNEL_SIZE: u32 = 32;
 const DEFAULT_SSAO_RADIUS: f32 = 0.15;
 const DEFAULT_SSAO_STRENGTH: f32 = 1.0;
-pub const DEFAULT_BLOOM_STRENGTH: f32 = 0.04;
+pub const DEFAULT_BLOOM_STRENGTH: f32 = 0.02;
 
 pub enum RenderError {
     DirtySwapchain,
@@ -1209,12 +1209,14 @@ impl Renderer {
 
             let light_space_matrix = light_proj * light_view;
             let main_light_pos = [main_light_pos[0], main_light_pos[1], main_light_pos[2], 0.0];
-            let light_dir = [
+
+            let light_dir = Vector3::new(
                 camera.target().x - main_light_pos[0],
                 camera.target().y - main_light_pos[1],
                 camera.target().z - main_light_pos[2],
-                1.0,
-            ];
+            )
+            .normalize();
+            let light_dir = [light_dir.x, light_dir.y, light_dir.z, 1.0];
 
             renderer.data.update_buffers(
                 frame_index,

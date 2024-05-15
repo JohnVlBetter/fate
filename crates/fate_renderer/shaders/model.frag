@@ -176,8 +176,11 @@ float calculateShadow()
     float shadow = 0.0;
     for(int i = 0; i < NUM_SAMPLES; ++i){
         vec2 sampleUV = projCoords.xy + filterRange * poissonDisk[i];
-        float closestDepth = texture(shadowMapSampler, sampleUV).r; 
-        shadow += currentDepth - bias > closestDepth  ? 1.0 : 0.0;
+        float closestDepth = texture(shadowMapSampler, sampleUV).r;
+        //TODO：这里还是计算的不太对，缺了frustumSize/(shadowMapSize*2)项
+        //目前是透视投影的shadowmap，先不加，后续改成正交投影的时候加上
+        float pcfBias = bias * (1 + distance(sampleUV, projCoords.xy));
+        shadow += currentDepth - pcfBias > closestDepth  ? 1.0 : 0.0;
     }
     shadow /= float(NUM_SAMPLES);
     

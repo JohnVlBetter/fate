@@ -27,7 +27,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let config = Default::default();
     let enable_debug = true;
     let file_path = Some(PathBuf::from(
-        "assets/models/DamagedHelmet/glTF/DamagedHelmet.gltf",
+        "assets/models/FlightHelmet/glTF/FlightHelmet.gltf",
     ));
     run(config, enable_debug, file_path);
 
