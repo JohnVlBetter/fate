@@ -44,6 +44,12 @@ where
     )
 }
 
+#[rustfmt::skip]
+pub fn ortho<S: BaseFloat>(left: S, right: S, bottom: S, top: S, near: S, far: S) -> Matrix4<S>
+{
+    cgmath::ortho(left, right, bottom, top, near, far)
+}
+
 pub fn clamp<T: PartialOrd>(value: T, min: T, max: T) -> T {
     let value = if value > max { max } else { value };
     if value < min {

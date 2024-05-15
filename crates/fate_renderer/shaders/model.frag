@@ -130,11 +130,16 @@ float ShadowCalculation()
     float currentDepth = fragPosLightSpace.z;
     vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
     projCoords = projCoords * 0.5 + 0.5;
-    float closestDepth = texture(shadowMapSampler, projCoords.xy).r; 
-    vec3 normal = normalize(oNormals);
-    vec3 lightDir = mainlight.direction.xyz;
-    float bias = max(0.05 * (1.0 - dot(normal, lightDir)), 0.005);
-    float shadow = currentDepth - bias > closestDepth  ? 1.0 : 0.0;
+    float shadow = 0.0;
+    vec2 offset[5] = vec2[](vec2(-0.00052,-0.000925),vec2(-0.00052,0.000925),vec2(0.00052,-0.000925),vec2(0.00052,0.000925),vec2(0.0,0.0));
+    for(int i = 0; i < 5; ++i){
+        float closestDepth = texture(shadowMapSampler, projCoords.xy + offset[i]).r; 
+        vec3 normal = normalize(oNormals);
+        vec3 lightDir = mainlight.direction.xyz;
+        float bias = max(0.05 * (1.0 - dot(normal, lightDir)), 0.005);
+        shadow += currentDepth - bias > closestDepth  ? 1.0 : 0.0;
+    }
+    shadow *= 0.2;
     
     if(projCoords.z > 1.0)
         shadow = 0.0;
@@ -470,7 +475,7 @@ void main() {
     float mainLightShadow = 1.0 - ShadowCalculation();
     color *= mainLightShadow;
 
-    /*vec3 additionalLightColor = vec3(0.0);
+    vec3 additionalLightColor = vec3(0.0);
     for (int i = 0; i < material.lightCount; i++) {
         Light light = lights.lights[i];
         uint lightType = light.type;
@@ -483,7 +488,7 @@ void main() {
             additionalLightColor += computeSpotLight(light, pbrInfo, n, v);
         }
     }
-    color += additionalLightColor;*/
+    color += additionalLightColor;
 
     vec3 ambient = computeIBL(pbrInfo, v, n);
     ambient *= clamp(mainLightShadow, 0.4, 1.0);
