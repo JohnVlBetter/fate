@@ -124,27 +124,70 @@ layout(binding = 14, set = 3) uniform sampler2D aoMapSampler;
 
 layout(location = 0) out vec4 outColor;
 
-float ShadowCalculation()
+#define NUM_SAMPLES 50
+#define NUM_RINGS 10
+
+#define PI 3.141592653589793
+#define PI2 6.283185307179586
+
+vec2 poissonDisk[NUM_SAMPLES];
+
+float rand_1to1(float x) { 
+  return fract(sin(x)*10000.0);
+}
+
+float rand_2to1(vec2 uv) { 
+	const float a = 12.9898, b = 78.233, c = 43758.5453;
+	float dt = dot(uv.xy, vec2(a, b)), sn = mod(dt, PI);
+	return fract(sin(sn) * c);
+}
+
+void poissonDiskSamples(const in vec2 randomSeed) {
+  float ANGLE_STEP = PI2 * float( NUM_RINGS ) / float( NUM_SAMPLES );
+  float INV_NUM_SAMPLES = 1.0 / float( NUM_SAMPLES );
+
+  float angle = rand_2to1( randomSeed ) * PI2;
+  float radius = INV_NUM_SAMPLES;
+  float radiusStep = radius;
+
+  for( int i = 0; i < NUM_SAMPLES; i ++ ) {
+    poissonDisk[i] = vec2( cos( angle ), sin( angle ) ) * pow( radius, 0.75 );
+    radius += radiusStep;
+    angle += ANGLE_STEP;
+  }
+}
+
+float calculateShadow()
 {
+    float texturesize = textureSize(shadowMapSampler, 0).x;
+    float stride = 5.0;
+    float filterRange = stride/texturesize;
+
     vec4 fragPosLightSpace = mainlight.lightSpaceMatrix * vec4(oPositions, 1.0);
     float currentDepth = fragPosLightSpace.z;
     vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
     projCoords = projCoords * 0.5 + 0.5;
+    poissonDiskSamples(projCoords.xy);
+
+    vec3 lightDir = mainlight.direction.xyz;
+    vec3 normal = normalize(oNormals);
+    float bias = max(0.05 * (1.0 - dot(normal, lightDir)), 0.005);
+
     float shadow = 0.0;
-    vec2 offset[5] = vec2[](vec2(-0.00052,-0.000925),vec2(-0.00052,0.000925),vec2(0.00052,-0.000925),vec2(0.00052,0.000925),vec2(0.0,0.0));
-    for(int i = 0; i < 5; ++i){
-        float closestDepth = texture(shadowMapSampler, projCoords.xy + offset[i]).r; 
-        vec3 normal = normalize(oNormals);
-        vec3 lightDir = mainlight.direction.xyz;
-        float bias = max(0.05 * (1.0 - dot(normal, lightDir)), 0.005);
+    for(int i = 0; i < NUM_SAMPLES; ++i){
+        vec2 sampleUV = projCoords.xy + filterRange * poissonDisk[i];
+        float closestDepth = texture(shadowMapSampler, sampleUV).r; 
         shadow += currentDepth - bias > closestDepth  ? 1.0 : 0.0;
     }
-    shadow *= 0.2;
+    shadow /= float(NUM_SAMPLES);
     
     if(projCoords.z > 1.0)
+    {
         shadow = 0.0;
-    return shadow;
+    }
+    return 1.0 - shadow;
 }
+
 
 TextureChannels getTextureChannels() {
     return TextureChannels(
@@ -472,7 +515,7 @@ void main() {
     vec3 v = normalize(cameraUBO.eye.xyz - oPositions);
 
     vec3 color = computeMainLight(mainlight.direction.xyz, mainlight.color.xyz, mainlight.intensity, pbrInfo, n, v);
-    float mainLightShadow = 1.0 - ShadowCalculation();
+    float mainLightShadow = calculateShadow();
     color *= mainLightShadow;
 
     vec3 additionalLightColor = vec3(0.0);
