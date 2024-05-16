@@ -124,7 +124,8 @@ layout(binding = 14, set = 3) uniform sampler2D aoMapSampler;
 
 layout(location = 0) out vec4 outColor;
 
-#define NUM_SAMPLES 50
+#define NUM_SAMPLES 64
+#define BLOCKER_SEARCH_NUM_SAMPLES NUM_SAMPLES
 #define NUM_RINGS 10
 
 #define PI 3.141592653589793
@@ -155,6 +156,63 @@ void poissonDiskSamples(const in vec2 randomSeed) {
     radius += radiusStep;
     angle += ANGLE_STEP;
   }
+}
+
+float findBlock(vec2 uv, float depth, float bias){
+    float texturesize = textureSize(shadowMapSampler, 0).x;
+    float stride = 10.0;
+    float filterRange = stride / texturesize;
+    poissonDiskSamples(uv);
+
+    float avgDepth = 0.0;
+    int count = 0;
+    for(int i = 0;i < BLOCKER_SEARCH_NUM_SAMPLES; ++i){
+        vec2 sampleUV = uv + filterRange * poissonDisk[i];
+        float blockDepth = texture(shadowMapSampler, sampleUV).r;
+        float pcfBias = bias * (1 + distance(sampleUV, uv));
+        if(depth - pcfBias > blockDepth){
+            avgDepth += blockDepth;
+            ++count;
+        }    
+    }
+    return avgDepth/float(count);
+}
+
+float calculateShadowPCSS()
+{
+    float texturesize = textureSize(shadowMapSampler, 0).x;
+    float filterSize = 1.0;
+
+    vec4 fragPosLightSpace = mainlight.lightSpaceMatrix * vec4(oPositions, 1.0);
+    float currentDepth = fragPosLightSpace.z;
+    vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
+    projCoords = projCoords * 0.5 + 0.5;
+    poissonDiskSamples(projCoords.xy);
+
+    vec3 lightDir = mainlight.direction.xyz;
+    vec3 normal = normalize(oNormals);
+    float bias = max(0.05 * (1.0 - dot(normal, lightDir)), 0.005);
+
+    float block = findBlock(projCoords.xy, currentDepth, bias);
+    float penumbra = (currentDepth - block)/block;
+    float filterRange = (penumbra * filterSize) / texturesize;
+
+    float shadow = 0.0;
+    for(int i = 0; i < NUM_SAMPLES; ++i){
+        vec2 sampleUV = projCoords.xy + filterRange * poissonDisk[i];
+        float closestDepth = texture(shadowMapSampler, sampleUV).r;
+        //TODO：这里还是计算的不太对，缺了frustumSize/(shadowMapSize*2)项
+        //目前是透视投影的shadowmap，先不加，后续改成正交投影的时候加上
+        float pcfBias = bias * (1 + distance(sampleUV, projCoords.xy));
+        shadow += currentDepth - pcfBias > closestDepth  ? 0.0 : 1.0;
+    }
+    shadow /= float(NUM_SAMPLES);
+    
+    if(projCoords.z > 1.0)
+    {
+        shadow = 0.0;
+    }
+    return shadow;
 }
 
 float calculateShadow()
