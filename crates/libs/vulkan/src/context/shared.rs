@@ -26,12 +26,14 @@ pub struct SharedContext {
     present_queue: vk::Queue,
     dynamic_rendering: DynamicRendering,
     synchronization2: Synchronization2,
+    debug_utils: DebugUtils,
 }
 
 impl SharedContext {
     pub fn new(window: &Window, enable_debug: bool) -> Self {
         let entry = unsafe { Entry::load().unwrap() };
         let instance = create_instance(&entry, window, enable_debug);
+        let debug_utils: DebugUtils = DebugUtils::new(&entry, &instance);
 
         let surface = Surface::new(&entry, &instance);
         let surface_khr = unsafe {
@@ -77,7 +79,24 @@ impl SharedContext {
             present_queue,
             dynamic_rendering,
             synchronization2,
+            debug_utils,
         }
+    }
+
+    pub fn get_debug_utils(&self) -> &DebugUtils{
+        &self.debug_utils
+    }
+
+    pub fn set_debug_utils_object_name(
+        &self,
+        device: vk::Device,
+        name_info: &vk::DebugUtilsObjectNameInfoEXT,
+    ) {
+        unsafe {
+            let _ = self
+                .debug_utils
+                .set_debug_utils_object_name(device, name_info);
+        };
     }
 }
 
@@ -459,9 +478,7 @@ impl SharedContext {
                 self.synchronization2
                     .queue_submit2(queue, std::slice::from_ref(&submit_info), vk::Fence::null())
                     .expect("提交失败！");
-                self.device
-                    .queue_wait_idle(queue)
-                    .expect("等待空闲失败！");
+                self.device.queue_wait_idle(queue).expect("等待空闲失败！");
             };
         }
 
