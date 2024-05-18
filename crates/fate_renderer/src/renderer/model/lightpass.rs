@@ -112,7 +112,14 @@ impl LightPass {
         depth_format: vk::Format,
         settings: RendererSettings,
     ) -> Self {
-        let dummy_texture = VulkanTexture::from_rgba(&context, 1, 1, &[std::u8::MAX; 4], true);
+        let dummy_texture = VulkanTexture::from_rgba(
+            &context,
+            1,
+            1,
+            &[std::u8::MAX; 4],
+            true,
+            std::ffi::CString::new("Default Texture").unwrap()
+        );
 
         let model_rc = model_data.model.upgrade().expect("模型已被释放！");
 

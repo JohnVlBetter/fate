@@ -31,8 +31,8 @@ pub(crate) fn create_skybox_cubemap<P: AsRef<Path>>(
         max_anisotropy: 16.0,
         ..Default::default()
     };
-    let texture = Texture::from_rgba_32(context, w, h, true, &data, Some(sampler_parameters));
-    let cubemap = Texture::create_renderable_cubemap(context, size, mip_levels, cubemap_format);
+    let texture = Texture::from_rgba_32(context, w, h, true, &data, Some(sampler_parameters),std::ffi::CString::new("Skybox Cubemap Texture").unwrap());
+    let cubemap = Texture::create_renderable_cubemap(context, size, mip_levels, cubemap_format,std::ffi::CString::new("Skybox Cubemap Texture").unwrap());
 
     let skybox_model = SkyboxModel::new(context);
 

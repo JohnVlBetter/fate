@@ -49,9 +49,18 @@ impl Texture {
         height: u32,
         data: &[u8],
         linear: bool,
+        image_name: std::ffi::CString,
     ) -> Self {
         let (texture, _) = context.execute_one_time_commands(|command_buffer| {
-            Self::cmd_from_rgba(context, command_buffer, width, height, data, linear)
+            Self::cmd_from_rgba(
+                context,
+                command_buffer,
+                width,
+                height,
+                data,
+                linear,
+                image_name,
+            )
         });
         texture
     }
@@ -63,6 +72,7 @@ impl Texture {
         height: u32,
         data: &[u8],
         linear: bool,
+        texture_name: std::ffi::CString,
     ) -> (Self, Buffer) {
         let max_mip_levels = ((width.min(height) as f32).log2().floor() + 1.0) as u32;
         let extent = vk::Extent2D { width, height };
@@ -97,6 +107,7 @@ impl Texture {
                     | vk::ImageUsageFlags::SAMPLED,
                 ..Default::default()
             },
+            texture_name,
         );
 
         {
@@ -150,6 +161,7 @@ impl Texture {
         with_mipmaps: bool,
         data: &[f32],
         sampler_parameters: Option<SamplerParameters>,
+        image_name: std::ffi::CString,
     ) -> Self {
         let max_mip_levels = if with_mipmaps {
             ((width.min(height) as f32).log2().floor() + 1.0) as u32
@@ -190,6 +202,7 @@ impl Texture {
                 usage,
                 ..Default::default()
             },
+            image_name
         );
 
         {
@@ -246,6 +259,7 @@ impl Texture {
         size: u32,
         mip_levels: u32,
         format: vk::Format,
+        image_name: std::ffi::CString,
     ) -> Self {
         let extent = vk::Extent2D {
             width: size,
@@ -269,6 +283,7 @@ impl Texture {
                 create_flags: vk::ImageCreateFlags::CUBE_COMPATIBLE,
                 ..Default::default()
             },
+            image_name
         );
 
         image.transition_image_layout(
@@ -311,6 +326,7 @@ impl Texture {
         width: u32,
         height: u32,
         format: vk::Format,
+        image_name: std::ffi::CString,
     ) -> Self {
         let extent = vk::Extent2D { width, height };
 
@@ -325,6 +341,7 @@ impl Texture {
                 usage: vk::ImageUsageFlags::SAMPLED | vk::ImageUsageFlags::COLOR_ATTACHMENT,
                 ..Default::default()
             },
+            image_name
         );
 
         image.transition_image_layout(

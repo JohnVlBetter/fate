@@ -3,6 +3,7 @@ use gltf::iter::{Materials, Textures as GltfTextures};
 use gltf::json::texture::{MagFilter, MinFilter, WrappingMode};
 use gltf::texture::Sampler;
 use std::collections::HashSet;
+use std::ffi::CString;
 use std::sync::Arc;
 use vulkan::ash::vk;
 use vulkan::{Buffer, Context, Image, Texture as VulkanTexture};
@@ -82,6 +83,7 @@ pub(crate) fn create_textures_from_gltf(
                 image.height,
                 &pixels,
                 !is_srgb,
+                CString::new("暂时没赋值模型纹理名字").unwrap(),
             )
         })
         .unzip::<_, _, Vec<_>, _>();

@@ -36,7 +36,14 @@ impl ShadowCasterPass {
         light_buffers: &[Buffer],
         depth_format: vk::Format,
     ) -> Self {
-        let dummy_texture = VulkanTexture::from_rgba(&context, 1, 1, &[std::u8::MAX; 4], true);
+        let dummy_texture = VulkanTexture::from_rgba(
+            &context,
+            1,
+            1,
+            &[std::u8::MAX; 4],
+            true,
+            std::ffi::CString::new("Default Texture").unwrap(),
+        );
 
         let model_rc = model_data.model.upgrade().expect("模型已被释放！");
 

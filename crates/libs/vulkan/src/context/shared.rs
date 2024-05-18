@@ -4,7 +4,8 @@ use ash::{
         ext::DebugUtils,
         khr::{DynamicRendering, Surface, Swapchain as SwapchainLoader, Synchronization2},
     },
-    vk, Device, Entry, Instance,
+    vk::{self, ObjectType},
+    Device, Entry, Instance,
 };
 use raw_window_handle::{HasRawDisplayHandle, HasRawWindowHandle};
 use std::{
@@ -83,19 +84,26 @@ impl SharedContext {
         }
     }
 
-    pub fn get_debug_utils(&self) -> &DebugUtils{
+    /*pub fn get_debug_utils(&self) -> &DebugUtils {
         &self.debug_utils
-    }
+    }*/
 
     pub fn set_debug_utils_object_name(
         &self,
-        device: vk::Device,
-        name_info: &vk::DebugUtilsObjectNameInfoEXT,
+        object_handle: u64,
+        object_name: CString,
+        object_type: ObjectType,
     ) {
         unsafe {
+            let name = CString::new(object_name).expect("Unknown");
+            let name_info = vk::DebugUtilsObjectNameInfoEXT::builder()
+                .object_handle(object_handle)
+                .object_name(&name)
+                .object_type(object_type)
+                .build();
             let _ = self
                 .debug_utils
-                .set_debug_utils_object_name(device, name_info);
+                .set_debug_utils_object_name(self.device.handle(), &name_info);
         };
     }
 }

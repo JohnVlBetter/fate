@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{ffi::CString, sync::Arc};
 
 use vulkan::{ash::vk, Context, Image, ImageParameters, Texture};
 
@@ -94,6 +94,7 @@ fn create_shadow_caster_depth(context: &Arc<Context>, extent: vk::Extent2D) -> T
             usage: vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::SAMPLED,
             ..Default::default()
         },
+        CString::new("ShadowCaster Depth Texture").unwrap(),
     );
 
     image.transition_image_layout(
@@ -122,6 +123,7 @@ fn create_gbuffer_normals(context: &Arc<Context>, extent: vk::Extent2D) -> Textu
             usage: vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::SAMPLED,
             ..Default::default()
         },
+        CString::new("GBuffer Normals Texture").unwrap(),
     );
 
     image.transition_image_layout(
@@ -154,6 +156,7 @@ fn create_gbuffer_depth(
             usage: vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT | vk::ImageUsageFlags::SAMPLED,
             ..Default::default()
         },
+        CString::new("GBuffer Depth Texture").unwrap(),
     );
 
     image.transition_image_layout(
@@ -183,6 +186,7 @@ fn create_ssao(context: &Arc<Context>, extent: vk::Extent2D) -> Texture {
             usage: vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::SAMPLED,
             ..Default::default()
         },
+        CString::new("SSAO Texture").unwrap(),
     );
 
     image.transition_image_layout(
@@ -211,6 +215,7 @@ fn create_ssao_blur(context: &Arc<Context>, extent: vk::Extent2D) -> Texture {
             usage: vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::SAMPLED,
             ..Default::default()
         },
+        CString::new("SSAO Blur Texture").unwrap(),
     );
 
     image.transition_image_layout(
@@ -249,6 +254,7 @@ fn create_scene_color(
             usage: image_usage,
             ..Default::default()
         },
+        CString::new("Scene Color Texture").unwrap(),
     );
 
     image.transition_image_layout(
@@ -293,6 +299,7 @@ fn create_scene_depth(
             usage: image_usage,
             ..Default::default()
         },
+        CString::new("Scene Depth Texture").unwrap(),
     );
 
     image.transition_image_layout(
@@ -324,6 +331,7 @@ fn create_scene_resolve(context: &Arc<Context>, extent: vk::Extent2D) -> Texture
             usage: vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::SAMPLED,
             ..Default::default()
         },
+        CString::new("Scene Resolve Texture").unwrap(),
     );
 
     image.transition_image_layout(
@@ -354,6 +362,7 @@ fn create_bloom(context: &Arc<Context>, extent: vk::Extent2D) -> BloomAttachment
             usage: vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::SAMPLED,
             ..Default::default()
         },
+        CString::new("Bloom Texture").unwrap(),
     );
 
     let mips_views =

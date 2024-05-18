@@ -79,6 +79,7 @@ impl SSAOPass {
                     min_filter: vk::Filter::NEAREST,
                     ..Default::default()
                 }),
+                std::ffi::CString::new("Noise Texture").unwrap(),
             )
         };
 
@@ -474,11 +475,7 @@ fn update_static_set(
     let normals_info = [vk::DescriptorImageInfo::builder()
         .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
         .image_view(normals.view)
-        .sampler(
-            normals
-                .sampler
-                .expect("SSAO法线图没有sampler"),
-        )
+        .sampler(normals.sampler.expect("SSAO法线图没有sampler"))
         .build()];
 
     let depth_info = [vk::DescriptorImageInfo::builder()
@@ -490,11 +487,7 @@ fn update_static_set(
     let noise_info = [vk::DescriptorImageInfo::builder()
         .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
         .image_view(noise_texture.view)
-        .sampler(
-            noise_texture
-                .sampler
-                .expect("SSAO噪声图没有sampler"),
-        )
+        .sampler(noise_texture.sampler.expect("SSAO噪声图没有sampler"))
         .build()];
 
     let descriptor_writes = [
@@ -728,13 +721,11 @@ fn create_ssao_frag_shader_specialization(
     Vec<vk::SpecializationMapEntry>,
     Vec<u8>,
 ) {
-    let map_entries = vec![
-        vk::SpecializationMapEntry {
-            constant_id: 0,
-            offset: 0,
-            size: size_of::<u32>(),
-        },
-    ];
+    let map_entries = vec![vk::SpecializationMapEntry {
+        constant_id: 0,
+        offset: 0,
+        size: size_of::<u32>(),
+    }];
 
     let data = unsafe { any_as_u8_slice(&saao_samples_count) }.to_vec();
 

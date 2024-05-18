@@ -1,5 +1,8 @@
 use super::{buffer::*, context::*, swapchain::SwapchainProperties};
-use ash::{vk, Device};
+use ash::{
+    vk::{self, Handle, ObjectType},
+    Device,
+};
 use std::sync::Arc;
 
 #[derive(Copy, Clone)]
@@ -68,7 +71,11 @@ impl Image {
         }
     }
 
-    pub fn create(context: Arc<Context>, parameters: ImageParameters) -> Self {
+    pub fn create(
+        context: Arc<Context>,
+        parameters: ImageParameters,
+        image_name: std::ffi::CString,
+    ) -> Self {
         let extent = vk::Extent3D {
             width: parameters.extent.width,
             height: parameters.extent.height,
@@ -94,6 +101,7 @@ impl Image {
                 .create_image(&image_info, None)
                 .expect("创建image失败！")
         };
+        context.set_debug_utils_object_name(image.as_raw(), image_name, ObjectType::IMAGE);
         let mem_requirements = unsafe { device.get_image_memory_requirements(image) };
         let mem_type_index = find_memory_type(
             mem_requirements,

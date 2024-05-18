@@ -90,7 +90,7 @@ pub(crate) fn create_pre_filtered_map(
     };
 
     let pre_filtered =
-        Texture::create_renderable_cubemap(context, size, max_mip_levels, cubemap_format);
+        Texture::create_renderable_cubemap(context, size, max_mip_levels, cubemap_format,std::ffi::CString::new("Pre-Filtered Texture").unwrap());
 
     let mut views = Vec::new();
     for lod in 0..max_mip_levels {

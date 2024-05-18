@@ -36,12 +36,16 @@ impl GBufferPass {
         camera_buffers: &[Buffer],
         depth_format: vk::Format,
     ) -> Self {
-        let dummy_texture = VulkanTexture::from_rgba(&context, 1, 1, &[std::u8::MAX; 4], true);
+        let dummy_texture = VulkanTexture::from_rgba(
+            &context,
+            1,
+            1,
+            &[std::u8::MAX; 4],
+            true,
+            std::ffi::CString::new("Default Texture").unwrap(),
+        );
 
-        let model_rc = model_data
-            .model
-            .upgrade()
-            .expect("模型已被释放！");
+        let model_rc = model_data.model.upgrade().expect("模型已被释放！");
 
         let descriptors = create_descriptors(
             &context,
@@ -71,10 +75,7 @@ impl GBufferPass {
 
 impl GBufferPass {
     pub fn set_model(&mut self, model_data: &ModelData, camera_buffers: &[Buffer]) {
-        let model_rc = model_data
-            .model
-            .upgrade()
-            .expect("模型已被释放！");
+        let model_rc = model_data.model.upgrade().expect("模型已被释放！");
 
         self.descriptors = create_descriptors(
             &self.context,
@@ -95,10 +96,7 @@ impl GBufferPass {
         model_data: &ModelData,
     ) {
         let device = self.context.device();
-        let model = model_data
-            .model
-            .upgrade()
-            .expect("模型已被释放！");
+        let model = model_data.model.upgrade().expect("模型已被释放！");
         let model = model.borrow();
 
         unsafe {

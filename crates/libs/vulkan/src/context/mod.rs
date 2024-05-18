@@ -6,7 +6,7 @@ use ash::{
     extensions::khr::{DynamicRendering, Surface, Synchronization2},
     vk, Device, Instance,
 };
-use std::sync::Arc;
+use std::{ffi::CString, sync::Arc};
 use winit::window::Window;
 
 pub struct Context {
@@ -54,6 +54,16 @@ impl Context {
             general_command_pool,
             transient_command_pool,
         }
+    }
+
+    pub fn set_debug_utils_object_name(
+        &self,
+        object_handle: u64,
+        object_name: CString,
+        object_type: vk::ObjectType,
+    ) {
+        self.shared_context
+            .set_debug_utils_object_name(object_handle, object_name, object_type);
     }
 }
 

@@ -132,7 +132,8 @@ pub(crate) fn create_brdf_lookup(context: &Arc<Context>, size: u32) -> Texture {
         (layout, pipeline)
     };
 
-    let lookup = Texture::create_renderable_texture(context, size, size, vk::Format::R16G16_SFLOAT);
+    let lookup = Texture::create_renderable_texture(context, size, size, vk::Format::R16G16_SFLOAT
+        ,std::ffi::CString::new("BRDF LUT Texture").unwrap());
 
     // Render
     context.execute_one_time_commands(|buffer| {
