@@ -1,5 +1,7 @@
 use crate::camera::Camera;
-use crate::renderer::{OutputMode, RendererSettings, ToneMapMode, DEFAULT_BLOOM_STRENGTH};
+use crate::renderer::{
+    FXAAMode, OutputMode, RendererSettings, ToneMapMode, DEFAULT_BLOOM_STRENGTH,
+};
 use egui::{ClippedPrimitive, Context, Label, Sense, TexturesDelta, Ui, ViewportId, Widget};
 use egui_winit::State as EguiWinit;
 use rendering::animation::PlaybackState;
@@ -181,9 +183,14 @@ impl Gui {
                 ssao_strength: self.state.ssao_strength,
                 tone_map_mode: ToneMapMode::from_value(self.state.selected_tone_map_mode)
                     .expect("未知tone map模式!"),
+                fxaa_mode: FXAAMode::from_value(self.state.selected_fxaa_mode)
+                    .expect("未知fxaa模式!"),
                 output_mode: OutputMode::from_value(self.state.selected_output_mode)
                     .expect("未知输出模式!"),
                 bloom_strength: self.state.bloom_strength as f32 / 100f32,
+                absolute_luminance_threshold: self.state.absolute_luminance_threshold as f32 / 100f32,
+                relative_luminance_threshold: self.state.relative_luminance_threshold as f32 / 100f32,
+                subpixel_blending: self.state.subpixel_blending as f32 / 100f32,
             })
         } else {
             None
@@ -463,6 +470,29 @@ fn build_renderer_settings_window(ui: &mut Ui, state: &mut State) {
                     ui.add(egui::Slider::new(&mut state.ssao_radius, 0.01..=1.0).text("SSAO半径"));
                     ui.add(egui::Slider::new(&mut state.ssao_strength, 0.5..=5.0).text("SSAO强度"));
                 }
+
+                let fxaa_modes = FXAAMode::all();
+                egui::ComboBox::from_label("FXAA").show_index(
+                    ui,
+                    &mut state.selected_fxaa_mode,
+                    fxaa_modes.len(),
+                    |i| format!("{:?}", fxaa_modes[i]),
+                );
+
+                ui.add(
+                    egui::Slider::new(&mut state.absolute_luminance_threshold, 0..=50)
+                        .text("绝对亮度阈值"),
+                );
+
+                ui.add(
+                    egui::Slider::new(&mut state.relative_luminance_threshold, 0..=50)
+                        .text("相对亮度阈值"),
+                );
+
+                ui.add(
+                    egui::Slider::new(&mut state.subpixel_blending, 0..=100)
+                        .text("子像素混合"),
+                );
             }
 
             {
@@ -506,12 +536,16 @@ struct State {
 
     selected_output_mode: usize,
     selected_tone_map_mode: usize,
+    selected_fxaa_mode: usize,
     emissive_intensity: f32,
     ssao_enabled: bool,
     ssao_radius: f32,
     ssao_strength: f32,
     ssao_kernel_size_index: usize,
     bloom_strength: u32,
+    absolute_luminance_threshold: u32,
+    relative_luminance_threshold: u32,
+    subpixel_blending: u32,
     renderer_settings_changed: bool,
 
     hovered: bool,
@@ -524,6 +558,7 @@ impl State {
         Self {
             selected_output_mode: renderer_settings.output_mode as _,
             selected_tone_map_mode: renderer_settings.tone_map_mode as _,
+            selected_fxaa_mode: renderer_settings.fxaa_mode as _,
             emissive_intensity: renderer_settings.emissive_intensity,
             ssao_enabled: renderer_settings.ssao_enabled,
             ssao_radius: renderer_settings.ssao_radius,
@@ -537,6 +572,7 @@ impl State {
         Self {
             selected_output_mode: self.selected_output_mode,
             selected_tone_map_mode: self.selected_tone_map_mode,
+            selected_fxaa_mode: self.selected_fxaa_mode,
             emissive_intensity: self.emissive_intensity,
             ssao_radius: self.ssao_radius,
             ssao_strength: self.ssao_strength,
@@ -549,11 +585,15 @@ impl State {
     fn check_renderer_settings_changed(&mut self, other: &Self) {
         self.renderer_settings_changed = self.selected_output_mode != other.selected_output_mode
             || self.selected_tone_map_mode != other.selected_tone_map_mode
+            || self.selected_fxaa_mode != other.selected_fxaa_mode
             || self.emissive_intensity != other.emissive_intensity
             || self.ssao_enabled != other.ssao_enabled
             || self.ssao_radius != other.ssao_radius
             || self.ssao_strength != other.ssao_strength
             || self.ssao_kernel_size_index != other.ssao_kernel_size_index
+            || self.absolute_luminance_threshold != other.absolute_luminance_threshold
+            || self.relative_luminance_threshold != other.relative_luminance_threshold
+            || self.subpixel_blending != other.subpixel_blending
             || self.bloom_strength != other.bloom_strength;
     }
 }
@@ -572,12 +612,16 @@ impl Default for State {
 
             selected_output_mode: 0,
             selected_tone_map_mode: 0,
+            selected_fxaa_mode: 0,
             emissive_intensity: 1.0,
             ssao_enabled: true,
             ssao_radius: 0.15,
             ssao_strength: 1.0,
             ssao_kernel_size_index: 1,
             bloom_strength: (DEFAULT_BLOOM_STRENGTH * 100f32) as _,
+            absolute_luminance_threshold: (0.1 * 100f32) as _,
+            relative_luminance_threshold: (0.1 * 100f32) as _,
+            subpixel_blending: (0.75 * 100f32) as _,
             renderer_settings_changed: false,
 
             hovered: false,

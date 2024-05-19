@@ -1,74 +1,24 @@
 use crate::renderer::attachments::Attachments;
 use crate::renderer::{fullscreen::*, RendererSettings};
+use crate::FXAAMode;
 use rendering::util::any_as_u8_slice;
 use std::{mem::size_of, sync::Arc};
 use vulkan::ash::{vk, Device};
 use vulkan::{Context, Descriptors};
 
-pub struct FinalPass {
+pub struct FXAAPass {
     context: Arc<Context>,
     descriptors: Descriptors,
     pipeline_layout: vk::PipelineLayout,
-    default_pipeline: vk::Pipeline,
-    uncharted_pipeline: vk::Pipeline,
-    hejl_richard_pipeline: vk::Pipeline,
-    aces_pipeline: vk::Pipeline,
-    none_pipeline: vk::Pipeline,
-    tone_map_mode: ToneMapMode,
-    bloom_strength: f32,
+    quality_pipeline: vk::Pipeline,
+    console_pipeline: vk::Pipeline,
+    fxaa_mode: FXAAMode,
+    absolute_luminance_threshold: f32,
+    relative_luminance_threshold: f32,
+    subpixel_blending: f32,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ToneMapMode {
-    Default = 0,
-    Uncharted,
-    HejlRichard,
-    Aces,
-    None,
-}
-
-impl ToneMapMode {
-    pub fn all() -> [ToneMapMode; 5] {
-        use ToneMapMode::*;
-        [Default, Uncharted, HejlRichard, Aces, None]
-    }
-
-    pub fn from_value(value: usize) -> Option<Self> {
-        use ToneMapMode::*;
-        match value {
-            0 => Some(Default),
-            1 => Some(Uncharted),
-            2 => Some(HejlRichard),
-            3 => Some(Aces),
-            4 => Some(None),
-            _ => Option::None,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum FXAAMode {
-    Quality = 0,
-    Console,
-}
-
-impl FXAAMode {
-    pub fn all() -> [FXAAMode; 2] {
-        use FXAAMode::*;
-        [Quality, Console]
-    }
-
-    pub fn from_value(value: usize) -> Option<Self> {
-        use FXAAMode::*;
-        match value {
-            0 => Some(Quality),
-            1 => Some(Console),
-            _ => Option::None,
-        }
-    }
-}
-
-impl FinalPass {
+impl FXAAPass {
     pub fn create(
         context: Arc<Context>,
         output_format: vk::Format,
@@ -77,54 +27,45 @@ impl FinalPass {
     ) -> Self {
         let descriptors = create_descriptors(&context, attachments);
         let pipeline_layout = create_pipeline_layout(context.device(), descriptors.layout());
-        let default_pipeline = create_pipeline(
-            &context,
-            output_format,
-            pipeline_layout,
-            ToneMapMode::Default,
-        );
-        let uncharted_pipeline = create_pipeline(
-            &context,
-            output_format,
-            pipeline_layout,
-            ToneMapMode::Uncharted,
-        );
-        let hejl_richard_pipeline = create_pipeline(
-            &context,
-            output_format,
-            pipeline_layout,
-            ToneMapMode::HejlRichard,
-        );
-        let aces_pipeline =
-            create_pipeline(&context, output_format, pipeline_layout, ToneMapMode::Aces);
-        let none_pipeline =
-            create_pipeline(&context, output_format, pipeline_layout, ToneMapMode::None);
+        let quality_pipeline =
+            create_pipeline(&context, output_format, pipeline_layout, FXAAMode::Quality);
+        let console_pipeline =
+            create_pipeline(&context, output_format, pipeline_layout, FXAAMode::Console);
 
-        let tone_map_mode = settings.tone_map_mode;
-        let bloom_strength = settings.bloom_strength;
+        let fxaa_mode = settings.fxaa_mode;
+        let absolute_luminance_threshold = settings.absolute_luminance_threshold;
+        let relative_luminance_threshold = settings.relative_luminance_threshold;
+        let subpixel_blending = settings.subpixel_blending;
 
-        FinalPass {
+        FXAAPass {
             context,
             descriptors,
             pipeline_layout,
-            default_pipeline,
-            uncharted_pipeline,
-            hejl_richard_pipeline,
-            aces_pipeline,
-            none_pipeline,
-            tone_map_mode,
-            bloom_strength,
+            quality_pipeline,
+            console_pipeline,
+            fxaa_mode,
+            absolute_luminance_threshold,
+            relative_luminance_threshold,
+            subpixel_blending,
         }
     }
 }
 
-impl FinalPass {
-    pub fn set_tone_map_mode(&mut self, tone_map_mode: ToneMapMode) {
-        self.tone_map_mode = tone_map_mode;
+impl FXAAPass {
+    pub fn set_fxaa_mode(&mut self, fxaa_mode: FXAAMode) {
+        self.fxaa_mode = fxaa_mode;
     }
 
-    pub fn set_bloom_strength(&mut self, bloom_strength: f32) {
-        self.bloom_strength = bloom_strength;
+    pub fn set_absolute_luminance_threshold(&mut self, absolute_luminance_threshold: f32) {
+        self.absolute_luminance_threshold = absolute_luminance_threshold;
+    }
+
+    pub fn set_relative_luminance_threshold(&mut self, relative_luminance_threshold: f32) {
+        self.relative_luminance_threshold = relative_luminance_threshold;
+    }
+
+    pub fn set_subpixel_blending(&mut self, subpixel_blending: f32) {
+        self.subpixel_blending = subpixel_blending;
     }
 
     pub fn set_attachments(&mut self, attachments: &Attachments) {
@@ -136,12 +77,9 @@ impl FinalPass {
 
     pub fn cmd_draw(&self, command_buffer: vk::CommandBuffer, quad_model: &QuadModel) {
         let device = self.context.device();
-        let current_pipeline = match self.tone_map_mode {
-            ToneMapMode::Default => self.default_pipeline,
-            ToneMapMode::Uncharted => self.uncharted_pipeline,
-            ToneMapMode::HejlRichard => self.hejl_richard_pipeline,
-            ToneMapMode::Aces => self.aces_pipeline,
-            ToneMapMode::None => self.none_pipeline,
+        let current_pipeline = match self.fxaa_mode {
+            FXAAMode::Quality => self.quality_pipeline,
+            FXAAMode::Console => self.console_pipeline,
         };
 
         unsafe {
@@ -174,7 +112,11 @@ impl FinalPass {
         };
 
         unsafe {
-            let data = [self.bloom_strength];
+            let data = [
+                self.absolute_luminance_threshold,
+                self.relative_luminance_threshold,
+                self.subpixel_blending,
+            ];
             let data = any_as_u8_slice(&data);
             device.cmd_push_constants(
                 command_buffer,
@@ -189,15 +131,12 @@ impl FinalPass {
     }
 }
 
-impl Drop for FinalPass {
+impl Drop for FXAAPass {
     fn drop(&mut self) {
         let device = self.context.device();
         unsafe {
-            device.destroy_pipeline(self.default_pipeline, None);
-            device.destroy_pipeline(self.uncharted_pipeline, None);
-            device.destroy_pipeline(self.hejl_richard_pipeline, None);
-            device.destroy_pipeline(self.aces_pipeline, None);
-            device.destroy_pipeline(self.none_pipeline, None);
+            device.destroy_pipeline(self.quality_pipeline, None);
+            device.destroy_pipeline(self.console_pipeline, None);
             device.destroy_pipeline_layout(self.pipeline_layout, None);
         }
     }
@@ -211,20 +150,12 @@ fn create_descriptors(context: &Arc<Context>, attachments: &Attachments) -> Desc
 }
 
 fn create_descriptor_set_layout(device: &Device) -> vk::DescriptorSetLayout {
-    let bindings = [
-        vk::DescriptorSetLayoutBinding::builder()
-            .binding(0)
-            .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
-            .descriptor_count(1)
-            .stage_flags(vk::ShaderStageFlags::FRAGMENT)
-            .build(),
-        vk::DescriptorSetLayoutBinding::builder()
-            .binding(1)
-            .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
-            .descriptor_count(1)
-            .stage_flags(vk::ShaderStageFlags::FRAGMENT)
-            .build(),
-    ];
+    let bindings = [vk::DescriptorSetLayoutBinding::builder()
+        .binding(0)
+        .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
+        .descriptor_count(1)
+        .stage_flags(vk::ShaderStageFlags::FRAGMENT)
+        .build()];
 
     let layout_info = vk::DescriptorSetLayoutCreateInfo::builder().bindings(&bindings);
 
@@ -237,7 +168,7 @@ fn create_descriptor_set_layout(device: &Device) -> vk::DescriptorSetLayout {
 fn create_descriptor_pool(device: &Device) -> vk::DescriptorPool {
     let pool_sizes = [vk::DescriptorPoolSize {
         ty: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
-        descriptor_count: 2,
+        descriptor_count: 1,
     }];
 
     let create_info = vk::DescriptorPoolCreateInfo::builder()
@@ -275,44 +206,23 @@ fn update_descriptor_set(
     set: vk::DescriptorSet,
     attachments: &Attachments,
 ) {
-    //TODO 临时测试debug用，后面改回去
-    let input_image_info = [vk::DescriptorImageInfo::builder()
+    let src_image_info = [vk::DescriptorImageInfo::builder()
         .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
-        .image_view(
-            attachments
-                .fxaa
-                //.shadow_caster_color
-                .view,
-        )
+        .image_view(attachments.get_scene_resolved_color().view)
         .sampler(
             attachments
-                .fxaa
-                //.shadow_caster_color
+                .get_scene_resolved_color()
                 .sampler
-                .expect("后处理输入image没有采样器！"),
+                .expect("FXAA Src Image没采样器"),
         )
         .build()];
 
-    let bloom_info = [vk::DescriptorImageInfo::builder()
-        .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
-        .image_view(attachments.bloom.mips_views[0])
-        .sampler(attachments.bloom.sampler)
+    let descriptor_writes = [vk::WriteDescriptorSet::builder()
+        .dst_set(set)
+        .dst_binding(0)
+        .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
+        .image_info(&src_image_info)
         .build()];
-
-    let descriptor_writes = [
-        vk::WriteDescriptorSet::builder()
-            .dst_set(set)
-            .dst_binding(0)
-            .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
-            .image_info(&input_image_info)
-            .build(),
-        vk::WriteDescriptorSet::builder()
-            .dst_set(set)
-            .dst_binding(1)
-            .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
-            .image_info(&bloom_info)
-            .build(),
-    ];
 
     unsafe {
         context
@@ -341,22 +251,21 @@ fn create_pipeline(
     context: &Arc<Context>,
     output_format: vk::Format,
     layout: vk::PipelineLayout,
-    tone_map_mode: ToneMapMode,
+    fxaa_mode: FXAAMode,
 ) -> vk::Pipeline {
     let (specialization_info, _map_entries, _data) =
-        create_model_frag_shader_specialization(tone_map_mode);
+        create_model_frag_shader_specialization(fxaa_mode);
 
     create_fullscreen_pipeline(
         context,
         output_format,
         layout,
-        "final",
+        "fxaa",
         Some(&specialization_info),
     )
 }
-
 fn create_model_frag_shader_specialization(
-    tone_map_mode: ToneMapMode,
+    fxaa_mode: FXAAMode,
 ) -> (
     vk::SpecializationInfo,
     Vec<vk::SpecializationMapEntry>,
@@ -368,7 +277,7 @@ fn create_model_frag_shader_specialization(
         size: size_of::<u32>(),
     }];
 
-    let data = [tone_map_mode as u32];
+    let data = [fxaa_mode as u32];
 
     let data = Vec::from(unsafe { rendering::util::any_as_u8_slice(&data) });
 

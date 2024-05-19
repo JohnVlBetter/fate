@@ -18,6 +18,7 @@ pub struct Attachments {
     pub ssao_blur: Texture,
     pub scene_color: Texture,
     pub scene_depth: Texture,
+    pub fxaa: Texture,
     pub scene_resolve: Option<Texture>,
     pub bloom: BloomAttachment,
 }
@@ -60,6 +61,7 @@ impl Attachments {
             vk::SampleCountFlags::TYPE_1 => None,
             _ => Some(create_scene_resolve(context, extent)),
         };
+        let fxaa = create_fxaa_texture(context, extent);
         let bloom = create_bloom(context, extent);
 
         Self {
@@ -71,6 +73,7 @@ impl Attachments {
             ssao_blur,
             scene_color,
             scene_depth,
+            fxaa,
             scene_resolve,
             bloom,
         }
@@ -332,6 +335,31 @@ fn create_scene_resolve(context: &Arc<Context>, extent: vk::Extent2D) -> Texture
             ..Default::default()
         },
         CString::new("Scene Resolve Texture").unwrap(),
+    );
+
+    image.transition_image_layout(
+        vk::ImageLayout::UNDEFINED,
+        vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
+    );
+
+    let view = image.create_view(vk::ImageViewType::TYPE_2D, vk::ImageAspectFlags::COLOR);
+
+    let sampler = create_sampler(context, vk::Filter::NEAREST, vk::Filter::NEAREST);
+
+    Texture::new(Arc::clone(context), image, view, Some(sampler))
+}
+
+fn create_fxaa_texture(context: &Arc<Context>, extent: vk::Extent2D) -> Texture {
+    let image = Image::create(
+        Arc::clone(context),
+        ImageParameters {
+            mem_properties: vk::MemoryPropertyFlags::DEVICE_LOCAL,
+            extent,
+            format: SCENE_COLOR_FORMAT,
+            usage: vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::SAMPLED,
+            ..Default::default()
+        },
+        CString::new("FXAA Texture").unwrap(),
     );
 
     image.transition_image_layout(

@@ -1,5 +1,6 @@
 mod attachments;
 mod fullscreen;
+mod fxaa;
 mod model;
 mod postprocess;
 mod skybox;
@@ -7,6 +8,7 @@ mod ssao;
 
 use self::attachments::Attachments;
 use self::fullscreen::QuadModel;
+use self::fxaa::FXAAPass;
 use self::model::gbufferpass::GBufferPass;
 pub use self::model::lightpass::{LightPass, OutputMode};
 use self::model::shadowcasterpass::ShadowCasterPass;
@@ -52,8 +54,12 @@ pub struct RendererSettings {
     pub ssao_radius: f32,
     pub ssao_strength: f32,
     pub tone_map_mode: ToneMapMode,
+    pub fxaa_mode: FXAAMode,
     pub output_mode: OutputMode,
     pub bloom_strength: f32,
+    pub absolute_luminance_threshold: f32,
+    pub relative_luminance_threshold: f32,
+    pub subpixel_blending: f32,
 }
 
 impl Default for RendererSettings {
@@ -65,8 +71,12 @@ impl Default for RendererSettings {
             ssao_radius: DEFAULT_SSAO_RADIUS,
             ssao_strength: DEFAULT_SSAO_STRENGTH,
             tone_map_mode: ToneMapMode::Default,
+            fxaa_mode: FXAAMode::Quality,
             output_mode: OutputMode::Final,
             bloom_strength: DEFAULT_BLOOM_STRENGTH,
+            absolute_luminance_threshold: 0.1,
+            relative_luminance_threshold: 0.1,
+            subpixel_blending: 0.75,
         }
     }
 }
@@ -88,6 +98,7 @@ pub struct Renderer {
     ssao_blur_pass: BlurPass,
     quad_model: QuadModel,
     bloom_pass: BloomPass,
+    fxaa_pass: FXAAPass,
     final_pass: FinalPass,
     gui_renderer: GuiRenderer,
     context: Arc<Context>,
@@ -165,6 +176,13 @@ impl Renderer {
 
         let bloom_pass = BloomPass::create(Arc::clone(&context), &attachments);
 
+        let fxaa_pass = FXAAPass::create(
+            Arc::clone(&context),
+            swapchain_properties.format.format,
+            &attachments,
+            settings,
+        );
+
         let final_pass = FinalPass::create(
             Arc::clone(&context),
             swapchain_properties.format.format,
@@ -205,6 +223,7 @@ impl Renderer {
             ssao_blur_pass,
             quad_model,
             bloom_pass,
+            fxaa_pass,
             final_pass,
             gui_renderer,
             timer,
@@ -820,6 +839,88 @@ impl Renderer {
         }
 
         {
+            cmd_transition_images_layouts(
+                command_buffer,
+                &[LayoutTransition {
+                    image: &self.attachments.fxaa.image,
+                    old_layout: vk::ImageLayout::UNDEFINED,
+                    new_layout: vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
+                    mips_range: MipsRange::All,
+                }],
+            );
+
+            let extent = vk::Extent2D {
+                width: self.attachments.fxaa.image.extent.width,
+                height: self.attachments.fxaa.image.extent.height,
+            };
+
+            unsafe {
+                self.context.device().cmd_set_viewport(
+                    command_buffer,
+                    0,
+                    &[vk::Viewport {
+                        width: extent.width as _,
+                        height: extent.height as _,
+                        max_depth: 1.0,
+                        ..Default::default()
+                    }],
+                );
+                self.context.device().cmd_set_scissor(
+                    command_buffer,
+                    0,
+                    &[vk::Rect2D {
+                        extent,
+                        ..Default::default()
+                    }],
+                )
+            }
+
+            let color_attachment_info = RenderingAttachmentInfo::builder()
+                .clear_value(vk::ClearValue {
+                    color: vk::ClearColorValue {
+                        float32: [0.0, 0.0, 0.0, 1.0],
+                    },
+                })
+                .image_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
+                .image_view(self.attachments.fxaa.view)
+                .load_op(vk::AttachmentLoadOp::CLEAR)
+                .store_op(vk::AttachmentStoreOp::STORE);
+
+            let rendering_info = RenderingInfo::builder()
+                .color_attachments(std::slice::from_ref(&color_attachment_info))
+                .layer_count(1)
+                .render_area(vk::Rect2D {
+                    offset: vk::Offset2D { x: 0, y: 0 },
+                    extent,
+                });
+
+            unsafe {
+                self.context
+                    .dynamic_rendering()
+                    .cmd_begin_rendering(command_buffer, &rendering_info)
+            };
+
+            self.fxaa_pass.cmd_draw(command_buffer, &self.quad_model);
+
+            unsafe {
+                self.context
+                    .dynamic_rendering()
+                    .cmd_end_rendering(command_buffer)
+            };
+
+            self.attachments
+                .fxaa
+                .image
+                .cmd_transition_image_mips_layout(
+                    command_buffer,
+                    0,
+                    1,
+                    vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
+                    vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+                );
+        }
+
+        {
             self.swapchain.images()[frame_index].cmd_transition_image_layout(
                 command_buffer,
                 vk::ImageLayout::UNDEFINED,
@@ -1035,6 +1136,8 @@ impl Renderer {
 
         self.bloom_pass.set_attachments(&self.attachments);
 
+        self.fxaa_pass.set_attachments(&self.attachments);
+
         self.final_pass.set_attachments(&self.attachments);
     }
 
@@ -1046,6 +1149,9 @@ impl Renderer {
         }
         if self.settings.tone_map_mode != settings.tone_map_mode {
             self.set_tone_map_mode(settings.tone_map_mode);
+        }
+        if self.settings.fxaa_mode != settings.fxaa_mode {
+            self.set_fxaa_mode(settings.fxaa_mode);
         }
         if self.settings.output_mode != settings.output_mode {
             self.set_output_mode(settings.output_mode);
@@ -1065,6 +1171,21 @@ impl Renderer {
         if (self.settings.bloom_strength - settings.bloom_strength).abs() > f32::EPSILON {
             self.set_bloom_strength(settings.bloom_strength);
         }
+        if (self.settings.absolute_luminance_threshold - settings.absolute_luminance_threshold)
+            .abs()
+            > f32::EPSILON
+        {
+            self.set_absolute_luminance_threshold(settings.absolute_luminance_threshold);
+        }
+        if (self.settings.relative_luminance_threshold - settings.relative_luminance_threshold)
+            .abs()
+            > f32::EPSILON
+        {
+            self.set_relative_luminance_threshold(settings.relative_luminance_threshold);
+        }
+        if (self.settings.subpixel_blending - settings.subpixel_blending).abs() > f32::EPSILON {
+            self.set_subpixel_blending(settings.subpixel_blending);
+        }
     }
 
     fn set_emissive_intensity(&mut self, emissive_intensity: f32) {
@@ -1079,6 +1200,11 @@ impl Renderer {
     fn set_tone_map_mode(&mut self, tone_map_mode: ToneMapMode) {
         self.settings.tone_map_mode = tone_map_mode;
         self.final_pass.set_tone_map_mode(tone_map_mode);
+    }
+
+    fn set_fxaa_mode(&mut self, fxaa_mode: FXAAMode) {
+        self.settings.fxaa_mode = fxaa_mode;
+        self.fxaa_pass.set_fxaa_mode(fxaa_mode);
     }
 
     fn set_output_mode(&mut self, output_mode: OutputMode) {
@@ -1117,6 +1243,21 @@ impl Renderer {
     fn set_bloom_strength(&mut self, strength: f32) {
         self.settings.bloom_strength = strength;
         self.final_pass.set_bloom_strength(strength);
+    }
+
+    fn set_absolute_luminance_threshold(&mut self, strength: f32) {
+        self.settings.absolute_luminance_threshold = strength;
+        self.fxaa_pass.set_absolute_luminance_threshold(strength);
+    }
+
+    fn set_relative_luminance_threshold(&mut self, strength: f32) {
+        self.settings.relative_luminance_threshold = strength;
+        self.fxaa_pass.set_relative_luminance_threshold(strength);
+    }
+
+    fn set_subpixel_blending(&mut self, strength: f32) {
+        self.settings.subpixel_blending = strength;
+        self.fxaa_pass.set_subpixel_blending(strength);
     }
 
     pub fn update_ubos(&mut self, frame_index: usize, camera: Camera) {
