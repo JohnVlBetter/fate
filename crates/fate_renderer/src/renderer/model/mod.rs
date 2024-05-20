@@ -67,6 +67,8 @@ impl ModelData {
         position: [f32; 4],
         direction: [f32; 4],
         color: [f32; 4],
+        fog_params: [f32; 4],
+        fog_color: [f32; 4],
         intensity: f32,
     ) {
         let model = &self.model.upgrade().expect("模型已被释放！");
@@ -133,6 +135,8 @@ impl ModelData {
                 position,
                 direction,
                 color,
+                fog_params,
+                fog_color,
                 intensity,
             )];
 

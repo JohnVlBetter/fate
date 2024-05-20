@@ -93,6 +93,8 @@ pub struct MainLightUniform {
     position: [f32; 4],
     direction: [f32; 4],
     color: [f32; 4],
+    fog_params: [f32; 4],
+    fog_color: [f32; 4],
     intensity: f32,
     pad: [f32; 3],
 }
@@ -103,6 +105,8 @@ impl MainLightUniform {
         position: [f32; 4],
         direction: [f32; 4],
         color: [f32; 4],
+        fog_params: [f32; 4],
+        fog_color: [f32; 4],
         intensity: f32,
     ) -> Self {
         Self {
@@ -110,6 +114,8 @@ impl MainLightUniform {
             position,
             direction,
             color,
+            fog_params,
+            fog_color,
             intensity,
             pad: [0.0, 0.0, 0.0],
         }

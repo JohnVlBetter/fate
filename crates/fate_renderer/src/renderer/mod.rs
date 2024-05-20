@@ -26,6 +26,7 @@ use rendering::cgmath::{Deg, InnerSpace, Matrix4, Point3, SquareMatrix, Vector3}
 use rendering::environment::Environment;
 use rendering::model::Model;
 use std::cell::RefCell;
+use std::f32::consts::LN_2;
 use std::mem::size_of;
 use std::rc::Rc;
 use std::sync::Arc;
@@ -60,6 +61,10 @@ pub struct RendererSettings {
     pub absolute_luminance_threshold: f32,
     pub relative_luminance_threshold: f32,
     pub subpixel_blending: f32,
+    pub fog_density: f32,
+    pub fog_end: f32,
+    pub fog_start: f32,
+    pub fog_color: [f32; 4],
 }
 
 impl Default for RendererSettings {
@@ -77,6 +82,10 @@ impl Default for RendererSettings {
             absolute_luminance_threshold: 0.1,
             relative_luminance_threshold: 0.1,
             subpixel_blending: 0.75,
+            fog_density: 1.0,
+            fog_end: 100.0,
+            fog_start: 0.1,
+            fog_color: [1.0, 1.0, 1.0, 1.0],
         }
     }
 }
@@ -1186,6 +1195,22 @@ impl Renderer {
         if (self.settings.subpixel_blending - settings.subpixel_blending).abs() > f32::EPSILON {
             self.set_subpixel_blending(settings.subpixel_blending);
         }
+        if (self.settings.fog_density - settings.fog_density).abs() > f32::EPSILON {
+            self.set_fog_density(settings.fog_density);
+        }
+        if (self.settings.fog_end - settings.fog_end).abs() > f32::EPSILON {
+            self.set_fog_end(settings.fog_end);
+        }
+        if ((self.settings.fog_color[0] - settings.fog_color[0]).abs() > f32::EPSILON)
+            || ((self.settings.fog_color[1] - settings.fog_color[1]).abs() > f32::EPSILON)
+            || ((self.settings.fog_color[2] - settings.fog_color[2]).abs() > f32::EPSILON)
+            || ((self.settings.fog_color[3] - settings.fog_color[3]).abs() > f32::EPSILON)
+        {
+            self.set_fog_color(settings.fog_color);
+        }
+        if (self.settings.fog_start - settings.fog_start).abs() > f32::EPSILON {
+            self.set_fog_start(settings.fog_start);
+        }
     }
 
     fn set_emissive_intensity(&mut self, emissive_intensity: f32) {
@@ -1258,6 +1283,22 @@ impl Renderer {
     fn set_subpixel_blending(&mut self, strength: f32) {
         self.settings.subpixel_blending = strength;
         self.fxaa_pass.set_subpixel_blending(strength);
+    }
+
+    fn set_fog_density(&mut self, strength: f32) {
+        self.settings.fog_density = strength;
+    }
+
+    fn set_fog_end(&mut self, strength: f32) {
+        self.settings.fog_end = strength;
+    }
+
+    fn set_fog_color(&mut self, fog_color: [f32; 4]) {
+        self.settings.fog_color = fog_color;
+    }
+
+    fn set_fog_start(&mut self, strength: f32) {
+        self.settings.fog_start = strength;
     }
 
     pub fn update_ubos(&mut self, frame_index: usize, camera: Camera) {
@@ -1359,12 +1400,19 @@ impl Renderer {
             .normalize();
             let light_dir = [light_dir.x, light_dir.y, light_dir.z, 1.0];
 
+            let fog_params_x = self.settings.fog_density / f32::sqrt(LN_2);
+            let fog_params_y = self.settings.fog_density / LN_2;
+            let e_sub_s = self.settings.fog_end - self.settings.fog_start;
+            let fog_params_z = -1.0 / e_sub_s;
+            let fog_params_w = self.settings.fog_end / e_sub_s;
             renderer.data.update_buffers(
                 frame_index,
                 light_space_matrix,
                 main_light_pos,
                 light_dir,
                 [1.0, 0.956, 0.839, 1.0],
+                [fog_params_x, fog_params_y, fog_params_z, fog_params_w],
+                self.settings.fog_color,
                 1.0,
             );
         }

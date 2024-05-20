@@ -109,6 +109,8 @@ layout(binding = 4, set = 0) uniform MainLight {
     vec4 position;
     vec4 direction;
     vec4 color;
+    vec4 fogParams;//先放主光里，懒得加新的uniform了
+    vec4 fogColor;//先放主光里，懒得加新的uniform了
     float intensity;
 } mainlight;
 layout(binding = 5, set = 1) uniform samplerCube irradianceMapSampler;
@@ -545,25 +547,17 @@ vec3 computeIBL(PbrInfo pbrInfo, vec3 v, vec3 n) {
 #define FOG_LINEAR
 float getFogParam(float viewDistance)
 {
-    float density = 0.1;
-    float ln2 = 0.6931472;
-    float fogParam = density / sqrt(ln2);
-    float fogFactor = fogParam * viewDistance; 
-    fogFactor = exp2(-fogFactor * fogFactor);
-
-    /*FogParams：(density / sqrt(ln(2)), density / ln(2), –1/(end-start), end/(end-start))*/
+    vec4 fogParams = mainlight.fogParams;
     #if defined FOG_LINEAR
-        fogFactor = 0.0;
-        //float unityFogFactor = viewDistance * FogParams.z + FogParams.w
+        float fogFactor = viewDistance * fogParams.z + fogParams.w;
     #elif defined FOG_EXP
-        fogFactor = 0.0;
-        //float unityFogFactor = FogParams.y * viewDistance; unityFogFactor = exp2(-unityFogFactor)
+        float fogFactor = fogParams.y * viewDistance; 
+        fogFactor = exp2(-fogFactor);
     #elif defined FOG_EXP2
-        fogFactor = 0.0;
-        //float unityFogFactor = FogParams.x * viewDistance; unityFogFactor = exp2(-unityFogFactor*unityFogFactor)
+        float fogFactor = fogParams.x * viewDistance; 
+        fogFactor = exp2(-fogFactor * fogFactor);
     #else
-        fogFactor = 0.0
-        //float unityFogFactor = 0.0
+        float fogFactor = 0.0;
     #endif
     return fogFactor;
 }
@@ -571,7 +565,7 @@ float getFogParam(float viewDistance)
 vec3 applyFog(vec3 color)
 {
     //TODO：后续传入fogColor
-    vec3 fogColor = vec3(0.7,0.7,0.7);
+    vec3 fogColor = mainlight.fogColor.xyz;
 	float viewDistance = length(cameraUBO.eye.xyz - oPositions);
     float fogFactor = getFogParam(viewDistance);
 	color.rgb = mix(fogColor.rgb, color.rgb, clamp(fogFactor, 0.0, 1.0));

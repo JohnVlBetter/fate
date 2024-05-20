@@ -188,9 +188,15 @@ impl Gui {
                 output_mode: OutputMode::from_value(self.state.selected_output_mode)
                     .expect("未知输出模式!"),
                 bloom_strength: self.state.bloom_strength as f32 / 100f32,
-                absolute_luminance_threshold: self.state.absolute_luminance_threshold as f32 / 100f32,
-                relative_luminance_threshold: self.state.relative_luminance_threshold as f32 / 100f32,
+                absolute_luminance_threshold: self.state.absolute_luminance_threshold as f32
+                    / 100f32,
+                relative_luminance_threshold: self.state.relative_luminance_threshold as f32
+                    / 100f32,
                 subpixel_blending: self.state.subpixel_blending as f32 / 100f32,
+                fog_density: self.state.fog_density,
+                fog_end: self.state.fog_end,
+                fog_start: self.state.fog_start,
+                fog_color: self.state.fog_color,
             })
         } else {
             None
@@ -459,6 +465,26 @@ fn build_renderer_settings_window(ui: &mut Ui, state: &mut State) {
                         .integer(),
                 );
 
+                ui.add(
+                    egui::Slider::new(&mut state.fog_density, 1.0..=10.0)
+                        .text("雾强度")
+                        .integer(),
+                );
+
+                ui.add(
+                    egui::Slider::new(&mut state.fog_start, -1000.0..=1000.0)
+                        .text("雾起始点")
+                        .integer(),
+                );
+
+                ui.add(
+                    egui::Slider::new(&mut state.fog_end, -1000.0..=1000.0)
+                        .text("雾终止点")
+                        .integer(),
+                );
+
+                ui.color_edit_button_rgba_unmultiplied(&mut state.fog_color);
+
                 ui.checkbox(&mut state.ssao_enabled, "SSAO");
                 if state.ssao_enabled {
                     egui::ComboBox::from_label("SSAO Kernel").show_index(
@@ -489,10 +515,7 @@ fn build_renderer_settings_window(ui: &mut Ui, state: &mut State) {
                         .text("相对亮度阈值"),
                 );
 
-                ui.add(
-                    egui::Slider::new(&mut state.subpixel_blending, 0..=100)
-                        .text("子像素混合"),
-                );
+                ui.add(egui::Slider::new(&mut state.subpixel_blending, 0..=100).text("子像素混合"));
             }
 
             {
@@ -546,6 +569,10 @@ struct State {
     absolute_luminance_threshold: u32,
     relative_luminance_threshold: u32,
     subpixel_blending: u32,
+    fog_density: f32,
+    fog_end: f32,
+    fog_start: f32,
+    fog_color: [f32; 4],
     renderer_settings_changed: bool,
 
     hovered: bool,
@@ -594,6 +621,10 @@ impl State {
             || self.absolute_luminance_threshold != other.absolute_luminance_threshold
             || self.relative_luminance_threshold != other.relative_luminance_threshold
             || self.subpixel_blending != other.subpixel_blending
+            || self.fog_density != other.fog_density
+            || self.fog_end != other.fog_end
+            || self.fog_start != other.fog_start
+            || self.fog_color != other.fog_color
             || self.bloom_strength != other.bloom_strength;
     }
 }
@@ -622,6 +653,10 @@ impl Default for State {
             absolute_luminance_threshold: (0.1 * 100f32) as _,
             relative_luminance_threshold: (0.1 * 100f32) as _,
             subpixel_blending: (0.75 * 100f32) as _,
+            fog_density: 1.0,
+            fog_end: 100.0,
+            fog_start: 0.1,
+            fog_color: [1.0, 1.0, 1.0, 1.0],
             renderer_settings_changed: false,
 
             hovered: false,
