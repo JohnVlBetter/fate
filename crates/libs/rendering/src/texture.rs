@@ -83,6 +83,7 @@ pub(crate) fn create_textures_from_gltf(
                 image.height,
                 &pixels,
                 !is_srgb,
+                //TODO: 这块暂时拿不到纹理对应的名字，后面加上
                 CString::new("暂时没赋值模型纹理名字").unwrap(),
             )
         })
