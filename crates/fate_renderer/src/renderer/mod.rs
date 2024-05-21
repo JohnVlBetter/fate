@@ -27,6 +27,7 @@ use rendering::environment::Environment;
 use rendering::model::Model;
 use std::cell::RefCell;
 use std::f32::consts::LN_2;
+use std::ffi::CString;
 use std::mem::size_of;
 use std::rc::Rc;
 use std::sync::Arc;
@@ -466,6 +467,10 @@ impl Renderer {
     ) {
         if self.settings.ssao_enabled {
             {
+                self.context.cmd_begin_debug_utils_label(
+                    command_buffer,
+                    CString::new("GBuffer Pass").unwrap(),
+                );
                 cmd_transition_images_layouts(
                     command_buffer,
                     &[
@@ -559,8 +564,12 @@ impl Renderer {
                         .dynamic_rendering()
                         .cmd_end_rendering(command_buffer)
                 };
+
+                self.context.cmd_end_debug_utils_label(command_buffer);
             }
 
+            self.context
+                .cmd_begin_debug_utils_label(command_buffer, CString::new("SSAO Pass").unwrap());
             cmd_transition_images_layouts(
                 command_buffer,
                 &[
@@ -612,10 +621,16 @@ impl Renderer {
 
             self.ssao_blur_pass
                 .cmd_draw(command_buffer, &self.attachments, &self.quad_model);
+
+            self.context.cmd_end_debug_utils_label(command_buffer);
         }
 
         //shadow caster pass
         {
+            self.context.cmd_begin_debug_utils_label(
+                command_buffer,
+                CString::new("ShadowCaster Pass").unwrap(),
+            );
             cmd_transition_images_layouts(
                 command_buffer,
                 &[
@@ -727,6 +742,7 @@ impl Renderer {
                     },
                 ],
             );
+            self.context.cmd_end_debug_utils_label(command_buffer);
         }
 
         let mut transitions = vec![
@@ -781,6 +797,10 @@ impl Renderer {
             }
 
             {
+                self.context.cmd_begin_debug_utils_label(
+                    command_buffer,
+                    CString::new("Forward Pass").unwrap(),
+                );
                 let mut color_attachment_info = RenderingAttachmentInfo::builder()
                     .clear_value(vk::ClearValue {
                         color: vk::ClearColorValue {
@@ -827,12 +847,20 @@ impl Renderer {
                 };
             }
 
+            self.context
+                .cmd_begin_debug_utils_label(command_buffer, CString::new("SkyBox Pass").unwrap());
             self.skybox_renderer.cmd_draw(command_buffer, frame_index);
+            self.context.cmd_end_debug_utils_label(command_buffer);
 
             if let Some(renderer) = self.model_renderer.as_ref() {
+                self.context.cmd_begin_debug_utils_label(
+                    command_buffer,
+                    CString::new("Model Light Pass").unwrap(),
+                );
                 renderer
                     .light_pass
                     .cmd_draw(command_buffer, frame_index, &renderer.data);
+                self.context.cmd_end_debug_utils_label(command_buffer);
             }
 
             unsafe {
@@ -840,14 +868,20 @@ impl Renderer {
                     .dynamic_rendering()
                     .cmd_end_rendering(command_buffer)
             };
+            self.context.cmd_end_debug_utils_label(command_buffer);
         }
 
         {
+            self.context
+                .cmd_begin_debug_utils_label(command_buffer, CString::new("Bloom Pass").unwrap());
             self.bloom_pass
                 .cmd_draw(command_buffer, &self.attachments, &self.quad_model);
+            self.context.cmd_end_debug_utils_label(command_buffer);
         }
 
         {
+            self.context
+                .cmd_begin_debug_utils_label(command_buffer, CString::new("FXAA Pass").unwrap());
             cmd_transition_images_layouts(
                 command_buffer,
                 &[LayoutTransition {
@@ -927,6 +961,7 @@ impl Renderer {
                     vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
                     vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
                 );
+            self.context.cmd_end_debug_utils_label(command_buffer);
         }
 
         {
@@ -938,6 +973,8 @@ impl Renderer {
         }
 
         {
+            self.context
+                .cmd_begin_debug_utils_label(command_buffer, CString::new("Uber Pass").unwrap());
             let extent = self.swapchain.properties().extent;
 
             unsafe {
@@ -988,17 +1025,24 @@ impl Renderer {
                 };
             }
 
+            self.context
+                .cmd_begin_debug_utils_label(command_buffer, CString::new("Final Pass").unwrap());
             self.final_pass.cmd_draw(command_buffer, &self.quad_model);
+            self.context.cmd_end_debug_utils_label(command_buffer);
 
+            self.context
+                .cmd_begin_debug_utils_label(command_buffer, CString::new("UI Pass").unwrap());
             self.gui_renderer
                 .cmd_draw(command_buffer, extent, pixels_per_point, gui_primitives)
                 .unwrap();
+            self.context.cmd_end_debug_utils_label(command_buffer);
 
             unsafe {
                 self.context
                     .dynamic_rendering()
                     .cmd_end_rendering(command_buffer)
             };
+            self.context.cmd_end_debug_utils_label(command_buffer);
         }
 
         {

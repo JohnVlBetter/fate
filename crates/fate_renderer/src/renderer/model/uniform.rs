@@ -88,35 +88,35 @@ impl From<(Matrix4<f32>, Light)> for LightUniform {
 
 #[derive(Copy, Clone, Debug)]
 #[repr(C)]
-pub struct MainLightUniform {
-    light_space_matrix: Matrix4<f32>,
-    position: [f32; 4],
-    direction: [f32; 4],
-    color: [f32; 4],
+pub struct RenderDataUniform {
+    main_light_space_matrix: Matrix4<f32>,
+    main_light_position: [f32; 4],
+    main_light_direction: [f32; 4],
+    main_light_color: [f32; 4],
     fog_params: [f32; 4],
     fog_color: [f32; 4],
-    intensity: f32,
+    main_light_intensity: f32,
     pad: [f32; 3],
 }
 
-impl MainLightUniform {
+impl RenderDataUniform {
     pub fn new(
-        light_space_matrix: Matrix4<f32>,
-        position: [f32; 4],
-        direction: [f32; 4],
-        color: [f32; 4],
+        main_light_space_matrix: Matrix4<f32>,
+        main_light_position: [f32; 4],
+        main_light_direction: [f32; 4],
+        main_light_color: [f32; 4],
         fog_params: [f32; 4],
         fog_color: [f32; 4],
-        intensity: f32,
+        main_light_intensity: f32,
     ) -> Self {
         Self {
-            light_space_matrix,
-            position,
-            direction,
-            color,
+            main_light_space_matrix,
+            main_light_position,
+            main_light_direction,
+            main_light_color,
             fog_params,
             fog_color,
-            intensity,
+            main_light_intensity,
             pad: [0.0, 0.0, 0.0],
         }
     }
@@ -307,9 +307,8 @@ pub fn create_lights_ubos(context: &Arc<Context>, model: &Model, count: u32) -> 
         .collect::<Vec<_>>()
 }
 
-pub fn create_main_lights_ubos(context: &Arc<Context>, count: u32) -> Vec<Buffer> {
-    //主光数量为1
-    let buffer_size = size_of::<MainLightUniform>() * 1;
+pub fn create_render_data_ubos(context: &Arc<Context>, count: u32) -> Vec<Buffer> {
+    let buffer_size = size_of::<RenderDataUniform>();
 
     (0..count)
         .map(|_| {

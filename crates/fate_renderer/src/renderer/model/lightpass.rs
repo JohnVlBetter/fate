@@ -130,7 +130,7 @@ impl LightPass {
                 model_transform_buffers: &model_data.transform_ubos,
                 model_skin_buffers: &model_data.skin_ubos,
                 light_buffers: &model_data.light_buffers,
-                main_light_buffers: &model_data.main_light_buffers,
+                render_data_buffers: &model_data.render_data_buffers,
                 dummy_texture: &dummy_texture,
                 environment,
 
@@ -204,7 +204,7 @@ impl LightPass {
                 model_transform_buffers: &model_data.transform_ubos,
                 model_skin_buffers: &model_data.skin_ubos,
                 light_buffers: &model_data.light_buffers,
-                main_light_buffers: &model_data.main_light_buffers,
+                render_data_buffers: &model_data.render_data_buffers,
                 dummy_texture: &self.dummy_texture,
                 environment,
 
@@ -431,7 +431,7 @@ struct DescriptorsResources<'a> {
     model_transform_buffers: &'a [Buffer],
     model_skin_buffers: &'a [Buffer],
     light_buffers: &'a [Buffer],
-    main_light_buffers: &'a [Buffer],
+    render_data_buffers: &'a [Buffer],
     dummy_texture: &'a VulkanTexture,
     environment: &'a Environment,
     model: &'a Model,
@@ -603,7 +603,7 @@ fn create_dynamic_data_descriptor_sets(
         let light_buffer = &resources.light_buffers[i];
         let model_transform_ubo = &resources.model_transform_buffers[i];
         let model_skin_ubo = &resources.model_skin_buffers[i];
-        let main_light_buffer = &resources.main_light_buffers[i];
+        let render_data_buffer = &resources.render_data_buffers[i];
 
         let camera_buffer_info = [vk::DescriptorBufferInfo::builder()
             .buffer(camera_ubo.buffer)
@@ -630,7 +630,7 @@ fn create_dynamic_data_descriptor_sets(
             .build()];
 
         let main_light_buffer_info = [vk::DescriptorBufferInfo::builder()
-            .buffer(main_light_buffer.buffer)
+            .buffer(render_data_buffer.buffer)
             .offset(0)
             .range(vk::WHOLE_SIZE)
             .build()];

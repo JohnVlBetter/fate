@@ -84,10 +84,6 @@ impl SharedContext {
         }
     }
 
-    /*pub fn get_debug_utils(&self) -> &DebugUtils {
-        &self.debug_utils
-    }*/
-
     pub fn set_debug_utils_object_name(
         &self,
         object_handle: u64,
@@ -104,6 +100,25 @@ impl SharedContext {
             let _ = self
                 .debug_utils
                 .set_debug_utils_object_name(self.device.handle(), &name_info);
+        };
+    }
+
+    pub fn cmd_begin_debug_utils_label(
+        &self,
+        command_buffer: vk::CommandBuffer,
+        label_name: CString,
+    ) {
+        unsafe {
+            let name = CString::new(label_name).expect("Unknown");
+            let name_info = vk::DebugUtilsLabelEXT::builder().label_name(&name).build();
+            self.debug_utils
+                .cmd_begin_debug_utils_label(command_buffer, &name_info);
+        };
+    }
+
+    pub fn cmd_end_debug_utils_label(&self, command_buffer: vk::CommandBuffer) {
+        unsafe {
+            self.debug_utils.cmd_end_debug_utils_label(command_buffer);
         };
     }
 }

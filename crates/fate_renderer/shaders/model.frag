@@ -1,4 +1,5 @@
 #version 450
+#define FOG_LINEAR
 
 layout(constant_id = 0) const uint MAX_LIGHT_COUNT = 1;
 layout(constant_id = 1) const uint MAX_REFLECTION_LOD = 1;
@@ -43,7 +44,7 @@ struct TextureChannels {
 };
 
 struct Light {
-    mat4 lightSpaceMatrix;
+    mat4 mainLightSpaceMatrix;
     vec4 position;
     vec4 direction;
     vec4 color;
@@ -101,18 +102,21 @@ layout(binding = 0, set = 0) uniform Camera {
     float zNear;
     float zFar;
 } cameraUBO;
+
 layout(binding = 1, set = 0) uniform Lights {
     Light lights[MAX_LIGHT_COUNT];
 } lights;
-layout(binding = 4, set = 0) uniform MainLight {
-    mat4 lightSpaceMatrix;
-    vec4 position;
-    vec4 direction;
-    vec4 color;
-    vec4 fogParams;//先放主光里，懒得加新的uniform了
-    vec4 fogColor;//先放主光里，懒得加新的uniform了
-    float intensity;
-} mainlight;
+
+layout(binding = 4, set = 0) uniform RenderData {
+    mat4 mainLightSpaceMatrix;
+    vec4 mainLightPosition;
+    vec4 mainLightDirection;
+    vec4 mainLightColor;
+    vec4 fogParams;
+    vec4 fogColor;
+    float mainLightIntensity;
+} renderData;
+
 layout(binding = 5, set = 1) uniform samplerCube irradianceMapSampler;
 layout(binding = 6, set = 1) uniform samplerCube preFilteredSampler;
 layout(binding = 7, set = 1) uniform sampler2D brdfLookupSampler;
@@ -185,13 +189,13 @@ float calculateShadowPCSS()
     float texturesize = textureSize(shadowMapSampler, 0).x;
     float filterSize = 1.0;
 
-    vec4 fragPosLightSpace = mainlight.lightSpaceMatrix * vec4(oPositions, 1.0);
+    vec4 fragPosLightSpace = renderData.mainLightSpaceMatrix * vec4(oPositions, 1.0);
     float currentDepth = fragPosLightSpace.z;
     vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
     projCoords = projCoords * 0.5 + 0.5;
     poissonDiskSamples(projCoords.xy);
 
-    vec3 lightDir = mainlight.direction.xyz;
+    vec3 lightDir = renderData.mainLightDirection.xyz;
     vec3 normal = normalize(oNormals);
     float bias = max(0.05 * (1.0 - dot(normal, lightDir)), 0.005);
 
@@ -223,13 +227,13 @@ float calculateShadow()
     float stride = 5.0;
     float filterRange = stride/texturesize;
 
-    vec4 fragPosLightSpace = mainlight.lightSpaceMatrix * vec4(oPositions, 1.0);
+    vec4 fragPosLightSpace = renderData.mainLightSpaceMatrix * vec4(oPositions, 1.0);
     float currentDepth = fragPosLightSpace.z;
     vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
     projCoords = projCoords * 0.5 + 0.5;
     poissonDiskSamples(projCoords.xy);
 
-    vec3 lightDir = mainlight.direction.xyz;
+    vec3 lightDir = renderData.mainLightDirection.xyz;
     vec3 normal = normalize(oNormals);
     float bias = max(0.05 * (1.0 - dot(normal, lightDir)), 0.005);
 
@@ -468,7 +472,7 @@ vec3 computeColor(
     return color;
 }
 
-vec3 computeMainLight(vec3 direction, vec3 color, float intensity, PbrInfo pbrInfo, vec3 n, vec3 v) {
+vec3 computerenderData(vec3 direction, vec3 color, float intensity, PbrInfo pbrInfo, vec3 n, vec3 v) {
     vec3 l = -normalize(direction);
     vec3 h = normalize(l + v);
     return computeColor(pbrInfo, n, l, v, h, color, intensity);
@@ -544,10 +548,9 @@ vec3 computeIBL(PbrInfo pbrInfo, vec3 v, vec3 n) {
     return kD * diffuse + specular;
 }
 
-#define FOG_LINEAR
 float getFogParam(float viewDistance)
 {
-    vec4 fogParams = mainlight.fogParams;
+    vec4 fogParams = renderData.fogParams;
     #if defined FOG_LINEAR
         float fogFactor = viewDistance * fogParams.z + fogParams.w;
     #elif defined FOG_EXP
@@ -564,8 +567,7 @@ float getFogParam(float viewDistance)
 
 vec3 applyFog(vec3 color)
 {
-    //TODO：后续传入fogColor
-    vec3 fogColor = mainlight.fogColor.xyz;
+    vec3 fogColor = renderData.fogColor.xyz;
 	float viewDistance = length(cameraUBO.eye.xyz - oPositions);
     float fogFactor = getFogParam(viewDistance);
 	color.rgb = mix(fogColor.rgb, color.rgb, clamp(fogFactor, 0.0, 1.0));
@@ -605,7 +607,7 @@ void main() {
     vec3 n = getNormal(textureChannels);
     vec3 v = normalize(cameraUBO.eye.xyz - oPositions);
 
-    vec3 color = computeMainLight(mainlight.direction.xyz, mainlight.color.xyz, mainlight.intensity, pbrInfo, n, v);
+    vec3 color = computerenderData(renderData.mainLightDirection.xyz, renderData.mainLightColor.xyz, renderData.mainLightIntensity, pbrInfo, n, v);
     float mainLightShadow = calculateShadow();
     color *= mainLightShadow;
 

@@ -65,6 +65,20 @@ impl Context {
         self.shared_context
             .set_debug_utils_object_name(object_handle, object_name, object_type);
     }
+
+    pub fn cmd_begin_debug_utils_label(
+        &self,
+        command_buffer: vk::CommandBuffer,
+        label_name: CString,
+    ) {
+        self.shared_context
+            .cmd_begin_debug_utils_label(command_buffer, label_name);
+    }
+
+    pub fn cmd_end_debug_utils_label(&self, command_buffer: vk::CommandBuffer) {
+        self.shared_context
+            .cmd_end_debug_utils_label(command_buffer);
+    }
 }
 
 fn create_command_pool(
