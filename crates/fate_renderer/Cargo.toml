@@ -6,6 +6,7 @@ edition.workspace = true
 [dependencies]
 vulkan.workspace = true
 rendering.workspace = true
+ecs.workspace = true
 
 log.workspace = true
 env_logger.workspace = true

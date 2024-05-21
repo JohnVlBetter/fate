@@ -10,6 +10,7 @@ edition = "2021"
 [workspace.dependencies]
 vulkan = { path = "crates/libs/vulkan" }
 rendering = { path = "crates/libs/rendering" }
+ecs = { path = "crates/libs/ecs" }
 
 log = "0.4"
 env_logger = "0.11"

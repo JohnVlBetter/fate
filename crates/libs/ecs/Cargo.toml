@@ -1,0 +1,8 @@
+[package]
+name = "ecs"
+version.workspace = true
+edition.workspace = true
+
+[[example]]
+name = "example"
+path = "example/example.rs"
