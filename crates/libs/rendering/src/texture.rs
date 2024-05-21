@@ -43,6 +43,7 @@ pub(crate) fn create_textures_from_gltf(
     textures: GltfTextures,
     materials: Materials,
     images: &[Data],
+    image_paths: Vec<&str>
 ) -> (Textures, Vec<Buffer>) {
     let srgb_image_indices = {
         let mut indices = HashSet::new();
@@ -83,8 +84,7 @@ pub(crate) fn create_textures_from_gltf(
                 image.height,
                 &pixels,
                 !is_srgb,
-                //TODO: 这块暂时拿不到纹理对应的名字，后面加上
-                CString::new("暂时没赋值模型纹理名字").unwrap(),
+                CString::new("Unknown").unwrap(),//下面sampler给名字，这里拿不到
             )
         })
         .unzip::<_, _, Vec<_>, _>();
@@ -93,6 +93,8 @@ pub(crate) fn create_textures_from_gltf(
         .map(|t| {
             let context = Arc::clone(context);
             let image = &images[t.source().index()];
+            let path = image_paths[t.source().index()];
+            image.image.set_debug_utils_object_name(&context, CString::new(path).unwrap());
             let view = image.view;
             let sampler = map_sampler(&context, &image.image, &t.sampler());
             Texture {

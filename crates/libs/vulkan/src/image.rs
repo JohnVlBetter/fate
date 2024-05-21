@@ -134,6 +134,14 @@ impl Image {
         )
     }
 
+    pub fn set_debug_utils_object_name(
+        &self,
+        context: &Arc<Context>,
+        image_name: std::ffi::CString,
+    ) {
+        context.set_debug_utils_object_name(self.image.as_raw(), image_name, ObjectType::IMAGE);
+    }
+
     pub fn create_swapchain_image(
         context: Arc<Context>,
         image: vk::Image,

@@ -1,5 +1,6 @@
 use crate::transform::Transform;
 use cgmath::{Vector3, Zero};
+use gltf::image::Source;
 use metadata::Metadata;
 use std::{error::Error, path::Path, result::Result, sync::Arc};
 use vulkan::ash::vk;
@@ -39,6 +40,17 @@ impl Model {
     ) -> Result<PreLoadedResource<Model, ModelStagingResources>, Box<dyn Error>> {
         let (document, buffers, images) = gltf::import(&path)?;
 
+        let mut image_paths: Vec<&str> = Vec::new();
+        for image in document.images() {
+            match image.source() {
+                Source::View { view: _, mime_type: _ } => {}
+                Source::Uri { uri, mime_type: _ } => {
+                    image_paths.push(uri);
+                    println!("Loading {} {}", image.index(), uri);
+                }
+            };
+        }
+
         let metadata = Metadata::new(path, &document);
 
         if document.scenes().len() == 0 {
@@ -47,9 +59,7 @@ impl Model {
 
         let meshes = create_meshes_from_gltf(&context, command_buffer, &document, &buffers);
         if meshes.is_none() {
-            return Err(Box::new(ModelLoadingError::new(
-                "没有可渲染的mesh",
-            )));
+            return Err(Box::new(ModelLoadingError::new("没有可渲染的mesh")));
         }
 
         let Meshes {
@@ -88,6 +98,7 @@ impl Model {
             document.textures(),
             document.materials(),
             &images,
+            image_paths
         );
 
         let lights = create_lights_from_gltf(&document);
