@@ -5,4 +5,7 @@ edition.workspace = true
 
 [[example]]
 name = "example"
-path = "example/example.rs"
+path = "examples/example.rs"
+
+[dependencies]
+syn = "2.0"
