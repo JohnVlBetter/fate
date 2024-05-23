@@ -247,10 +247,16 @@ fn create_scene_color(
         }
         _ => vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::TRANSIENT_ATTACHMENT,
     };
+    //测试fxaa用
+    /*let new_extent = vk::Extent2D{
+        width: extent.width / 4,
+        height: extent.height / 4,
+    };*/
     let image = Image::create(
         Arc::clone(context),
         ImageParameters {
             mem_properties: vk::MemoryPropertyFlags::DEVICE_LOCAL,
+            //extent: new_extent,
             extent,
             sample_count: msaa_samples,
             format: SCENE_COLOR_FORMAT,
