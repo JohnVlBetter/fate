@@ -14,7 +14,7 @@ fn main() {
     let mut world = World::new();
 
     let mut schedule = Schedule::default();
-    world.run_schedule(label)
+    //world.run_schedule(label)
     loop {
         schedule.run(&mut world);
     }

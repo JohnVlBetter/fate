@@ -4,8 +4,8 @@ version.workspace = true
 edition.workspace = true
 
 [[example]]
-name = "example"
-path = "examples/example.rs"
+name = "ecs_example"
+path = "examples/ecs_example.rs"
 
 [dependencies]
 bevy_ecs = "0.13.2"
