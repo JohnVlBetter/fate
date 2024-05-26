@@ -1,6 +1,6 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, path::Path, sync::Arc};
 
-use crate::resource_loader::ResourceLoader;
+use crate::{resource::Resource, resource_loader::ResourceLoader};
 #[derive(Default)]
 pub struct ResourceMgr {
     loaders: Vec<Arc<dyn ResourceLoader>>,
@@ -11,84 +11,68 @@ pub struct ResourceMgr {
 
 impl ResourceMgr {
     pub fn new() -> Self {
-        Self::new_with_loaders(Default::default())
-    }
-
-    pub(crate) fn new_with_loaders(loaders: Arc<dyn ResourceLoader>) -> Self {
         Self {
             ..Default::default()
         }
     }
 
-    pub fn register_loader<L: ResourceLoader>(&self, loader: L) {
-        let mut loaders = self.data.loaders.write();
+    pub fn register_loader<L: ResourceLoader>(&mut self, loader: L) {
         let type_name = std::any::type_name::<L>();
         let loader = Arc::new(loader);
         let (loader_index, is_new) =
-            if let Some(index) = loaders.preregistered_loaders.remove(type_name) {
+            if let Some(index) = self.preregistered_loaders.remove(type_name) {
                 (index, false)
             } else {
-                (loaders.values.len(), true)
+                (self.loaders.len(), true)
             };
         for extension in loader.extensions() {
-            loaders
-                .extension_to_index
+            self.extension_to_index
                 .insert(extension.to_string(), loader_index);
         }
 
         if is_new {
-            loaders.type_name_to_index.insert(type_name, loader_index);
-            loaders.values.push(MaybeAssetLoader::Ready(loader));
+            self.type_name_to_index.insert(type_name, loader_index);
+            self.loaders.push(loader);
         } else {
-            let maybe_loader = std::mem::replace(
-                &mut loaders.values[loader_index],
-                MaybeAssetLoader::Ready(loader.clone()),
-            );
-            match maybe_loader {
-                MaybeAssetLoader::Ready(_) => unreachable!(),
-                MaybeAssetLoader::Pending { sender, .. } => {
-                    IoTaskPool::get()
-                        .spawn(async move {
-                            let _ = sender.broadcast(loader).await;
-                        })
-                        .detach();
-                }
-            }
+            let _ = std::mem::replace(&mut self.loaders[loader_index], loader);
         }
     }
 
-    pub async fn get_asset_loader_with_extension(
+    pub fn get_asset_loader_with_extension(
         &self,
         extension: &str,
-    ) -> Result<Arc<dyn ResourceLoader>, Box<dyn std::error::Error>> {
+    ) -> Option<Arc<dyn ResourceLoader>> {
+        let index = self.extension_to_index.get(extension).unwrap();
+
+        self.loaders.get(*index).cloned()
     }
 
-    pub async fn get_asset_loader_with_type_name(
+    pub fn get_asset_loader_with_type_name(
         &self,
         type_name: &str,
-    ) -> Result<Arc<dyn ResourceLoader>, Box<dyn std::error::Error>> {
+    ) -> Option<Arc<dyn ResourceLoader>> {
+        let index = self.type_name_to_index.get(type_name).unwrap();
+
+        self.loaders.get(*index).cloned()
     }
 
-    #[must_use = "not using the returned strong handle may result in the unexpected release of the asset"]
-    pub fn load<'a, A: Resource>(&self, path: impl Into<Path<'a>>) -> Handle<A> {
-        self.load_with_meta_transform(path, None)
+    pub fn load(&self, path: &Path) -> Option<Arc<dyn Resource>> {
+        let extension = path.extension().unwrap().to_str().unwrap();
+        let loader = self.get_asset_loader_with_extension(extension)?;
+        loader.load(path.to_str().unwrap())
     }
 
-    pub fn preregister_loader<L: ResourceLoader>(&self, extensions: &[&str]) {
-        let mut loaders = self.data.loaders.write();
-        let loader_index = loaders.values.len();
+    pub fn preregister_loader<L: ResourceLoader>(&mut self, extensions: &[&str]) {
+        let loader_index = self.loaders.len();
         let type_name = std::any::type_name::<L>();
-        loaders
-            .preregistered_loaders
-            .insert(type_name, loader_index);
-        loaders.type_name_to_index.insert(type_name, loader_index);
+        self.preregistered_loaders.insert(type_name, loader_index);
+        self.type_name_to_index.insert(type_name, loader_index);
         for extension in extensions {
-            if loaders
+            if self
                 .extension_to_index
                 .insert(extension.to_string(), loader_index)
                 .is_some()
-            {
-            }
+            {}
         }
     }
 }

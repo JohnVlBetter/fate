@@ -1,7 +1,7 @@
-use std::path::Path;
+use std::sync::Arc;
 
 pub trait ResourceLoader: Send + Sync + 'static {
-    fn load(&self, path: Path) -> Result<Box<dyn crate::resource::Resource>, Box<dyn std::error::Error>>;
+    fn load(&self, path: &str) -> Option<Arc<dyn crate::resource::Resource>>;
 
     fn extensions(&self) -> &[&str];
 }
