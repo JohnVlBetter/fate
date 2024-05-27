@@ -1,0 +1,13 @@
+use std::path::Path;
+
+use audio::audio_source::AudioLoader;
+use resource::resource_mgr::ResourceMgr;
+
+fn main() {
+    let mut mgr = ResourceMgr::new();
+    mgr.register_loader(AudioLoader::default());
+    let loader = mgr.get_asset_loader_with_extension("ogg");
+    println!("{}", loader.unwrap().extensions()[0]);
+    let resource = mgr.load(&Path::new("assets/audio/breakout_collision.ogg"));
+    let resource = resource.unwrap().as_ref();
+}
