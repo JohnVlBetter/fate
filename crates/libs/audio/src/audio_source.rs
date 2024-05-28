@@ -1,5 +1,6 @@
 use ::resource::resource_loader::ResourceLoader;
 use resource::resource;
+use std::any::Any;
 use std::sync::Arc;
 
 use std::fs::File;
@@ -17,7 +18,11 @@ impl AsRef<[u8]> for AudioSource {
     }
 }
 
-impl resource::Resource for AudioSource {}
+impl resource::Resource for AudioSource {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
 
 #[derive(Default)]
 pub struct AudioLoader;
