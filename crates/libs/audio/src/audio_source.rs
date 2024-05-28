@@ -1,6 +1,7 @@
 use ::resource::resource_loader::ResourceLoader;
 use resource::resource;
 use std::any::Any;
+use std::io::Cursor;
 use std::sync::Arc;
 
 use std::fs::File;
@@ -21,6 +22,22 @@ impl AsRef<[u8]> for AudioSource {
 impl resource::Resource for AudioSource {
     fn as_any(&self) -> &dyn Any {
         self
+    }
+}
+
+pub trait Decodable: Send + Sync + 'static {
+    type DecoderItem: rodio::Sample + Send + Sync;
+    type Decoder: rodio::Source + Send + Iterator<Item = Self::DecoderItem>;
+
+    fn decoder(&self) -> Self::Decoder;
+}
+
+impl Decodable for AudioSource {
+    type DecoderItem = <rodio::Decoder<Cursor<AudioSource>> as Iterator>::Item;
+    type Decoder = rodio::Decoder<Cursor<AudioSource>>;
+
+    fn decoder(&self) -> Self::Decoder {
+        rodio::Decoder::new(Cursor::new(self.clone())).unwrap()
     }
 }
 
