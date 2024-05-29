@@ -10,3 +10,11 @@ path = "examples/audio_example.rs"
 [dependencies]
 resource = { path = "../resource", version = "0.0.1" }
 rodio = { version = "0.18.1", default-features = false }
+
+[features]
+symphonia-aac = ["rodio/symphonia-aac"]
+symphonia-all = ["rodio/symphonia-all"]
+symphonia-flac = ["rodio/symphonia-flac"]
+symphonia-isomp4 = ["rodio/symphonia-isomp4"]
+symphonia-vorbis = ["rodio/symphonia-vorbis"]
+symphonia-wav = ["rodio/symphonia-wav"]
