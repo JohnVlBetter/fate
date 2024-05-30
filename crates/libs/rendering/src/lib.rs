@@ -19,6 +19,7 @@ pub mod texture;
 pub mod util;
 pub mod transform;
 pub mod vertex;
+pub mod hdr_loader;
 
 pub use aabb::*;
 pub use cgmath;

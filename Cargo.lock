@@ -2165,6 +2165,7 @@ dependencies = [
  "log",
  "mikktspace",
  "rand",
+ "resource",
  "vulkan",
 ]
 
