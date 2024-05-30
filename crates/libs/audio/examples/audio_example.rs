@@ -4,7 +4,8 @@ use resource::resource_mgr::ResourceMgr;
 use std::path::Path;
 
 fn main() {
-    let mut mgr = ResourceMgr::new();
+    let binding = ResourceMgr::get_instance();
+    let mut mgr = binding.lock().unwrap();
     mgr.register_loader(AudioLoader::default());
     let resource = mgr.load(&Path::new("assets/audio/Windless Slopes.ogg"));
     let binding = resource.unwrap();

@@ -1,6 +1,8 @@
+use crate::hdr_loader::{HDRTextureSource, HdrTextureLoader};
 use crate::math::perspective;
 use crate::util::*;
 use cgmath::{Deg, Matrix4};
+use resource::resource_mgr::ResourceMgr;
 use std::mem::size_of;
 use std::path::Path;
 use std::sync::Arc;
@@ -21,7 +23,13 @@ pub(crate) fn create_skybox_cubemap<P: AsRef<Path>>(
     log::info!("生成cubemap");
     let start = Instant::now();
     let device = context.device();
-    let (w, h, data) = load_hdr_image(path);
+
+    let ins = ResourceMgr::get_instance();
+    let mut mgr: std::sync::MutexGuard<ResourceMgr> = ins.lock().unwrap();
+    mgr.register_loader(HdrTextureLoader::default());
+    let resource = mgr.load(path.as_ref());
+    let binding = resource.unwrap();
+    let hdr_resource = binding.as_any().downcast_ref::<HDRTextureSource>().unwrap();
     let mip_levels = (size as f32).log2().floor() as u32 + 1;
 
     let cubemap_format = vk::Format::R16G16B16A16_SFLOAT;
@@ -31,8 +39,22 @@ pub(crate) fn create_skybox_cubemap<P: AsRef<Path>>(
         max_anisotropy: 16.0,
         ..Default::default()
     };
-    let texture = Texture::from_rgba_32(context, w, h, true, &data, Some(sampler_parameters),std::ffi::CString::new("Skybox Cubemap Texture").unwrap());
-    let cubemap = Texture::create_renderable_cubemap(context, size, mip_levels, cubemap_format,std::ffi::CString::new("Skybox Cubemap Texture").unwrap());
+    let texture = Texture::from_rgba_32(
+        context,
+        hdr_resource.width,
+        hdr_resource.height,
+        true,
+        &hdr_resource.data,
+        Some(sampler_parameters),
+        std::ffi::CString::new("Skybox Cubemap Texture").unwrap(),
+    );
+    let cubemap = Texture::create_renderable_cubemap(
+        context,
+        size,
+        mip_levels,
+        cubemap_format,
+        std::ffi::CString::new("Skybox Cubemap Texture").unwrap(),
+    );
 
     let skybox_model = SkyboxModel::new(context);
 

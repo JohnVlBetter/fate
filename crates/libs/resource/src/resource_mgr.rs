@@ -1,4 +1,8 @@
-use std::{collections::HashMap, path::Path, sync::Arc};
+use std::{
+    collections::HashMap,
+    path::Path,
+    sync::{Arc, Mutex},
+};
 
 use crate::{resource::Resource, resource_loader::ResourceLoader};
 #[derive(Default)]
@@ -10,9 +14,17 @@ pub struct ResourceMgr {
 }
 
 impl ResourceMgr {
-    pub fn new() -> Self {
-        Self {
-            ..Default::default()
+    pub fn get_instance() -> Arc<Mutex<ResourceMgr>> {
+        static mut RESOURCEMGR: Option<Arc<Mutex<ResourceMgr>>> = None;
+
+        unsafe {
+            RESOURCEMGR
+                .get_or_insert_with(|| {
+                    Arc::new(Mutex::new(Self {
+                        ..Default::default()
+                    }))
+                })
+                .clone()
         }
     }
 
