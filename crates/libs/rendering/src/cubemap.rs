@@ -24,10 +24,8 @@ pub(crate) fn create_skybox_cubemap<P: AsRef<Path>>(
     let start = Instant::now();
     let device = context.device();
 
-    let ins = ResourceMgr::get_instance();
-    let mut mgr: std::sync::MutexGuard<ResourceMgr> = ins.lock().unwrap();
-    mgr.register_loader(HdrTextureLoader::default());
-    let resource = mgr.load(path.as_ref());
+    ResourceMgr::register_loader(HdrTextureLoader::default());
+    let resource = ResourceMgr::load(path.as_ref());
     let binding = resource.unwrap();
     let hdr_resource = binding.as_any().downcast_ref::<HDRTextureSource>().unwrap();
     let mip_levels = (size as f32).log2().floor() as u32 + 1;
