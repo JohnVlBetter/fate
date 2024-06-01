@@ -10,9 +10,5 @@ fn main() {
     let resource = binding.as_any().downcast_ref::<AudioSource>().unwrap();
     let player = AudioPlayer::default();
     player.play(resource);
-    std::thread::sleep(std::time::Duration::from_secs(1));
-    player.pause();
-    std::thread::sleep(std::time::Duration::from_secs(10));
-    player.resume(resource);
-    std::thread::sleep(std::time::Duration::from_secs(10000));
+    std::thread::sleep(std::time::Duration::from_secs(100));
 }

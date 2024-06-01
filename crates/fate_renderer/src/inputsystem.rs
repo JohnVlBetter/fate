@@ -140,7 +140,7 @@ impl InputSystem {
         self.is_control_w_clicked
     }
 
-    pub fn is_control_a_clicked(&self) -> bool {
+    pub fn _is_control_a_clicked(&self) -> bool {
         self.is_control_a_clicked
     }
 
@@ -148,7 +148,7 @@ impl InputSystem {
         self.is_control_s_clicked
     }
 
-    pub fn is_control_d_clicked(&self) -> bool {
+    pub fn _is_control_d_clicked(&self) -> bool {
         self.is_control_d_clicked
     }
 
