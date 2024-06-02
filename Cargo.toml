@@ -10,7 +10,7 @@ edition = "2021"
 [workspace.dependencies]
 vulkan = { path = "crates/libs/vulkan" }
 rendering = { path = "crates/libs/rendering" }
-ecs = { path = "crates/libs/ecs" }
+scene = { path = "crates/libs/scene" }
 asset = { path = "crates/libs/asset" }
 audio = { path = "crates/libs/audio" }
 

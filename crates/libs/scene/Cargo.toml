@@ -1,0 +1,12 @@
+[package]
+name = "scene"
+version.workspace = true
+edition.workspace = true
+
+[[example]]
+name = "scene_example"
+path = "examples/scene_example.rs"
+
+[dependencies]
+bevy_ecs = "0.13.2"
+smallvec = { version = "1.11", features = ["union", "const_generics"] }
