@@ -1,5 +1,6 @@
 use bevy_ecs::{component::Component, entity::Entity};
 use core::slice;
+use std::ops::Deref;
 use smallvec::SmallVec;
 
 #[derive(Component, Debug)]
@@ -17,8 +18,15 @@ impl<'a> IntoIterator for &'a Children {
 
     type IntoIter = slice::Iter<'a, Entity>;
 
-    #[inline(always)]
     fn into_iter(self) -> Self::IntoIter {
         self.0.iter()
+    }
+}
+
+impl Deref for Children {
+    type Target = [Entity];
+
+    fn deref(&self) -> &Self::Target {
+        &self.0[..]
     }
 }
