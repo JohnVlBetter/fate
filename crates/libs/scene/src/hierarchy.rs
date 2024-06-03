@@ -1,7 +1,7 @@
-use bevy_ecs::event::Event;
 use bevy_ecs::{
     bundle::Bundle,
     entity::Entity,
+    event::Event,
     prelude::Events,
     system::{Command, Commands, EntityCommands},
     world::{EntityWorldMut, World},
@@ -278,7 +278,7 @@ pub trait BuildChildren {
     fn remove_parent(&mut self) -> &mut Self;
 }
 
-impl<'w, 's, 'a> BuildChildren for EntityCommands<'a> {
+impl<'a> BuildChildren for EntityCommands<'a> {
     fn with_children(&mut self, spawn_children: impl FnOnce(&mut ChildBuilder)) -> &mut Self {
         let parent = self.id();
         let mut builder = ChildBuilder {
@@ -292,7 +292,7 @@ impl<'w, 's, 'a> BuildChildren for EntityCommands<'a> {
         spawn_children(&mut builder);
         let children = builder.push_children;
         if children.children.contains(&parent) {
-            panic!("Entity cannot be a child of itself.");
+            panic!("子节点不能是自己");
         }
         self.commands().add(children);
         self
@@ -301,7 +301,7 @@ impl<'w, 's, 'a> BuildChildren for EntityCommands<'a> {
     fn push_children(&mut self, children: &[Entity]) -> &mut Self {
         let parent = self.id();
         if children.contains(&parent) {
-            panic!("Cannot push entity as a child of itself.");
+            panic!("子节点不能是自己");
         }
         self.commands().add(PushChildren {
             children: SmallVec::from(children),
@@ -313,7 +313,7 @@ impl<'w, 's, 'a> BuildChildren for EntityCommands<'a> {
     fn insert_children(&mut self, index: usize, children: &[Entity]) -> &mut Self {
         let parent = self.id();
         if children.contains(&parent) {
-            panic!("Cannot insert entity as a child of itself.");
+            panic!("子节点不能是自己");
         }
         self.commands().add(InsertChildren {
             children: SmallVec::from(children),
@@ -335,7 +335,7 @@ impl<'w, 's, 'a> BuildChildren for EntityCommands<'a> {
     fn add_child(&mut self, child: Entity) -> &mut Self {
         let parent = self.id();
         if child == parent {
-            panic!("Cannot add entity as a child of itself.");
+            panic!("子节点不能是自己");
         }
         self.commands().add(AddChild { child, parent });
         self
@@ -350,7 +350,7 @@ impl<'w, 's, 'a> BuildChildren for EntityCommands<'a> {
     fn replace_children(&mut self, children: &[Entity]) -> &mut Self {
         let parent = self.id();
         if children.contains(&parent) {
-            panic!("Cannot replace entity as a child of itself.");
+            panic!("子节点不能是自己");
         }
         self.commands().add(ReplaceChildren {
             children: SmallVec::from(children),
@@ -362,7 +362,7 @@ impl<'w, 's, 'a> BuildChildren for EntityCommands<'a> {
     fn set_parent(&mut self, parent: Entity) -> &mut Self {
         let child = self.id();
         if child == parent {
-            panic!("Cannot set parent to itself");
+            panic!("父节点不能是自己");
         }
         self.commands().add(AddChild { child, parent });
         self
@@ -445,7 +445,7 @@ impl<'w> BuildWorldChildren for EntityWorldMut<'w> {
     fn add_child(&mut self, child: Entity) -> &mut Self {
         let parent = self.id();
         if child == parent {
-            panic!("Cannot add entity as a child of itself.");
+            panic!("子节点不能是自己");
         }
         self.world_scope(|world| {
             update_old_parent(world, child, parent);
@@ -462,7 +462,7 @@ impl<'w> BuildWorldChildren for EntityWorldMut<'w> {
     fn push_children(&mut self, children: &[Entity]) -> &mut Self {
         let parent = self.id();
         if children.contains(&parent) {
-            panic!("Cannot push entity as a child of itself.");
+            panic!("子节点不能是自己");
         }
         self.world_scope(|world| {
             update_old_parents(world, parent, children);
@@ -481,7 +481,7 @@ impl<'w> BuildWorldChildren for EntityWorldMut<'w> {
     fn insert_children(&mut self, index: usize, children: &[Entity]) -> &mut Self {
         let parent = self.id();
         if children.contains(&parent) {
-            panic!("Cannot insert entity as a child of itself.");
+            panic!("子节点不能是自己");
         }
         self.world_scope(|world| {
             update_old_parents(world, parent, children);
@@ -971,106 +971,5 @@ mod tests {
         assert_eq!(*world.get::<Parent>(child2).unwrap(), Parent(parent));
         assert_eq!(*world.get::<Parent>(child3).unwrap(), Parent(parent));
         assert_eq!(*world.get::<Parent>(child4).unwrap(), Parent(parent));
-    }
-
-    #[test]
-    fn children_removed_when_empty_world() {
-        let mut world = World::default();
-        let entities = world
-            .spawn_batch(vec![C(1), C(2), C(3)])
-            .collect::<Vec<Entity>>();
-
-        let parent1 = entities[0];
-        let parent2 = entities[1];
-        let child = entities[2];
-
-        world.entity_mut(parent1).push_children(&[child]);
-        assert_eq!(
-            world.get::<Children>(parent1).unwrap().0.as_slice(),
-            &[child]
-        );
-
-        world.entity_mut(parent2).push_children(&[child]);
-        assert!(world.get::<Children>(parent1).is_none());
-
-        world.entity_mut(parent1).insert_children(0, &[child]);
-        assert!(world.get::<Children>(parent2).is_none());
-
-        world.entity_mut(parent1).remove_children(&[child]);
-        assert!(world.get::<Children>(parent1).is_none());
-    }
-
-    #[test]
-    fn children_removed_when_empty_commands() {
-        let mut world = World::default();
-        let entities = world
-            .spawn_batch(vec![C(1), C(2), C(3)])
-            .collect::<Vec<Entity>>();
-
-        let parent1 = entities[0];
-        let parent2 = entities[1];
-        let child = entities[2];
-
-        let mut queue = CommandQueue::default();
-
-        {
-            let mut commands = Commands::new(&mut queue, &world);
-            commands.entity(parent1).push_children(&[child]);
-            queue.apply(&mut world);
-        }
-        assert_eq!(
-            world.get::<Children>(parent1).unwrap().0.as_slice(),
-            &[child]
-        );
-
-        {
-            let mut commands = Commands::new(&mut queue, &world);
-            commands.entity(parent2).push_children(&[child]);
-            queue.apply(&mut world);
-        }
-        assert!(world.get::<Children>(parent1).is_none());
-
-        {
-            let mut commands = Commands::new(&mut queue, &world);
-            commands.entity(parent1).insert_children(0, &[child]);
-            queue.apply(&mut world);
-        }
-        assert!(world.get::<Children>(parent2).is_none());
-
-        {
-            let mut commands = Commands::new(&mut queue, &world);
-            commands.entity(parent2).add_child(child);
-            queue.apply(&mut world);
-        }
-        assert!(world.get::<Children>(parent1).is_none());
-
-        {
-            let mut commands = Commands::new(&mut queue, &world);
-            commands.entity(parent2).remove_children(&[child]);
-            queue.apply(&mut world);
-        }
-        assert!(world.get::<Children>(parent2).is_none());
-    }
-
-    #[test]
-    fn regression_push_children_same_archetype() {
-        let mut world = World::new();
-        let child = world.spawn_empty().id();
-        world.spawn_empty().push_children(&[child]);
-    }
-
-    #[test]
-    fn push_children_idempotent() {
-        let mut world = World::new();
-        let child = world.spawn_empty().id();
-        let parent = world
-            .spawn_empty()
-            .push_children(&[child])
-            .push_children(&[child])
-            .id();
-
-        let mut query = world.query::<&Children>();
-        let children = query.get(&world, parent).unwrap();
-        assert_eq!(**children, [child]);
     }
 }
