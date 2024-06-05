@@ -5,7 +5,6 @@ use bevy_ecs::{
     prelude::{Changed, Entity, Query, With, Without},
     query::{Added, Or},
     removal_detection::RemovedComponents,
-    schedule::SystemSet,
     system::{Local, ParamSet},
 };
 use glam::{Affine3A, Mat3, Mat4, Quat, Vec3, Vec3A};

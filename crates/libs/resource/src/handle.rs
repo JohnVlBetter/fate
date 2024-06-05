@@ -1,119 +1,75 @@
 use std::{
-    any::TypeId,
     hash::{Hash, Hasher},
+    marker::PhantomData,
     path::Path,
-    sync::Arc,
 };
 
 use bevy_ecs::component::Component;
-use bevy_utils::get_short_name;
+use bevy_utils::CowArc;
 
 use crate::resource::Resource;
 
-pub struct StrongHandle {
-    pub(crate) id: i32,
-    pub(crate) asset_server_managed: bool,
-    pub(crate) path: Option<Path>,
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
+pub struct ResourceId<R: Resource> {
+    index: u32,
+    marker: PhantomData<fn() -> R>,
 }
 
-impl Drop for StrongHandle {
+#[derive(Component)]
+pub struct Handle<R: Resource> {
+    pub(crate) resource_id: u32,
+    pub(crate) resource_server_managed: bool,
+    pub(crate) path: Option<CowArc<'static, Path>>,
+    pub(crate) label: Option<CowArc<'static, str>>,
+    marker: PhantomData<fn() -> R>,
+}
+
+impl<R: Resource> Drop for Handle<R> {
     fn drop(&mut self) {}
 }
 
-impl std::fmt::Debug for StrongHandle {
+impl<R: Resource> std::fmt::Debug for Handle<R> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("StrongHandle")
-            .field("id", &self.id)
-            .field("asset_server_managed", &self.asset_server_managed)
-            .field("path", &self.path)
+        f.debug_struct("resource handle")
+            .field("resource id", &self.resource_id)
+            .field("resource server managed", &self.resource_server_managed)
+            .field("resource path", &self.path)
             .finish()
     }
 }
 
-#[derive(Component)]
-pub enum Handle<R: Resource> {
-    Strong(Arc<StrongHandle>),
-    Weak(AssetId<R>),
-}
-
 impl<T: Resource> Clone for Handle<T> {
     fn clone(&self) -> Self {
-        match self {
-            Handle::Strong(handle) => Handle::Strong(handle.clone()),
-            Handle::Weak(id) => Handle::Weak(*id),
+        Handle {
+            resource_id: self.resource_id,
+            resource_server_managed: self.resource_server_managed,
+            path: self.path.clone(),
+            label: self.label.clone(),
+            marker: PhantomData,
         }
     }
 }
 
 impl<R: Resource> Handle<R> {
-    pub const fn weak_from_u128(value: u128) -> Self {
-        Handle::Weak(AssetId::Uuid {
-            uuid: Uuid::from_u128(value),
-        })
+    #[inline]
+    pub fn id(&self) -> u32 {
+        self.resource_id
     }
 
     #[inline]
-    pub fn id(&self) -> AssetId<R> {
-        match self {
-            Handle::Strong(handle) => handle.id.typed_unchecked(),
-            Handle::Weak(id) => *id,
-        }
-    }
-
-    #[inline]
-    pub fn path(&self) -> Option<&AssetPath<'static>> {
-        match self {
-            Handle::Strong(handle) => handle.path.as_ref(),
-            Handle::Weak(_) => None,
-        }
-    }
-
-    #[inline]
-    pub fn is_weak(&self) -> bool {
-        matches!(self, Handle::Weak(_))
-    }
-
-    #[inline]
-    pub fn is_strong(&self) -> bool {
-        matches!(self, Handle::Strong(_))
-    }
-
-    #[inline]
-    pub fn clone_weak(&self) -> Self {
-        match self {
-            Handle::Strong(handle) => Handle::Weak(handle.id.typed_unchecked::<R>()),
-            Handle::Weak(id) => Handle::Weak(*id),
-        }
-    }
-
-    #[inline]
-    pub fn untyped(self) -> UntypedHandle {
-        match self {
-            Handle::Strong(handle) => UntypedHandle::Strong(handle),
-            Handle::Weak(id) => UntypedHandle::Weak(id.untyped()),
-        }
+    pub fn path(&self) -> Option<&CowArc<'static, Path>> {
+        self.path.as_ref()
     }
 }
 
 impl<R: Resource> Default for Handle<R> {
     fn default() -> Self {
-        Handle::Weak(AssetId::default())
-    }
-}
-
-impl<R: Resource> std::fmt::Debug for Handle<R> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let name = get_short_name(std::any::type_name::<R>());
-        match self {
-            Handle::Strong(handle) => {
-                write!(
-                    f,
-                    "StrongHandle<{name}>{{ id: {:?}, path: {:?} }}",
-                    handle.id.internal(),
-                    handle.path
-                )
-            }
-            Handle::Weak(id) => write!(f, "WeakHandle<{name}>({:?})", id.internal()),
+        Handle {
+            resource_id: u32::MAX,
+            resource_server_managed: false,
+            path: None,
+            label: None,
+            marker: PhantomData,
         }
     }
 }
