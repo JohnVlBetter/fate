@@ -18,7 +18,7 @@ pub struct ResourceId<R: Resource> {
 #[derive(Component)]
 pub struct Handle<R: Resource> {
     pub(crate) resource_id: u32,
-    pub(crate) resource_server_managed: bool,
+    pub(crate) is_loaded: bool,
     pub(crate) path: Option<CowArc<'static, Path>>,
     pub(crate) label: Option<CowArc<'static, str>>,
     marker: PhantomData<fn() -> R>,
@@ -32,7 +32,7 @@ impl<R: Resource> std::fmt::Debug for Handle<R> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("resource handle")
             .field("resource id", &self.resource_id)
-            .field("resource server managed", &self.resource_server_managed)
+            .field("is loaded", &self.is_loaded)
             .field("resource path", &self.path)
             .finish()
     }
@@ -42,7 +42,7 @@ impl<T: Resource> Clone for Handle<T> {
     fn clone(&self) -> Self {
         Handle {
             resource_id: self.resource_id,
-            resource_server_managed: self.resource_server_managed,
+            is_loaded: self.is_loaded,
             path: self.path.clone(),
             label: self.label.clone(),
             marker: PhantomData,
@@ -66,7 +66,7 @@ impl<R: Resource> Default for Handle<R> {
     fn default() -> Self {
         Handle {
             resource_id: u32::MAX,
-            resource_server_managed: false,
+            is_loaded: false,
             path: None,
             label: None,
             marker: PhantomData,
