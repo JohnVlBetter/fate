@@ -9,12 +9,6 @@ use bevy_utils::CowArc;
 
 use crate::resource::Resource;
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
-pub struct ResourceId<R: Resource> {
-    index: u32,
-    marker: PhantomData<fn() -> R>,
-}
-
 #[derive(Component)]
 pub struct Handle<R: Resource> {
     pub(crate) resource_id: u32,

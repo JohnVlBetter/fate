@@ -27,13 +27,13 @@ impl ResourceIndexAllocator {
     }
 }
 
-struct DenseResourceStorage<R: Resource> {
+struct ResourceStorage<R: Resource> {
     storage: Vec<Option<R>>,
     len: u32,
     allocator: Arc<ResourceIndexAllocator>,
 }
 
-impl<R: Resource> Default for DenseResourceStorage<R> {
+impl<R: Resource> Default for ResourceStorage<R> {
     fn default() -> Self {
         Self {
             len: 0,
@@ -43,7 +43,7 @@ impl<R: Resource> Default for DenseResourceStorage<R> {
     }
 }
 
-impl<R: Resource> DenseResourceStorage<R> {
+impl<R: Resource> ResourceStorage<R> {
     pub(crate) fn len(&self) -> usize {
         self.len as usize
     }
