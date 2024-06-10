@@ -4,13 +4,17 @@ use bevy_ecs::{
     component::Component,
     event::{Event, Events},
     schedule::{
-        InternedScheduleLabel, IntoSystemConfigs, IntoSystemSetConfigs, NextState, Schedule,
-        ScheduleLabel, Schedules, State, States,
+        InternedScheduleLabel, IntoSystemConfigs, IntoSystemSetConfigs, Schedule,
+        ScheduleBuildSettings, ScheduleLabel, Schedules,
     },
     system::Resource,
     world::{FromWorld, World},
 };
 use std::fmt::Debug;
+
+use crate::main_schedule::Start;
+
+define_label!(AppLabel, APP_LABEL_INTERNER);
 
 pub struct Application {
     pub world: World,
@@ -24,7 +28,7 @@ impl Application {
         Application::default()
     }
 
-    /*pub fn empty() -> Application {
+    pub fn empty() -> Application {
         let mut world = World::new();
         world.init_resource::<Schedules>();
         Self {
@@ -33,7 +37,7 @@ impl Application {
             sub_applications: HashMap::default(),
             main_schedule_label: Main.intern(),
         }
-    }*/
+    }
 
     pub fn update(&mut self) {
         self.world.run_schedule(self.main_schedule_label);
@@ -49,21 +53,6 @@ impl Application {
         let mut app = std::mem::replace(self, Application::empty());
         let runner = std::mem::replace(&mut app.runner, Box::new(run_once));
         (runner)(app);
-    }
-
-    pub fn add_state<S: States>(&mut self) -> &mut Self {
-        self.init_resource::<State<S>>()
-            .init_resource::<NextState<S>>()
-            .add_systems(
-                StateTransition,
-                (
-                    run_enter_schedule::<S>.run_if(run_once_condition()),
-                    apply_state_transition::<S>,
-                )
-                    .chain(),
-            );
-
-        self
     }
 
     pub fn add_systems<M>(
@@ -109,7 +98,7 @@ impl Application {
     {
         if !self.world.contains_resource::<Events<T>>() {
             self.init_resource::<Events<T>>().add_systems(
-                First,
+                Start,
                 bevy_ecs::event::event_update_system::<T>
                     .run_if(bevy_ecs::event::event_update_condition::<T>),
             );
@@ -277,4 +266,11 @@ impl Debug for SubApplication {
             .finish()?;
         write!(f, "}}")
     }
+}
+
+fn run_once(mut app: Application) -> () {
+    app.finish();
+    app.cleanup();
+
+    app.update();
 }

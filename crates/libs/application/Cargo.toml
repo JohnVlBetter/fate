@@ -8,4 +8,4 @@ name = "application_example"
 path = "examples/application_example.rs"
 
 [dependencies]
-bevy_ecs = "0.13.2"
+bevy_ecs = "0.14.0"
