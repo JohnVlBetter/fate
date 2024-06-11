@@ -3,15 +3,17 @@ use std::{
     sync::{atomic::AtomicU32, Arc},
 };
 
-pub trait Resource: Send + Sync + 'static {
+use bevy_ecs::system::Resource;
+
+pub trait Asset: Send + Sync + 'static {
     fn as_any(&self) -> &dyn Any;
 }
 
-pub(crate) struct ResourceIndexAllocator {
+pub struct AssetIndexAllocator {
     next_index: AtomicU32,
 }
 
-impl Default for ResourceIndexAllocator {
+impl Default for AssetIndexAllocator {
     fn default() -> Self {
         Self {
             next_index: Default::default(),
@@ -19,20 +21,21 @@ impl Default for ResourceIndexAllocator {
     }
 }
 
-impl ResourceIndexAllocator {
+impl AssetIndexAllocator {
     pub fn reserve(&self) -> u32 {
         self.next_index
             .fetch_add(1, std::sync::atomic::Ordering::Relaxed)
     }
 }
 
-struct ResourceStorage<R: Resource> {
-    storage: Vec<Option<R>>,
+#[derive(Resource)]
+pub struct AssetStorage<A: Asset> {
+    storage: Vec<Option<A>>,
     len: u32,
-    allocator: Arc<ResourceIndexAllocator>,
+    allocator: Arc<AssetIndexAllocator>,
 }
 
-impl<R: Resource> Default for ResourceStorage<R> {
+impl<A: Asset> Default for AssetStorage<A> {
     fn default() -> Self {
         Self {
             len: 0,
@@ -42,16 +45,16 @@ impl<R: Resource> Default for ResourceStorage<R> {
     }
 }
 
-impl<R: Resource> ResourceStorage<R> {
-    pub(crate) fn len(&self) -> usize {
+impl<A: Asset> AssetStorage<A> {
+    pub fn len(&self) -> usize {
         self.len as usize
     }
 
-    pub(crate) fn is_empty(&self) -> bool {
+    pub fn is_empty(&self) -> bool {
         self.len == 0
     }
 
-    pub(crate) fn insert(&mut self, index: u32, asset: R) -> bool {
+    pub fn insert(&mut self, index: u32, asset: A) -> bool {
         self.flush();
         let value = &mut self.storage[index as usize];
         let exists = value.is_some();
@@ -63,17 +66,17 @@ impl<R: Resource> ResourceStorage<R> {
     }
 
     //todo: 回收废弃index再利用
-    pub(crate) fn remove_dropped(&mut self, index: u32) -> Option<R> {
+    pub fn remove_dropped(&mut self, index: u32) -> Option<A> {
         self.remove_internal(index, |dense_storage| {
             dense_storage.storage[index as usize] = None;
         })
     }
 
-    pub(crate) fn remove_still_alive(&mut self, index: u32) -> Option<R> {
+    pub fn remove_still_alive(&mut self, index: u32) -> Option<A> {
         self.remove_internal(index, |_| {})
     }
 
-    fn remove_internal(&mut self, index: u32, removed_action: impl FnOnce(&mut Self)) -> Option<R> {
+    fn remove_internal(&mut self, index: u32, removed_action: impl FnOnce(&mut Self)) -> Option<A> {
         self.flush();
         let value = &mut self.storage[index as usize];
         let res = value.take().map(|value| {
@@ -84,17 +87,17 @@ impl<R: Resource> ResourceStorage<R> {
         res
     }
 
-    pub(crate) fn get(&self, index: u32) -> Option<&R> {
+    pub fn get(&self, index: u32) -> Option<&A> {
         let value = self.storage.get(index as usize)?;
         value.as_ref()
     }
 
-    pub(crate) fn get_mut(&mut self, index: u32) -> Option<&mut R> {
+    pub fn get_mut(&mut self, index: u32) -> Option<&mut A> {
         let value = self.storage.get_mut(index as usize)?;
         value.as_mut()
     }
 
-    pub(crate) fn flush(&mut self) {
+    pub fn flush(&mut self) {
         let new_len = self
             .allocator
             .next_index
@@ -102,11 +105,11 @@ impl<R: Resource> ResourceStorage<R> {
         self.storage.resize_with(new_len as usize, || None);
     }
 
-    pub(crate) fn get_index_allocator(&self) -> Arc<ResourceIndexAllocator> {
+    pub fn get_index_allocator(&self) -> Arc<AssetIndexAllocator> {
         self.allocator.clone()
     }
 
-    pub(crate) fn ids(&self) -> impl Iterator<Item = u32> + '_ {
+    pub fn ids(&self) -> impl Iterator<Item = u32> + '_ {
         self.storage.iter().enumerate().filter_map(
             |(i, v)| {
                 if v.is_some() {
@@ -118,7 +121,7 @@ impl<R: Resource> ResourceStorage<R> {
         )
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = (u32, &R)> {
+    pub fn iter(&self) -> impl Iterator<Item = (u32, &A)> {
         self.storage
             .iter()
             .enumerate()

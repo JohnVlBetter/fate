@@ -7,6 +7,10 @@ edition.workspace = true
 vulkan.workspace = true
 rendering.workspace = true
 scene.workspace = true
+asset.workspace = true
+audio.workspace = true
+application.workspace = true
+bevy_ecs = "0.13.2"
 
 log.workspace = true
 env_logger.workspace = true

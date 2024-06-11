@@ -1,8 +1,8 @@
 use crate::hdr_loader::{HDRTextureSource, HdrTextureLoader};
 use crate::math::perspective;
 use crate::util::*;
+use asset::asset_mgr::AssetMgr;
 use cgmath::{Deg, Matrix4};
-use resource::resource_mgr::ResourceMgr;
 use std::mem::size_of;
 use std::path::Path;
 use std::sync::Arc;
@@ -24,8 +24,8 @@ pub(crate) fn create_skybox_cubemap<P: AsRef<Path>>(
     let start = Instant::now();
     let device = context.device();
 
-    ResourceMgr::register_loader(HdrTextureLoader::default());
-    let resource = ResourceMgr::load(path.as_ref());
+    AssetMgr::register_loader(HdrTextureLoader::default());
+    let resource = AssetMgr::load(path.as_ref());
     let binding = resource.unwrap();
     let hdr_resource = binding.as_any().downcast_ref::<HDRTextureSource>().unwrap();
     let mip_levels = (size as f32).log2().floor() as u32 + 1;

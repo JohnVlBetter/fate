@@ -1,5 +1,5 @@
-use ::resource::resource_loader::ResourceLoader;
-use resource::resource;
+use ::asset::asset_loader::AssetLoader;
+use asset::asset;
 use std::any::Any;
 use std::io::Cursor;
 use std::sync::Arc;
@@ -19,7 +19,7 @@ impl AsRef<[u8]> for AudioSource {
     }
 }
 
-impl resource::Resource for AudioSource {
+impl asset::Asset for AudioSource {
     fn as_any(&self) -> &dyn Any {
         self
     }
@@ -44,8 +44,8 @@ impl Decodable for AudioSource {
 #[derive(Default)]
 pub struct AudioLoader;
 
-impl ResourceLoader for AudioLoader {
-    fn load(&self, path: &str) -> Option<Arc<dyn resource::Resource>> {
+impl AssetLoader for AudioLoader {
+    fn load(&self, path: &str) -> Option<Arc<dyn asset::Asset>> {
         let mut bytes = Vec::new();
         let file = File::open(path).unwrap();
         let mut reader = BufReader::new(file);

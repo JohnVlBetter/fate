@@ -235,6 +235,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "asset"
+version = "0.0.1"
+dependencies = [
+ "bevy_ecs",
+ "bevy_utils",
+]
+
+[[package]]
 name = "async-channel"
 version = "2.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -286,7 +294,7 @@ dependencies = [
 name = "audio"
 version = "0.0.1"
 dependencies = [
- "resource",
+ "asset",
  "rodio",
 ]
 
@@ -1070,6 +1078,10 @@ checksum = "9fc0510504f03c51ada170672ac806f1f105a88aa97a5281117e1ddc3368e51a"
 name = "fate_renderer"
 version = "0.1.0"
 dependencies = [
+ "application",
+ "asset",
+ "audio",
+ "bevy_ecs",
  "clap",
  "egui",
  "egui-ash-renderer",
@@ -2176,6 +2188,7 @@ checksum = "c08c74e62047bb2de4ff487b251e4a92e24f48745648451635cec7d591162d9f"
 name = "rendering"
 version = "0.1.0"
 dependencies = [
+ "asset",
  "byteorder",
  "cgmath",
  "gltf",
@@ -2184,16 +2197,7 @@ dependencies = [
  "log",
  "mikktspace",
  "rand",
- "resource",
  "vulkan",
-]
-
-[[package]]
-name = "resource"
-version = "0.0.1"
-dependencies = [
- "bevy_ecs",
- "bevy_utils",
 ]
 
 [[package]]

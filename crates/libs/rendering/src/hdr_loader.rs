@@ -2,8 +2,8 @@ use std::any::Any;
 use std::sync::Arc;
 use std::{fs::File, io::BufReader, path::Path};
 
-use resource::resource::Resource;
-use resource::resource_loader::ResourceLoader;
+use asset::asset::Asset;
+use asset::asset_loader::AssetLoader;
 
 use image::{codecs::hdr::HdrDecoder, Rgb};
 
@@ -14,7 +14,7 @@ pub struct HDRTextureSource {
     pub data: Vec<f32>,
 }
 
-impl Resource for HDRTextureSource {
+impl Asset for HDRTextureSource {
     fn as_any(&self) -> &dyn Any {
         self
     }
@@ -23,8 +23,8 @@ impl Resource for HDRTextureSource {
 #[derive(Default)]
 pub struct HdrTextureLoader;
 
-impl ResourceLoader for HdrTextureLoader {
-    fn load(&self, path: &str) -> Option<Arc<dyn Resource>> {
+impl AssetLoader for HdrTextureLoader {
+    fn load(&self, path: &str) -> Option<Arc<dyn Asset>> {
         let (width, height, data) = load_hdr_image(path);
         Some(Arc::new(HDRTextureSource {
             width,

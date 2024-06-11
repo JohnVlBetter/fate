@@ -4,51 +4,51 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use crate::{resource::Resource, resource_loader::ResourceLoader};
+use crate::{asset::Asset, asset_loader::AssetLoader};
 #[derive(Default)]
-pub struct ResourceMgr {
-    loaders: Vec<Arc<dyn ResourceLoader>>,
+pub struct AssetMgr {
+    loaders: Vec<Arc<dyn AssetLoader>>,
     extension_to_index: HashMap<String, usize>,
     type_name_to_index: HashMap<&'static str, usize>,
     preregistered_loaders: HashMap<&'static str, usize>,
 }
 
-impl ResourceMgr {
-    pub fn register_loader<L: ResourceLoader>(loader: L) {
-        let binding = ResourceMgr::get_instance();
+impl AssetMgr {
+    pub fn register_loader<L: AssetLoader>(loader: L) {
+        let binding = AssetMgr::get_instance();
         let mut mgr = binding.lock().unwrap();
         mgr.internal_register_loader(loader);
     }
 
-    pub fn get_asset_loader_with_extension(extension: &str) -> Option<Arc<dyn ResourceLoader>> {
-        let binding = ResourceMgr::get_instance();
+    pub fn get_asset_loader_with_extension(extension: &str) -> Option<Arc<dyn AssetLoader>> {
+        let binding = AssetMgr::get_instance();
         let mgr = binding.lock().unwrap();
         mgr.internal_get_asset_loader_with_extension(extension)
     }
 
-    pub fn get_asset_loader_with_type_name(type_name: &str) -> Option<Arc<dyn ResourceLoader>> {
-        let binding = ResourceMgr::get_instance();
+    pub fn get_asset_loader_with_type_name(type_name: &str) -> Option<Arc<dyn AssetLoader>> {
+        let binding = AssetMgr::get_instance();
         let mgr = binding.lock().unwrap();
         mgr.internal_get_asset_loader_with_type_name(type_name)
     }
 
-    pub fn load(path: &Path) -> Option<Arc<dyn Resource>> {
-        let binding = ResourceMgr::get_instance();
+    pub fn load(path: &Path) -> Option<Arc<dyn Asset>> {
+        let binding = AssetMgr::get_instance();
         let mgr = binding.lock().unwrap();
         mgr.internal_load(path)
     }
 
-    pub fn preregister_loader<L: ResourceLoader>(extensions: &[&str]) {
-        let binding = ResourceMgr::get_instance();
+    pub fn preregister_loader<L: AssetLoader>(extensions: &[&str]) {
+        let binding = AssetMgr::get_instance();
         let mut mgr = binding.lock().unwrap();
         mgr.internal_preregister_loader::<L>(extensions)
     }
 
-    fn get_instance() -> Arc<Mutex<ResourceMgr>> {
-        static mut RESOURCEMGR: Option<Arc<Mutex<ResourceMgr>>> = None;
+    fn get_instance() -> Arc<Mutex<AssetMgr>> {
+        static mut ASSET_MGR: Option<Arc<Mutex<AssetMgr>>> = None;
 
         unsafe {
-            RESOURCEMGR
+            ASSET_MGR
                 .get_or_insert_with(|| {
                     Arc::new(Mutex::new(Self {
                         ..Default::default()
@@ -58,7 +58,7 @@ impl ResourceMgr {
         }
     }
 
-    fn internal_register_loader<L: ResourceLoader>(&mut self, loader: L) {
+    fn internal_register_loader<L: AssetLoader>(&mut self, loader: L) {
         let type_name = std::any::type_name::<L>();
         let loader = Arc::new(loader);
         let (loader_index, is_new) =
@@ -83,7 +83,7 @@ impl ResourceMgr {
     fn internal_get_asset_loader_with_extension(
         &self,
         extension: &str,
-    ) -> Option<Arc<dyn ResourceLoader>> {
+    ) -> Option<Arc<dyn AssetLoader>> {
         let index = self.extension_to_index.get(extension).unwrap();
 
         self.loaders.get(*index).cloned()
@@ -92,19 +92,19 @@ impl ResourceMgr {
     fn internal_get_asset_loader_with_type_name(
         &self,
         type_name: &str,
-    ) -> Option<Arc<dyn ResourceLoader>> {
+    ) -> Option<Arc<dyn AssetLoader>> {
         let index = self.type_name_to_index.get(type_name).unwrap();
 
         self.loaders.get(*index).cloned()
     }
 
-    fn internal_load(&self, path: &Path) -> Option<Arc<dyn Resource>> {
+    fn internal_load(&self, path: &Path) -> Option<Arc<dyn Asset>> {
         let extension = path.extension().unwrap().to_str().unwrap();
         let loader = self.internal_get_asset_loader_with_extension(extension)?;
         loader.load(path.to_str().unwrap())
     }
 
-    fn internal_preregister_loader<L: ResourceLoader>(&mut self, extensions: &[&str]) {
+    fn internal_preregister_loader<L: AssetLoader>(&mut self, extensions: &[&str]) {
         let loader_index = self.loaders.len();
         let type_name = std::any::type_name::<L>();
         self.preregistered_loaders.insert(type_name, loader_index);

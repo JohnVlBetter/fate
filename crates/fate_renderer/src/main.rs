@@ -6,6 +6,14 @@ mod loader;
 mod renderer;
 
 use crate::{camera::*, config::Config, gui::Gui, inputsystem::*, loader::*, renderer::*};
+use application::application::Application;
+use application::main_schedule::{Start, Update};
+use asset::asset::AssetStorage;
+use audio::audio_source::AudioSource;
+use bevy_ecs::component::Component;
+use bevy_ecs::entity::Entity;
+use bevy_ecs::query::{self, With};
+use bevy_ecs::system::{Commands, Query, Res, ResMut};
 use log::LevelFilter;
 use rendering::cgmath::Vector3;
 use rendering::environment::Environment;
@@ -24,14 +32,39 @@ fn main() -> Result<(), Box<dyn Error>> {
     log::set_max_level(LevelFilter::Error);
     log::info!("Fate初始化开始...");
 
-    let config = Default::default();
+    let config = Config::default();
     let enable_debug = true;
     let file_path = Some(PathBuf::from(
         "assets/models/FlightHelmet/glTF/FlightHelmet.gltf",
     ));
-    run(config, enable_debug, file_path);
+    let mut app = Application::new();
+    app.init_resource::<AssetStorage<AudioSource>>();
+    app.init_schedule(Start);
+    app.init_schedule(Update);
+    app.add_systems(Start, setup);
+    app.add_systems(Update, update);
+    app.run();
+    //run(config, enable_debug, file_path);
 
     Ok(())
+}
+
+#[derive(Component, Default)]
+struct Gameobject {
+    pub id: i32,
+}
+
+fn setup(mut commands: Commands, mut audios: ResMut<AssetStorage<AudioSource>>) {
+    // Plane
+    commands.spawn(Gameobject {
+        id: audios.len() as i32,
+    });
+}
+
+fn update(mut commands: Commands, query: Query<(Entity, &Gameobject)>) {
+    query.for_each(|(entity, gameobject)| {
+        log::info!("Entity: {:?}, Gameobject: {:?}", entity, gameobject.id);
+    });
 }
 
 fn run(config: Config, enable_debug: bool, path: Option<PathBuf>) {
