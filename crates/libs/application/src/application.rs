@@ -10,17 +10,19 @@ use bevy_ecs::{
     system::Resource,
     world::{FromWorld, World},
 };
+use bevy_utils::{define_label, intern::Interned};
 use std::fmt::Debug;
 
-use crate::main_schedule::Start;
+use crate::main_schedule::{Main, Start};
 
 define_label!(AppLabel, APP_LABEL_INTERNER);
+pub type InternedAppLabel = Interned<dyn AppLabel>;
 
 pub struct Application {
     pub world: World,
     pub runner: Box<dyn FnOnce(Application) + Send>,
     pub main_schedule_label: InternedScheduleLabel,
-    sub_applications: HashMap<String, SubApplication>,
+    sub_applications: HashMap<InternedAppLabel, SubApplication>,
 }
 
 impl Application {
@@ -41,9 +43,9 @@ impl Application {
 
     pub fn update(&mut self) {
         self.world.run_schedule(self.main_schedule_label);
-        for (_label, sub_app) in &mut self.sub_apps {
-            sub_app.extract(&mut self.world);
-            sub_app.run();
+        for (_label, sub_application) in &mut self.sub_applications {
+            sub_application.extract(&mut self.world);
+            sub_application.run();
         }
 
         self.world.clear_trackers();
@@ -134,7 +136,7 @@ impl Application {
     pub fn sub_app_mut(&mut self, label: impl AppLabel) -> &mut Application {
         match self.get_sub_app_mut(label) {
             Ok(app) => app,
-            Err(label) => panic!("Sub-App with label '{:?}' does not exist", label),
+            Err(label) => panic!("不存在'{:?}'", label),
         }
     }
 
@@ -142,7 +144,7 @@ impl Application {
         &mut self,
         label: impl AppLabel,
     ) -> Result<&mut Application, impl AppLabel> {
-        self.sub_apps
+        self.sub_applications
             .get_mut(&label.intern())
             .map(|sub_app| &mut sub_app.app)
             .ok_or(label)
@@ -156,15 +158,15 @@ impl Application {
     }
 
     pub fn insert_sub_app(&mut self, label: impl AppLabel, sub_app: SubApplication) {
-        self.sub_apps.insert(label.intern(), sub_app);
+        self.sub_applications.insert(label.intern(), sub_app);
     }
 
     pub fn remove_sub_app(&mut self, label: impl AppLabel) -> Option<SubApplication> {
-        self.sub_apps.remove(&label.intern())
+        self.sub_applications.remove(&label.intern())
     }
 
     pub fn get_sub_app(&self, label: impl AppLabel) -> Result<&Application, impl AppLabel> {
-        self.sub_apps
+        self.sub_applications
             .get(&label.intern())
             .map(|sub_app| &sub_app.app)
             .ok_or(label)
@@ -247,8 +249,7 @@ impl Debug for Application {
 
 impl Default for Application {
     fn default() -> Self {
-        let mut app = Application::empty();
-        app
+        Application::empty()
     }
 }
 
@@ -258,9 +259,30 @@ pub struct SubApplication {
     extract: Box<dyn Fn(&mut World, &mut Application) + Send>,
 }
 
+impl SubApplication {
+    pub fn new(
+        app: Application,
+        extract: impl Fn(&mut World, &mut Application) + Send + 'static,
+    ) -> Self {
+        Self {
+            app,
+            extract: Box::new(extract),
+        }
+    }
+
+    pub fn run(&mut self) {
+        self.app.world.run_schedule(self.app.main_schedule_label);
+        self.app.world.clear_trackers();
+    }
+
+    pub fn extract(&mut self, main_world: &mut World) {
+        (self.extract)(main_world, &mut self.app);
+    }
+}
+
 impl Debug for SubApplication {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "SubApplication {{ app: ")?;
+        write!(f, "SubApplication {{ Application: ")?;
         f.debug_map()
             .entries(self.app.sub_applications.iter().map(|(k, v)| (k, v)))
             .finish()?;
@@ -269,8 +291,5 @@ impl Debug for SubApplication {
 }
 
 fn run_once(mut app: Application) -> () {
-    app.finish();
-    app.cleanup();
-
     app.update();
 }

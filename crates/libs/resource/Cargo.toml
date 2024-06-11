@@ -8,5 +8,5 @@ name = "resource_example"
 path = "examples/resource_example.rs"
 
 [dependencies]
-bevy_ecs = "0.14.0"
+bevy_ecs = "0.13.2"
 bevy_utils = "0.13.2"
