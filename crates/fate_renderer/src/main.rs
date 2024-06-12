@@ -7,9 +7,10 @@ mod renderer;
 
 use crate::{camera::*, config::Config, gui::Gui, inputsystem::*, loader::*, renderer::*};
 use application::application::Application;
-use application::main_schedule::{Start, Update};
+use application::main_schedule::{Main, PostUpdate, Start, Update};
 use asset::asset::AssetStorage;
-use audio::audio_source::AudioSource;
+use asset::asset_mgr::AssetMgr;
+use audio::audio_source::{AudioLoader, AudioSource};
 use bevy_ecs::component::Component;
 use bevy_ecs::entity::Entity;
 use bevy_ecs::query::{self, With};
@@ -18,6 +19,7 @@ use log::LevelFilter;
 use rendering::cgmath::Vector3;
 use rendering::environment::Environment;
 use rendering::{animation::PlaybackMode, model::Model};
+use std::path::Path;
 use std::{cell::RefCell, error::Error, path::PathBuf, rc::Rc, sync::Arc, time::Instant};
 use vulkan::*;
 use winit::{
@@ -32,17 +34,20 @@ fn main() -> Result<(), Box<dyn Error>> {
     log::set_max_level(LevelFilter::Error);
     log::info!("Fate初始化开始...");
 
-    let config = Config::default();
-    let enable_debug = true;
-    let file_path = Some(PathBuf::from(
-        "assets/models/FlightHelmet/glTF/FlightHelmet.gltf",
-    ));
+    //let config = Config::default();
+    //let enable_debug = true;
+    //let file_path = Some(PathBuf::from(
+    //    "assets/models/FlightHelmet/glTF/FlightHelmet.gltf",
+    //));
     let mut app = Application::new();
+    let main = Main {};
+    main.build(&mut app);
     app.init_resource::<AssetStorage<AudioSource>>();
     app.init_schedule(Start);
     app.init_schedule(Update);
-    app.add_systems(Start, setup);
-    app.add_systems(Update, update);
+    app.add_systems(Start, init);
+    app.add_systems(Update, setup);
+    app.add_systems(PostUpdate, update);
     app.run();
     //run(config, enable_debug, file_path);
 
@@ -54,6 +59,15 @@ struct Gameobject {
     pub id: i32,
 }
 
+fn init(mut commands: Commands, mut audios: ResMut<AssetStorage<AudioSource>>) {
+    AssetMgr::register_loader(AudioLoader::default());
+    let resource = AssetMgr::load(&Path::new("assets/audio/Windless Slopes.ogg"));
+    let binding = resource.unwrap();
+    let resource = binding.as_any().downcast_ref::<AudioSource>().unwrap();
+    audios.insert(resource.clone());
+    audios.insert(resource.clone());
+}
+
 fn setup(mut commands: Commands, mut audios: ResMut<AssetStorage<AudioSource>>) {
     // Plane
     commands.spawn(Gameobject {
@@ -63,7 +77,7 @@ fn setup(mut commands: Commands, mut audios: ResMut<AssetStorage<AudioSource>>) 
 
 fn update(mut commands: Commands, query: Query<(Entity, &Gameobject)>) {
     query.for_each(|(entity, gameobject)| {
-        log::info!("Entity: {:?}, Gameobject: {:?}", entity, gameobject.id);
+        println!("Entity: {:?}, Gameobject: {:?}", entity, gameobject.id);
     });
 }
 

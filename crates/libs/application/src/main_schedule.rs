@@ -79,7 +79,7 @@ impl MainScheduleOrder {
 }
 
 impl Main {
-    fn build(&self, app: &mut Application) {
+    pub fn build(&self, app: &mut Application) {
         let mut main_schedule = Schedule::new(Main);
         main_schedule.set_executor_kind(ExecutorKind::SingleThreaded);
 

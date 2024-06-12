@@ -54,8 +54,9 @@ impl<A: Asset> AssetStorage<A> {
         self.len == 0
     }
 
-    pub fn insert(&mut self, index: u32, asset: A) -> bool {
-        self.flush();
+    pub fn insert(&mut self, asset: A) -> bool {
+        self.allocator.reserve();
+        let index = self.flush() - 1;
         let value = &mut self.storage[index as usize];
         let exists = value.is_some();
         if !exists {
@@ -97,12 +98,13 @@ impl<A: Asset> AssetStorage<A> {
         value.as_mut()
     }
 
-    pub fn flush(&mut self) {
+    pub fn flush(&mut self) -> u32 {
         let new_len = self
             .allocator
             .next_index
             .load(std::sync::atomic::Ordering::Relaxed);
         self.storage.resize_with(new_len as usize, || None);
+        new_len
     }
 
     pub fn get_index_allocator(&self) -> Arc<AssetIndexAllocator> {
