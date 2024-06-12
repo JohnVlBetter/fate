@@ -10,16 +10,13 @@ use crate::application::Application;
 pub struct Main;
 
 #[derive(ScheduleLabel, Clone, Debug, PartialEq, Eq, Hash)]
-pub struct PreStartup;
-
-#[derive(ScheduleLabel, Clone, Debug, PartialEq, Eq, Hash)]
-pub struct Startup;
-
-#[derive(ScheduleLabel, Clone, Debug, PartialEq, Eq, Hash)]
-pub struct PostStartup;
+pub struct PreStart;
 
 #[derive(ScheduleLabel, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Start;
+
+#[derive(ScheduleLabel, Clone, Debug, PartialEq, Eq, Hash)]
+pub struct PostStart;
 
 #[derive(ScheduleLabel, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct PreUpdate;
@@ -29,9 +26,6 @@ pub struct Update;
 
 #[derive(ScheduleLabel, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct PostUpdate;
-
-#[derive(ScheduleLabel, Clone, Debug, PartialEq, Eq, Hash)]
-pub struct Last;
 
 #[derive(Resource, Debug)]
 pub struct MainScheduleOrder {
@@ -43,13 +37,11 @@ impl Default for MainScheduleOrder {
     fn default() -> Self {
         Self {
             labels: vec![
-                Start.intern(),
                 PreUpdate.intern(),
                 Update.intern(),
                 PostUpdate.intern(),
-                Last.intern(),
             ],
-            startup_labels: vec![PreStartup.intern(), Startup.intern(), PostStartup.intern()],
+            startup_labels: vec![PreStart.intern(), Start.intern(), PostStart.intern()],
         }
     }
 }

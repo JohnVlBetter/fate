@@ -1087,6 +1087,7 @@ dependencies = [
  "egui-ash-renderer",
  "egui-winit",
  "env_logger",
+ "glam",
  "log",
  "rendering",
  "scene",

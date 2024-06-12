@@ -7,18 +7,22 @@ mod renderer;
 
 use crate::{camera::*, config::Config, gui::Gui, inputsystem::*, loader::*, renderer::*};
 use application::application::Application;
-use application::main_schedule::{Main, PostUpdate, Start, Update};
+use application::main_schedule::{Main, PostUpdate, PreStart, PreUpdate, Start, Update};
 use asset::asset::AssetStorage;
 use asset::asset_mgr::AssetMgr;
 use audio::audio_source::{AudioLoader, AudioSource};
 use bevy_ecs::component::Component;
 use bevy_ecs::entity::Entity;
-use bevy_ecs::query::{self, With};
-use bevy_ecs::system::{Commands, Query, Res, ResMut};
+use bevy_ecs::query::With;
+use bevy_ecs::system::{Commands, Query, ResMut};
+use glam::Vec3;
 use log::LevelFilter;
 use rendering::cgmath::Vector3;
 use rendering::environment::Environment;
 use rendering::{animation::PlaybackMode, model::Model};
+use scene::hierarchy::BuildChildren;
+use scene::parent::Parent;
+use scene::transform::{propagate_transforms, GlobalTransform, Transform, TransformBundle};
 use std::path::Path;
 use std::{cell::RefCell, error::Error, path::PathBuf, rc::Rc, sync::Arc, time::Instant};
 use vulkan::*;
@@ -43,15 +47,17 @@ fn main() -> Result<(), Box<dyn Error>> {
     let main = Main {};
     main.build(&mut app);
     app.init_resource::<AssetStorage<AudioSource>>();
-    app.init_schedule(Start);
-    app.init_schedule(Update);
-    app.add_systems(Start, init);
-    app.add_systems(Update, setup);
-    app.add_systems(PostUpdate, update);
-    app.run();
+    app.add_systems(PreStart, init);
+    app.add_systems(Start, setup);
+    app.add_systems(PreUpdate, move_a);
+    app.add_systems(Update, update);
+    app.add_systems(PostUpdate, propagate_transforms);
+    loop {
+        app.update();
+    }
     //run(config, enable_debug, file_path);
 
-    Ok(())
+    //Ok(())
 }
 
 #[derive(Component, Default)]
@@ -59,7 +65,7 @@ struct Gameobject {
     pub id: i32,
 }
 
-fn init(mut commands: Commands, mut audios: ResMut<AssetStorage<AudioSource>>) {
+fn init(mut audios: ResMut<AssetStorage<AudioSource>>) {
     AssetMgr::register_loader(AudioLoader::default());
     let resource = AssetMgr::load(&Path::new("assets/audio/Windless Slopes.ogg"));
     let binding = resource.unwrap();
@@ -68,20 +74,52 @@ fn init(mut commands: Commands, mut audios: ResMut<AssetStorage<AudioSource>>) {
     audios.insert(resource.clone());
 }
 
-fn setup(mut commands: Commands, mut audios: ResMut<AssetStorage<AudioSource>>) {
-    // Plane
-    commands.spawn(Gameobject {
-        id: audios.len() as i32,
+fn setup(mut commands: Commands) {
+    let a = commands
+        .spawn((
+            TransformBundle::from_transform(Transform::from_xyz(0.0, 0.0, 0.0)),
+            Gameobject { id: 1 },
+        ))
+        .id();
+    let b = commands
+        .spawn((
+            TransformBundle::from_transform(Transform::from_xyz(1.0, 0.0, 0.0)),
+            Gameobject { id: 2 },
+        ))
+        .id();
+    let c = commands
+        .spawn((
+            TransformBundle::from_transform(Transform::from_xyz(0.0, 1.0, 0.0)),
+            Gameobject { id: 3 },
+        ))
+        .id();
+    commands.entity(a).push_children(&[b, c]);
+}
+
+fn move_a(mut query: Query<&mut Transform, With<Parent>>) {
+    query.iter_mut().for_each(|mut transform| {
+        transform.translation += Vec3 {
+            x: 1.0,
+            y: 0.5,
+            z: -0.1,
+        };
     });
 }
 
-fn update(mut commands: Commands, query: Query<(Entity, &Gameobject)>) {
-    query.for_each(|(entity, gameobject)| {
-        println!("Entity: {:?}, Gameobject: {:?}", entity, gameobject.id);
-    });
+fn update(query: Query<(Entity, &Gameobject, &GlobalTransform)>) {
+    query
+        .iter()
+        .for_each(|(entity, gameobject, global_transform)| {
+            println!(
+                "Entity: {:?}, Gameobject: {:?}, global_transform: {:?}",
+                entity,
+                gameobject.id,
+                global_transform.translation()
+            );
+        });
 }
 
-fn run(config: Config, enable_debug: bool, path: Option<PathBuf>) {
+fn _run(config: Config, enable_debug: bool, path: Option<PathBuf>) {
     let event_loop = EventLoop::new().unwrap();
     event_loop.set_control_flow(ControlFlow::Poll);
     let window = WindowBuilder::new()

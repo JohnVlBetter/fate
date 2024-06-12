@@ -44,7 +44,6 @@ impl Application {
     pub fn update(&mut self) {
         self.world.run_schedule(self.main_schedule_label);
         for (_label, sub_application) in &mut self.sub_applications {
-            sub_application.extract(&mut self.world);
             sub_application.run();
         }
 
@@ -255,28 +254,16 @@ impl Default for Application {
 
 pub struct SubApplication {
     pub app: Application,
-
-    extract: Box<dyn Fn(&mut World, &mut Application) + Send>,
 }
 
 impl SubApplication {
-    pub fn new(
-        app: Application,
-        extract: impl Fn(&mut World, &mut Application) + Send + 'static,
-    ) -> Self {
-        Self {
-            app,
-            extract: Box::new(extract),
-        }
+    pub fn new(app: Application) -> Self {
+        Self { app }
     }
 
     pub fn run(&mut self) {
         self.app.world.run_schedule(self.app.main_schedule_label);
         self.app.world.clear_trackers();
-    }
-
-    pub fn extract(&mut self, main_world: &mut World) {
-        (self.extract)(main_world, &mut self.app);
     }
 }
 
