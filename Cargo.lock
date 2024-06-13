@@ -2275,7 +2275,6 @@ dependencies = [
 name = "scene"
 version = "0.1.0"
 dependencies = [
- "bevy_ecs",
  "glam",
  "smallvec",
 ]
