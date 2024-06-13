@@ -8,7 +8,7 @@ use std::sync::Arc;
 use vulkan::ash::vk;
 use vulkan::{Buffer, Context, Image, Texture as VulkanTexture};
 
-pub(crate) struct Textures {
+pub struct Textures {
     _images: Vec<VulkanTexture>,
     pub textures: Vec<Texture>,
 }
@@ -37,7 +37,7 @@ impl Drop for Texture {
     }
 }
 
-pub(crate) fn create_textures_from_gltf(
+pub fn create_textures_from_gltf(
     context: &Arc<Context>,
     command_buffer: vk::CommandBuffer,
     textures: GltfTextures,

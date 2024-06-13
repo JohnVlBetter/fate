@@ -24,7 +24,7 @@ pub struct Metadata {
 }
 
 impl Metadata {
-    pub(crate) fn new<P: AsRef<Path>>(path: P, document: &Document) -> Self {
+    pub fn new<P: AsRef<Path>>(path: P, document: &Document) -> Self {
         Metadata {
             name: String::from(path.as_ref().file_name().unwrap().to_str().unwrap()),
             path: String::from(path.as_ref().to_str().unwrap()),

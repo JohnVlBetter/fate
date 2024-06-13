@@ -13,6 +13,7 @@ rendering = { path = "crates/libs/rendering" }
 scene = { path = "crates/libs/scene" }
 asset = { path = "crates/libs/asset" }
 audio = { path = "crates/libs/audio" }
+gltf_loader = { path = "crates/libs/gltf_loader" }
 application = { path = "crates/libs/application" }
 
 log = "0.4"

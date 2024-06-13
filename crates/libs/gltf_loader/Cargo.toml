@@ -1,0 +1,20 @@
+[package]
+name = "gltf_loader"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+mikktspace.workspace = true
+rendering.workspace = true
+log.workspace = true
+cgmath.workspace = true
+vulkan.workspace = true
+
+[dependencies.gltf]
+workspace = true
+features = [
+    "KHR_lights_punctual",
+    "KHR_materials_unlit",
+    "KHR_materials_pbrSpecularGlossiness",
+    "KHR_materials_emissive_strength",
+]

@@ -75,6 +75,6 @@ fn map_gltf_lights(lights: Lights) -> Vec<Light> {
         .collect()
 }
 
-pub(crate) fn create_lights_from_gltf(document: &Document) -> Vec<Light> {
+pub fn create_lights_from_gltf(document: &Document) -> Vec<Light> {
     document.lights().map_or(vec![], map_gltf_lights)
 }

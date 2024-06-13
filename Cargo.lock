@@ -1294,6 +1294,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "gltf_loader"
+version = "0.1.0"
+dependencies = [
+ "cgmath",
+ "gltf",
+ "log",
+ "mikktspace",
+ "rendering",
+ "vulkan",
+]
+
+[[package]]
 name = "half"
 version = "2.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
