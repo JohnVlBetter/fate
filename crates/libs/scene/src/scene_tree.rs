@@ -1,7 +1,10 @@
-use std::collections::HashMap;
+use std::{
+    any::{Any, TypeId},
+    collections::HashMap,
+};
 
 use crate::component::Component;
-use smallvec::SmallVec;
+//use smallvec::SmallVec;
 
 #[derive(Debug)]
 pub struct Node {
@@ -9,7 +12,7 @@ pub struct Node {
     pub(crate) name: String,
     pub(crate) parent: Option<u32>,
     pub(crate) children: Vec<u32>,
-    pub(crate) components: SmallVec<[u32; 8]>,
+    pub(crate) components: Vec<u32>, //SmallVec<[u32; 8]>,
 }
 
 impl Node {
@@ -19,7 +22,7 @@ impl Node {
             name,
             parent: None,
             children: Vec::new(),
-            components: SmallVec::new(),
+            components: Vec::new(),
         }
     }
 
@@ -67,7 +70,7 @@ impl SceneTree {
         }
     }
 
-    pub fn spawn_node(&mut self, name: &str, parent_id: Option<u32>) -> u32 {
+    pub fn create_node(&mut self, name: &str, parent_id: Option<u32>) -> u32 {
         let id = self.id_allocator;
         self.id_allocator += 1;
         let mut node = Node::new(id, name.to_string());
@@ -87,4 +90,118 @@ impl SceneTree {
         self.nodes.insert(id, node);
         id
     }
+
+    pub fn destory_node(&mut self, id: u32) {
+        let node = self
+            .nodes
+            .remove(&id)
+            .unwrap_or_else(|| panic!("没有找到id为 {} 的节点!", id));
+        //移除父节点的子节点
+        if let Some(parent_id) = node.parent {
+            let parent = self
+                .nodes
+                .get_mut(&parent_id)
+                .unwrap_or_else(|| panic!("没有找到id为 {} 的节点!", parent_id));
+            parent.children.remove(
+                parent
+                    .children
+                    .iter()
+                    .position(|child_id| *child_id == id)
+                    .expect("没找到要删除的子节点!"),
+            );
+        }
+        //移除所有component
+        node.components.iter().for_each(|component_id| {
+            self.components.remove(component_id);
+        });
+    }
+
+    pub fn get_node(&self, id: u32) -> &Node {
+        self.nodes
+            .get(&id)
+            .unwrap_or_else(|| panic!("没有找到id为 {} 的节点!", id))
+    }
+
+    pub fn add_component<C: Component + 'static>(&mut self, node_id: u32, mut component: C) -> u32 {
+        let id = self.id_allocator;
+        self.id_allocator += 1;
+        component.set_id(id);
+        let component = Box::new(component);
+        let node = self
+            .nodes
+            .get_mut(&node_id)
+            .unwrap_or_else(|| panic!("没有找到id为 {} 的节点!", node_id));
+        self.components.insert(id, component);
+        node.components.push(id);
+        id
+    }
+
+    /*pub fn get_component<C: Component>(&self, node_id: u32) -> Option<&C> {
+        let node = self
+            .nodes
+            .get(&node_id)
+            .unwrap_or_else(|| panic!("没有找到id为 {} 的节点!", node_id));
+        let component_id = node
+            .components
+            .iter()
+            .find(|component_id| self.components.get(component_id).unwrap().type_id() == C::ID);
+        component_id.map(|component_id| {
+            self.components
+                .get(component_id)
+                .unwrap()
+                .downcast_ref::<C>()
+                .unwrap()
+        })
+    }*/
+
+    pub fn get_component<C: Component + 'static>(&self, node_id: u32) {
+        let node = self
+            .nodes
+            .get(&node_id)
+            .unwrap_or_else(|| panic!("没有找到id为 {} 的节点!", node_id));
+        node.components.iter().find(|component_id| {
+            Self::is_component::<C>(self.components.get(component_id).unwrap())
+        });
+        //println!("{:?}", component_id);
+    }
+
+    fn is_component<C: Component + 'static>(s: &dyn Any) -> bool {
+        if s.is::<C>() {
+            println!("It's a C!");
+            true
+        } else {
+            println!("Not a C...");
+            false
+        }
+    }
 }
+/*
+use std::any::Any;
+
+trait Component: Any {}
+
+struct MeshRenderer {}
+
+impl Component for MeshRenderer {}
+
+struct Scene {
+    components: Vec<Box<dyn Component>>,
+}
+
+impl Scene {
+    fn get_component<T: Component + 'static>(&self) -> Option<&T> {
+        for component in &self.components {
+            if let Some(specified_type) = component.as_any().downcast_ref::<T>() {
+                return Some(specified_type);
+            }
+        }
+        None
+    }
+}
+
+impl Component {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
+*/
