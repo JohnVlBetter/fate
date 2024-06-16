@@ -8,6 +8,8 @@ pub trait ComponentBase {
 pub enum Component {
     MeshRenderer(MeshRenderer),
     Transform(Transform),
+    Camera(Camera),
+    Light(Light),
 }
 
 #[derive(PartialEq, PartialOrd, Debug)]
@@ -56,6 +58,60 @@ impl ComponentBase for Transform {
     fn get_pred() -> impl Fn(&&Component) -> bool {
         move |comp| {
             if let Component::Transform(_) = comp {
+                true
+            } else {
+                false
+            }
+        }
+    }
+}
+
+#[derive(PartialEq, PartialOrd, Debug)]
+pub struct Camera {
+    pub id: u32,
+    pub node_id: u32,
+    pub view: String,
+}
+
+impl ComponentBase for Camera {
+    fn id(&self) -> u32 {
+        self.id
+    }
+
+    fn set_id(&mut self, id: u32) {
+        self.id = id;
+    }
+
+    fn get_pred() -> impl Fn(&&Component) -> bool {
+        move |comp| {
+            if let Component::Camera(_) = comp {
+                true
+            } else {
+                false
+            }
+        }
+    }
+}
+
+#[derive(PartialEq, PartialOrd, Debug)]
+pub struct Light {
+    pub id: u32,
+    pub node_id: u32,
+    pub color: String,
+}
+
+impl ComponentBase for Light {
+    fn id(&self) -> u32 {
+        self.id
+    }
+
+    fn set_id(&mut self, id: u32) {
+        self.id = id;
+    }
+
+    fn get_pred() -> impl Fn(&&Component) -> bool {
+        move |comp| {
+            if let Component::Light(_) = comp {
                 true
             } else {
                 false

@@ -42,6 +42,10 @@ impl Node {
     pub fn children(&self) -> &[u32] {
         &self.children
     }
+
+    pub fn components(&self) -> &[Component] {
+        &self.components
+    }
 }
 
 pub struct SceneTree {
@@ -57,8 +61,12 @@ impl SceneTree {
         SceneTree {
             nodes,
             root: 0,
-            id_allocator: 0,
+            id_allocator: 1,
         }
+    }
+
+    pub fn get_root_node() -> u32 {
+        0
     }
 
     pub fn create_node(&mut self, name: &str, parent_id: Option<u32>) -> u32 {
@@ -75,9 +83,17 @@ impl SceneTree {
                 node.parent = Some(parent_id);
             }
             None => {
+                let root = self.nodes.get_mut(&0).unwrap();
+                root.children.push(id);
                 node.parent = Some(self.root);
             }
         }
+        let transform = Component::Transform(crate::component::Transform {
+            id: 0,
+            node_id: id,
+            matrix: "Matrix".to_string(),
+        });
+        node.components.push(transform);
         self.nodes.insert(id, node);
         id
     }
@@ -147,5 +163,26 @@ impl SceneTree {
             .get_mut(&node_id)
             .unwrap_or_else(|| panic!("没有找到id为 {} 的节点!", node_id));
         node.components.iter().find(pred)
+    }
+}
+
+impl Default for SceneTree {
+    fn default() -> Self {
+        let mut tree = Self::new();
+        let main_camera_node = tree.create_node("MainCamera", None);
+        let main_light_node = tree.create_node("MainLight", None);
+        let main_camera = Component::Camera(crate::component::Camera {
+            id: 0,
+            node_id: main_camera_node,
+            view: "View".to_string(),
+        });
+        tree.add_component(main_camera_node, main_camera);
+        let main_light = Component::Light(crate::component::Light {
+            id: 0,
+            node_id: main_light_node,
+            color: "Color".to_string(),
+        });
+        tree.add_component(main_light_node, main_light);
+        tree
     }
 }
