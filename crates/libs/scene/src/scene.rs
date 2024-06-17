@@ -17,5 +17,7 @@ impl Scene {
         Scene::default()
     }
 
-    pub fn update(&mut self) {}
+    pub fn update(&mut self) {
+        self.scene_tree.update();
+    }
 }

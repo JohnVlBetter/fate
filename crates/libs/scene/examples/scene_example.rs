@@ -50,4 +50,10 @@ fn main() {
             }
         }
     }
+
+    scene_tree.update();
+
+    scene_tree.destory_node(node_id);
+
+    scene_tree.update();
 }

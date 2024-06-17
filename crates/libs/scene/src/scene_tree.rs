@@ -1,9 +1,6 @@
 use std::collections::HashMap;
 
-use crate::{
-    component::{Component, ComponentBase},
-    transform,
-};
+use crate::component::{Component, ComponentBase};
 //use smallvec::SmallVec;
 
 #[derive(Debug)]
@@ -104,10 +101,21 @@ impl SceneTree {
     }
 
     pub fn destory_node(&mut self, id: u32) {
-        let node = self
+        let mut node = self
             .nodes
             .remove(&id)
             .unwrap_or_else(|| panic!("没有找到id为 {} 的节点!", id));
+        node.components.iter_mut().for_each(|comp| {
+            if let Component::Transform(transform) = comp {
+                transform.destroy();
+            } else if let Component::Camera(camera) = comp {
+                camera.destroy();
+            } else if let Component::Light(light) = comp {
+                light.destroy();
+            } else if let Component::MeshRenderer(mesh_renderer) = comp {
+                mesh_renderer.destroy();
+            }
+        });
         //移除父节点的子节点
         if let Some(parent_id) = node.parent {
             let parent = self
@@ -128,6 +136,32 @@ impl SceneTree {
         self.nodes
             .get(&id)
             .unwrap_or_else(|| panic!("没有找到id为 {} 的节点!", id))
+    }
+
+    pub fn update(&mut self) {
+        let mut satck: Vec<u32> = Vec::new();
+        satck.push(self.root);
+        while !satck.is_empty() {
+            let node_id = satck.pop().unwrap();
+            let node = self
+                .nodes
+                .get_mut(&node_id)
+                .unwrap_or_else(|| panic!("没有找到id为 {} 的节点!", node_id));
+            node.components.iter_mut().for_each(|comp| {
+                if let Component::Transform(transform) = comp {
+                    transform.update();
+                } else if let Component::Camera(camera) = comp {
+                    camera.update();
+                } else if let Component::Light(light) = comp {
+                    light.update();
+                } else if let Component::MeshRenderer(mesh_renderer) = comp {
+                    mesh_renderer.update();
+                }
+            });
+            for child_id in node.children() {
+                satck.push(*child_id);
+            }
+        }
     }
 
     pub fn has_component(&mut self, node_id: u32, component: Component) -> bool {
