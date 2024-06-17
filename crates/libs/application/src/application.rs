@@ -1,282 +1,102 @@
-use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 
-use bevy_ecs::{
-    component::Component,
-    event::{Event, Events},
-    schedule::{
-        InternedScheduleLabel, IntoSystemConfigs, IntoSystemSetConfigs, Schedule,
-        ScheduleBuildSettings, ScheduleLabel, Schedules,
-    },
-    system::Resource,
-    world::{FromWorld, World},
+use scene::{
+    component::{Camera, Component, ComponentBase, Light, MeshRenderer, Transform},
+    scene::Scene,
 };
-use bevy_utils::{define_label, intern::Interned};
-use std::fmt::Debug;
-
-use crate::main_schedule::{Main, Start};
-
-define_label!(AppLabel, APP_LABEL_INTERNER);
-pub type InternedAppLabel = Interned<dyn AppLabel>;
 
 pub struct Application {
-    pub world: World,
-    pub runner: Box<dyn FnOnce(Application) + Send>,
-    pub main_schedule_label: InternedScheduleLabel,
-    sub_applications: HashMap<InternedAppLabel, SubApplication>,
+    pub(crate) scene: Scene,
 }
 
 impl Application {
+    fn get_instance() -> Arc<Mutex<Application>> {
+        static mut APPLICATION: Option<Arc<Mutex<Application>>> = None;
+
+        unsafe {
+            APPLICATION
+                .get_or_insert_with(|| {
+                    Arc::new(Mutex::new(Self {
+                        ..Default::default()
+                    }))
+                })
+                .clone()
+        }
+    }
     pub fn new() -> Application {
         Application::default()
     }
-
-    pub fn empty() -> Application {
-        let mut world = World::new();
-        world.init_resource::<Schedules>();
-        Self {
-            world,
-            runner: Box::new(run_once),
-            sub_applications: HashMap::default(),
-            main_schedule_label: Main.intern(),
-        }
-    }
-
     pub fn update(&mut self) {
-        self.world.run_schedule(self.main_schedule_label);
-        for (_label, sub_application) in &mut self.sub_applications {
-            sub_application.run();
-        }
-
-        self.world.clear_trackers();
-    }
-
-    pub fn run(&mut self) {
-        let mut app = std::mem::replace(self, Application::empty());
-        let runner = std::mem::replace(&mut app.runner, Box::new(run_once));
-        (runner)(app);
-    }
-
-    pub fn add_systems<M>(
-        &mut self,
-        schedule: impl ScheduleLabel,
-        systems: impl IntoSystemConfigs<M>,
-    ) -> &mut Self {
-        let schedule = schedule.intern();
-        let mut schedules = self.world.resource_mut::<Schedules>();
-
-        if let Some(schedule) = schedules.get_mut(schedule) {
-            schedule.add_systems(systems);
-        } else {
-            let mut new_schedule = Schedule::new(schedule);
-            new_schedule.add_systems(systems);
-            schedules.insert(new_schedule);
-        }
-
-        self
-    }
-
-    #[track_caller]
-    pub fn configure_sets(
-        &mut self,
-        schedule: impl ScheduleLabel,
-        sets: impl IntoSystemSetConfigs,
-    ) -> &mut Self {
-        let schedule = schedule.intern();
-        let mut schedules = self.world.resource_mut::<Schedules>();
-        if let Some(schedule) = schedules.get_mut(schedule) {
-            schedule.configure_sets(sets);
-        } else {
-            let mut new_schedule = Schedule::new(schedule);
-            new_schedule.configure_sets(sets);
-            schedules.insert(new_schedule);
-        }
-        self
-    }
-
-    pub fn add_event<T>(&mut self) -> &mut Self
-    where
-        T: Event,
-    {
-        if !self.world.contains_resource::<Events<T>>() {
-            self.init_resource::<Events<T>>().add_systems(
-                Start,
-                bevy_ecs::event::event_update_system::<T>
-                    .run_if(bevy_ecs::event::event_update_condition::<T>),
-            );
-        }
-        self
-    }
-
-    pub fn insert_resource<R: Resource>(&mut self, resource: R) -> &mut Self {
-        self.world.insert_resource(resource);
-        self
-    }
-
-    pub fn insert_non_send_resource<R: 'static>(&mut self, resource: R) -> &mut Self {
-        self.world.insert_non_send_resource(resource);
-        self
-    }
-
-    pub fn init_resource<R: Resource + FromWorld>(&mut self) -> &mut Self {
-        self.world.init_resource::<R>();
-        self
-    }
-
-    pub fn init_non_send_resource<R: 'static + FromWorld>(&mut self) -> &mut Self {
-        self.world.init_non_send_resource::<R>();
-        self
-    }
-
-    pub fn set_runner(&mut self, run_fn: impl FnOnce(Application) + 'static + Send) -> &mut Self {
-        self.runner = Box::new(run_fn);
-        self
-    }
-
-    pub fn sub_app_mut(&mut self, label: impl AppLabel) -> &mut Application {
-        match self.get_sub_app_mut(label) {
-            Ok(app) => app,
-            Err(label) => panic!("不存在'{:?}'", label),
-        }
-    }
-
-    pub fn get_sub_app_mut(
-        &mut self,
-        label: impl AppLabel,
-    ) -> Result<&mut Application, impl AppLabel> {
-        self.sub_applications
-            .get_mut(&label.intern())
-            .map(|sub_app| &mut sub_app.app)
-            .ok_or(label)
-    }
-
-    pub fn sub_app(&self, label: impl AppLabel) -> &Application {
-        match self.get_sub_app(label) {
-            Ok(app) => app,
-            Err(label) => panic!("Sub-App with label '{:?}' does not exist", label),
-        }
-    }
-
-    pub fn insert_sub_app(&mut self, label: impl AppLabel, sub_app: SubApplication) {
-        self.sub_applications.insert(label.intern(), sub_app);
-    }
-
-    pub fn remove_sub_app(&mut self, label: impl AppLabel) -> Option<SubApplication> {
-        self.sub_applications.remove(&label.intern())
-    }
-
-    pub fn get_sub_app(&self, label: impl AppLabel) -> Result<&Application, impl AppLabel> {
-        self.sub_applications
-            .get(&label.intern())
-            .map(|sub_app| &sub_app.app)
-            .ok_or(label)
-    }
-
-    pub fn add_schedule(&mut self, schedule: Schedule) -> &mut Self {
-        let mut schedules = self.world.resource_mut::<Schedules>();
-        schedules.insert(schedule);
-
-        self
-    }
-
-    pub fn init_schedule(&mut self, label: impl ScheduleLabel) -> &mut Self {
-        let label = label.intern();
-        let mut schedules = self.world.resource_mut::<Schedules>();
-        if !schedules.contains(label) {
-            schedules.insert(Schedule::new(label));
-        }
-        self
-    }
-
-    pub fn get_schedule(&self, label: impl ScheduleLabel) -> Option<&Schedule> {
-        let schedules = self.world.get_resource::<Schedules>()?;
-        schedules.get(label)
-    }
-
-    pub fn get_schedule_mut(&mut self, label: impl ScheduleLabel) -> Option<&mut Schedule> {
-        let schedules = self.world.get_resource_mut::<Schedules>()?;
-        schedules.into_inner().get_mut(label)
-    }
-
-    pub fn edit_schedule(
-        &mut self,
-        label: impl ScheduleLabel,
-        f: impl FnOnce(&mut Schedule),
-    ) -> &mut Self {
-        let label = label.intern();
-        let mut schedules = self.world.resource_mut::<Schedules>();
-
-        if schedules.get(label).is_none() {
-            schedules.insert(Schedule::new(label));
-        }
-
-        let schedule = schedules.get_mut(label).unwrap();
-        f(schedule);
-
-        self
-    }
-
-    pub fn configure_schedules(
-        &mut self,
-        schedule_build_settings: ScheduleBuildSettings,
-    ) -> &mut Self {
-        self.world
-            .resource_mut::<Schedules>()
-            .configure_schedules(schedule_build_settings);
-        self
-    }
-
-    pub fn allow_ambiguous_component<T: Component>(&mut self) -> &mut Self {
-        self.world.allow_ambiguous_component::<T>();
-        self
-    }
-
-    pub fn allow_ambiguous_resource<T: Resource>(&mut self) -> &mut Self {
-        self.world.allow_ambiguous_resource::<T>();
-        self
-    }
-}
-
-impl Debug for Application {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "App {{ SubApplication: ")?;
-        f.debug_map()
-            .entries(self.sub_applications.iter().map(|(k, v)| (k, v)))
-            .finish()?;
-        write!(f, "}}")
+        self.scene.update();
     }
 }
 
 impl Default for Application {
     fn default() -> Self {
-        Application::empty()
+        Application::new()
     }
 }
 
-pub struct SubApplication {
-    pub app: Application,
+pub fn add_transform_component(node_id: u32) {
+    let mut transform = Transform {
+        id: 0,
+        node_id,
+        matrix: "Matrix".to_string(),
+    };
+    transform.start();
+    let transform = Component::Transform(transform);
+    Application::get_instance()
+        .lock()
+        .unwrap()
+        .scene
+        .scene_tree
+        .add_component(node_id, transform);
 }
 
-impl SubApplication {
-    pub fn new(app: Application) -> Self {
-        Self { app }
-    }
-
-    pub fn run(&mut self) {
-        self.app.world.run_schedule(self.app.main_schedule_label);
-        self.app.world.clear_trackers();
-    }
+pub fn add_camera_component(node_id: u32) {
+    let mut camera = Camera {
+        id: 0,
+        node_id,
+        view: "View".to_string(),
+    };
+    camera.start();
+    let camera = Component::Camera(camera);
+    Application::get_instance()
+        .lock()
+        .unwrap()
+        .scene
+        .scene_tree
+        .add_component(node_id, camera);
 }
 
-impl Debug for SubApplication {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "SubApplication {{ Application: ")?;
-        f.debug_map()
-            .entries(self.app.sub_applications.iter().map(|(k, v)| (k, v)))
-            .finish()?;
-        write!(f, "}}")
-    }
+pub fn add_light_component(node_id: u32) {
+    let mut light = Light {
+        id: 0,
+        node_id,
+        color: "Color".to_string(),
+    };
+    light.start();
+    let light = Component::Light(light);
+    Application::get_instance()
+        .lock()
+        .unwrap()
+        .scene
+        .scene_tree
+        .add_component(node_id, light);
 }
 
-fn run_once(mut app: Application) -> () {
-    app.update();
+pub fn add_mesh_renderer_component(node_id: u32) {
+    let mut mesh_renderer = MeshRenderer {
+        id: 0,
+        node_id,
+        mesh: "Mesh".to_string(),
+    };
+    mesh_renderer.start();
+    let mesh_renderer = Component::MeshRenderer(mesh_renderer);
+    Application::get_instance()
+        .lock()
+        .unwrap()
+        .scene
+        .scene_tree
+        .add_component(node_id, mesh_renderer);
 }

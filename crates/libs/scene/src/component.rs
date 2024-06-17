@@ -2,6 +2,9 @@ pub trait ComponentBase {
     fn id(&self) -> u32;
     fn set_id(&mut self, id: u32);
     fn get_pred() -> impl Fn(&&Component) -> bool;
+    fn update(&mut self);
+    fn start(&mut self);
+    fn destroy(&mut self);
 }
 
 #[derive(PartialEq, PartialOrd, Debug)]
@@ -37,6 +40,18 @@ impl ComponentBase for MeshRenderer {
             }
         }
     }
+
+    fn update(&mut self) {
+        println!("MeshRenderer update");
+    }
+
+    fn start(&mut self) {
+        println!("MeshRenderer start");
+    }
+
+    fn destroy(&mut self) {
+        println!("MeshRenderer destroy");
+    }
 }
 
 #[derive(PartialEq, PartialOrd, Debug)]
@@ -63,6 +78,18 @@ impl ComponentBase for Transform {
                 false
             }
         }
+    }
+
+    fn update(&mut self) {
+        println!("Transform update");
+    }
+
+    fn start(&mut self) {
+        println!("Transform start");
+    }
+
+    fn destroy(&mut self) {
+        println!("Transform destroy");
     }
 }
 
@@ -91,6 +118,18 @@ impl ComponentBase for Camera {
             }
         }
     }
+
+    fn update(&mut self) {
+        println!("Camera update");
+    }
+
+    fn start(&mut self) {
+        println!("Camera start");
+    }
+
+    fn destroy(&mut self) {
+        println!("Camera destroy");
+    }
 }
 
 #[derive(PartialEq, PartialOrd, Debug)]
@@ -117,5 +156,17 @@ impl ComponentBase for Light {
                 false
             }
         }
+    }
+
+    fn update(&mut self) {
+        println!("Light update");
+    }
+
+    fn start(&mut self) {
+        println!("Light start");
+    }
+
+    fn destroy(&mut self) {
+        println!("Light destroy");
     }
 }
