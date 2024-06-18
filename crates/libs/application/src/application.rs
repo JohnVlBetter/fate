@@ -1,8 +1,9 @@
 use std::sync::{Arc, Mutex};
 
 use scene::{
-    component::{Camera, Component, ComponentBase, Light, MeshRenderer, Transform},
+    component::{Camera, Component, ComponentBase, Light, MeshRenderer},
     scene::Scene,
+    transform::Transform,
 };
 
 pub struct Application {
@@ -38,11 +39,7 @@ impl Default for Application {
 }
 
 pub fn add_transform_component(node_id: u32) {
-    let mut transform = Transform {
-        id: 0,
-        node_id,
-        matrix: "Matrix".to_string(),
-    };
+    let mut transform = Transform::default();
     transform.start();
     let transform = Component::Transform(transform);
     Application::get_instance()

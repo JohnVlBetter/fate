@@ -1,3 +1,5 @@
+use crate::transform::Transform;
+
 pub trait ComponentBase {
     fn id(&self) -> u32;
     fn set_id(&mut self, id: u32);
@@ -51,45 +53,6 @@ impl ComponentBase for MeshRenderer {
 
     fn destroy(&mut self) {
         println!("MeshRenderer destroy");
-    }
-}
-
-#[derive(PartialEq, PartialOrd, Debug)]
-pub struct Transform {
-    pub id: u32,
-    pub node_id: u32,
-    pub matrix: String,
-}
-
-impl ComponentBase for Transform {
-    fn id(&self) -> u32 {
-        self.id
-    }
-
-    fn set_id(&mut self, id: u32) {
-        self.id = id;
-    }
-
-    fn get_pred() -> impl Fn(&&Component) -> bool {
-        move |comp| {
-            if let Component::Transform(_) = comp {
-                true
-            } else {
-                false
-            }
-        }
-    }
-
-    fn update(&mut self) {
-        println!("Transform update");
-    }
-
-    fn start(&mut self) {
-        println!("Transform start");
-    }
-
-    fn destroy(&mut self) {
-        println!("Transform destroy");
     }
 }
 

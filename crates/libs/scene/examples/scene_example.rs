@@ -39,8 +39,8 @@ fn main() {
                     "mesh_renderer has mesh {} {}",
                     mesh_renderer.id, mesh_renderer.mesh
                 );
-            } else if let Component::Transform(transform) = component {
-                println!("transform has matrix {} {}", transform.id, transform.matrix);
+            } else if let Component::Transform(mut transform) = component {
+                println!("transform has matrix {:?}", transform.local_to_world_matrix());
             } else if let Component::Camera(camera) = component {
                 println!("camera has view {}", camera.view);
             } else if let Component::Light(light) = component {

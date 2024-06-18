@@ -1,6 +1,9 @@
 use std::collections::HashMap;
 
-use crate::component::{Component, ComponentBase};
+use crate::{
+    component::{Component, ComponentBase},
+    transform,
+};
 //use smallvec::SmallVec;
 
 #[derive(Debug)]
@@ -88,11 +91,7 @@ impl SceneTree {
                 node.parent = Some(self.root);
             }
         }
-        let mut transform = crate::component::Transform {
-            id: 0,
-            node_id: id,
-            matrix: "Matrix".to_string(),
-        };
+        let mut transform = transform::Transform::default();
         transform.start();
         let transform = Component::Transform(transform);
         node.components.push(transform);
