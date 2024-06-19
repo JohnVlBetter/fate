@@ -1,3 +1,4 @@
+use glam::Vec3;
 use scene::{
     component::{Component, ComponentBase, MeshRenderer},
     scene_tree::SceneTree,
@@ -24,36 +25,16 @@ fn main() {
     } else {
         println!("mesh_renderer has no mesh");
     }
-
+    scene_tree.print_tree();
     let node = scene_tree.get_node(0);
-    println!("node children: {}", node.children().len());
-    println!("node components: {}", node.components().len());
-
-    for child in node.children() {
-        let child = scene_tree.get_node(*child);
-        println!("child: {}", child.name());
-        let components = child.components();
-        for component in components {
-            if let Component::MeshRenderer(mesh_renderer) = component {
-                println!(
-                    "mesh_renderer has mesh {} {}",
-                    mesh_renderer.id, mesh_renderer.mesh
-                );
-            } else if let Component::Transform(mut transform) = component {
-                println!("transform has matrix {:?}", transform.local_to_world_matrix());
-            } else if let Component::Camera(camera) = component {
-                println!("camera has view {}", camera.view);
-            } else if let Component::Light(light) = component {
-                println!("light has color {}", light.color);
-            } else {
-                println!("unknown component");
-            }
+    match &node.components()[0] {
+        Component::Transform(mut transform) => {
+            transform.with_translation(Vec3::new(1.0, 2.0, 3.0));
+            println!("node 0 transform {:?}", transform.local_matrix());
         }
-    }
-
-    scene_tree.update();
-
-    scene_tree.destory_node(node_id);
-
-    scene_tree.update();
+        _ => panic!("Expected Transform component"),
+    };
+    //scene_tree.update();
+    println!("*****************");
+    scene_tree.print_tree();
 }

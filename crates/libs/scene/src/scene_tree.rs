@@ -143,7 +143,7 @@ impl SceneTree {
         let mut satck: Vec<(Transform, u32)> = Vec::new();
         satck.push((Transform::default(), 0));
         while !satck.is_empty() {
-            let (parent_transform, node_id) = satck.pop().unwrap();
+            let (mut parent_transform, node_id) = satck.pop().unwrap();
             let node = self
                 .nodes
                 .get_mut(&node_id)
@@ -153,10 +153,8 @@ impl SceneTree {
                 Component::Transform(transform) => transform,
                 _ => panic!("Expected Transform component"),
             };
-            if transform.is_dirty() || parent_transform.is_dirty() {
-                //todo
-                transform.update();
-            }
+            transform.local_to_world_matrix =
+                parent_transform.local_to_world_matrix() * transform.local_matrix();
 
             node.components.iter_mut().for_each(|comp| {
                 if let Component::Camera(camera) = comp {
@@ -211,6 +209,31 @@ impl SceneTree {
             .get_mut(&node_id)
             .unwrap_or_else(|| panic!("没有找到id为 {} 的节点!", node_id));
         node.components.iter().find(pred)
+    }
+
+    pub fn print_tree(&mut self) {
+        let mut stack: Vec<(u32, u32)> = Vec::new();
+        stack.push((0, 0));
+        while !stack.is_empty() {
+            let (node_id, level) = stack.pop().unwrap();
+            let node = self
+                .nodes
+                .get_mut(&node_id)
+                .unwrap_or_else(|| panic!("没有找到id为 {} 的节点!", node_id));
+            println!("{}{}", "  ".repeat(level as usize), node.name);
+            node.components.iter().for_each(|comp| {
+                if let Component::Transform(mut transform) = comp {
+                    println!(
+                        "{}{}",
+                        "  ".repeat((level + 1) as usize),
+                        transform.local_matrix()
+                    );
+                }
+            });
+            for child_id in node.children() {
+                stack.push((*child_id, level + 1));
+            }
+        }
     }
 }
 

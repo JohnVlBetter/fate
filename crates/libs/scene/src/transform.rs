@@ -11,6 +11,7 @@ pub struct Transform {
     pub translation: Vec3,
     pub rotation: Quat,
     pub scale: Vec3,
+    pub(crate) local_matrix: Affine3A,
     pub(crate) local_to_world_matrix: Affine3A,
     pub(crate) dirty: bool,
 }
@@ -51,7 +52,8 @@ impl Transform {
             translation,
             rotation: Quat::IDENTITY,
             scale: Vec3::ONE,
-            local_to_world_matrix: Affine3A::from_translation(translation),
+            local_matrix: Affine3A::from_translation(translation),
+            local_to_world_matrix: Affine3A::IDENTITY,
             dirty: false,
         }
     }
@@ -64,7 +66,8 @@ impl Transform {
             translation: Vec3::ZERO,
             rotation: rotation,
             scale: Vec3::ONE,
-            local_to_world_matrix: Affine3A::from_rotation_translation(rotation, Vec3::ZERO),
+            local_matrix: Affine3A::from_rotation_translation(rotation, Vec3::ZERO),
+            local_to_world_matrix: Affine3A::IDENTITY,
             dirty: false,
         }
     }
@@ -77,26 +80,33 @@ impl Transform {
             translation: Vec3::ZERO,
             rotation: Quat::IDENTITY,
             scale: scale,
-            local_to_world_matrix: Affine3A::from_scale(scale),
+            local_matrix: Affine3A::from_scale(scale),
+            local_to_world_matrix: Affine3A::IDENTITY,
             dirty: false,
         }
     }
 
     #[inline]
-    pub fn calculate_local_to_world_matrix(&mut self) {
+    pub fn calculate_local_matrix(&mut self) {
         if self.dirty {
-            self.local_to_world_matrix = Affine3A::from_scale_rotation_translation(
+            self.local_matrix = Affine3A::from_scale_rotation_translation(
                 self.scale,
                 self.rotation,
                 self.translation,
             );
+            self.dirty = false;
         }
     }
 
     #[inline]
-    pub fn local_to_world_matrix(&mut self) -> Mat4 {
-        self.calculate_local_to_world_matrix();
-        Mat4::from(self.local_to_world_matrix)
+    pub fn local_matrix(&mut self) -> Affine3A {
+        self.calculate_local_matrix();
+        self.local_matrix
+    }
+
+    #[inline]
+    pub fn local_to_world_matrix(&mut self) -> Affine3A {
+        self.local_to_world_matrix
     }
 
     #[inline]
@@ -109,11 +119,8 @@ impl Transform {
             translation,
             rotation,
             scale,
-            local_to_world_matrix: Affine3A::from_scale_rotation_translation(
-                scale,
-                rotation,
-                translation,
-            ),
+            local_matrix: Affine3A::from_scale_rotation_translation(scale, rotation, translation),
+            local_to_world_matrix: Affine3A::IDENTITY,
             dirty: false,
         }
     }
@@ -284,46 +291,11 @@ impl Transform {
     }
 
     #[inline]
-    pub fn affine(&mut self) -> Affine3A {
-        self.calculate_local_to_world_matrix();
-        self.local_to_world_matrix
-    }
-
-    #[inline]
-    #[must_use]
-    pub fn mul_transform(&self, transform: Transform) -> Self {
-        let translation = self.transform_point(transform.translation);
-        let rotation = self.rotation * transform.rotation;
-        let scale = self.scale * transform.scale;
-        Transform {
-            id: 0,
-            node_id: 0,
-            translation,
-            rotation,
-            scale,
-            local_to_world_matrix: Affine3A::from_scale_rotation_translation(
-                scale,
-                rotation,
-                translation,
-            ),
-            dirty: false,
-        }
-    }
-
-    #[inline]
     pub fn transform_point(&self, mut point: Vec3) -> Vec3 {
         point = self.scale * point;
         point = self.rotation * point;
         point += self.translation;
         point
-    }
-}
-
-impl Mul<Transform> for Transform {
-    type Output = Transform;
-
-    fn mul(self, transform: Transform) -> Self::Output {
-        self.mul_transform(transform)
     }
 }
 
@@ -379,6 +351,7 @@ impl Default for Transform {
             translation: Vec3::ZERO,
             rotation: Quat::IDENTITY,
             scale: Vec3::ONE,
+            local_matrix: Affine3A::IDENTITY,
             local_to_world_matrix: Affine3A::IDENTITY,
             dirty: false,
         }
