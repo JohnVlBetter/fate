@@ -9,4 +9,4 @@ path = "examples/scene_example.rs"
 
 [dependencies]
 smallvec = { version = "1.11", features = ["union", "const_generics"] }
-cgmath.workspace = true
+glam = { version = "0.28", features = ["approx"] }
