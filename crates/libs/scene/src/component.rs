@@ -4,6 +4,7 @@ pub trait ComponentBase {
     fn id(&self) -> u32;
     fn set_id(&mut self, id: u32);
     fn get_pred() -> impl Fn(&&Component) -> bool;
+    fn get_node_id(&self) -> u32;
     fn update(&mut self);
     fn start(&mut self);
     fn destroy(&mut self);
@@ -54,6 +55,10 @@ impl ComponentBase for MeshRenderer {
     fn destroy(&mut self) {
         println!("MeshRenderer destroy");
     }
+
+    fn get_node_id(&self) -> u32 {
+        self.node_id
+    }
 }
 
 #[derive(PartialEq, PartialOrd, Debug)]
@@ -93,6 +98,10 @@ impl ComponentBase for Camera {
     fn destroy(&mut self) {
         println!("Camera destroy");
     }
+
+    fn get_node_id(&self) -> u32 {
+        self.node_id
+    }
 }
 
 #[derive(PartialEq, PartialOrd, Debug)]
@@ -131,5 +140,9 @@ impl ComponentBase for Light {
 
     fn destroy(&mut self) {
         println!("Light destroy");
+    }
+
+    fn get_node_id(&self) -> u32 {
+        self.node_id
     }
 }

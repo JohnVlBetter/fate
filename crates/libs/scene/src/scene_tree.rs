@@ -2,9 +2,8 @@ use std::collections::HashMap;
 
 use crate::{
     component::{Component, ComponentBase},
-    transform,
+    transform::{self, Transform},
 };
-//use smallvec::SmallVec;
 
 #[derive(Debug)]
 pub struct Node {
@@ -60,7 +59,10 @@ pub struct SceneTree {
 impl SceneTree {
     pub fn new() -> Self {
         let mut nodes: HashMap<u32, Node> = HashMap::new();
-        nodes.insert(0, Node::new(0, "Scene Root".to_string()));
+        let mut root = Node::new(0, "Scene Root".to_string());
+        root.components
+            .push(Component::Transform(transform::Transform::default()));
+        nodes.insert(0, root);
         SceneTree {
             nodes,
             root: 0,
@@ -138,18 +140,26 @@ impl SceneTree {
     }
 
     pub fn update(&mut self) {
-        let mut satck: Vec<u32> = Vec::new();
-        satck.push(self.root);
+        let mut satck: Vec<(Transform, u32)> = Vec::new();
+        satck.push((Transform::default(), 0));
         while !satck.is_empty() {
-            let node_id = satck.pop().unwrap();
+            let (parent_transform, node_id) = satck.pop().unwrap();
             let node = self
                 .nodes
                 .get_mut(&node_id)
                 .unwrap_or_else(|| panic!("没有找到id为 {} 的节点!", node_id));
+
+            let mut transform = match node.components[0] {
+                Component::Transform(transform) => transform,
+                _ => panic!("Expected Transform component"),
+            };
+            if transform.is_dirty() || parent_transform.is_dirty() {
+                //todo
+                transform.update();
+            }
+
             node.components.iter_mut().for_each(|comp| {
-                if let Component::Transform(transform) = comp {
-                    transform.update();
-                } else if let Component::Camera(camera) = comp {
+                if let Component::Camera(camera) = comp {
                     camera.update();
                 } else if let Component::Light(light) = comp {
                     light.update();
@@ -158,7 +168,7 @@ impl SceneTree {
                 }
             });
             for child_id in node.children() {
-                satck.push(*child_id);
+                satck.push((transform, *child_id));
             }
         }
     }

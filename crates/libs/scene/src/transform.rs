@@ -29,6 +29,16 @@ impl PartialEq for Transform {
 
 impl Transform {
     #[inline]
+    pub fn set_dirty(&mut self, dirty: bool) {
+        self.dirty = dirty;
+    }
+
+    #[inline]
+    pub fn is_dirty(&self) -> bool {
+        self.dirty
+    }
+
+    #[inline]
     pub fn from_xyz(x: f32, y: f32, z: f32) -> Self {
         Self::from_translation(Vec3::new(x, y, z))
     }
@@ -73,7 +83,19 @@ impl Transform {
     }
 
     #[inline]
-    pub fn local_to_world_matrix(&self) -> Mat4 {
+    pub fn calculate_local_to_world_matrix(&mut self) {
+        if self.dirty {
+            self.local_to_world_matrix = Affine3A::from_scale_rotation_translation(
+                self.scale,
+                self.rotation,
+                self.translation,
+            );
+        }
+    }
+
+    #[inline]
+    pub fn local_to_world_matrix(&mut self) -> Mat4 {
+        self.calculate_local_to_world_matrix();
         Mat4::from(self.local_to_world_matrix)
     }
 
@@ -114,6 +136,7 @@ impl Transform {
     #[must_use]
     pub const fn with_translation(mut self, translation: Vec3) -> Self {
         self.translation = translation;
+        self.dirty = true;
         self
     }
 
@@ -121,6 +144,7 @@ impl Transform {
     #[must_use]
     pub const fn with_rotation(mut self, rotation: Quat) -> Self {
         self.rotation = rotation;
+        self.dirty = true;
         self
     }
 
@@ -128,6 +152,7 @@ impl Transform {
     #[must_use]
     pub const fn with_scale(mut self, scale: Vec3) -> Self {
         self.scale = scale;
+        self.dirty = true;
         self
     }
 
@@ -179,6 +204,7 @@ impl Transform {
     #[inline]
     pub fn rotate(&mut self, rotation: Quat) {
         self.rotation = rotation * self.rotation;
+        self.dirty = true;
     }
 
     #[inline]
@@ -204,6 +230,7 @@ impl Transform {
     #[inline]
     pub fn rotate_local(&mut self, rotation: Quat) {
         self.rotation *= rotation;
+        self.dirty = true;
     }
 
     #[inline]
@@ -229,6 +256,7 @@ impl Transform {
     #[inline]
     pub fn translate_around(&mut self, point: Vec3, rotation: Quat) {
         self.translation = point + rotation * (self.translation - point);
+        self.dirty = true;
     }
 
     #[inline]
@@ -252,10 +280,12 @@ impl Transform {
             .unwrap_or_else(|| up.any_orthonormal_vector());
         let up = back.cross(right);
         self.rotation = Quat::from_mat3(&Mat3::from_cols(right, up, back));
+        self.dirty = true;
     }
 
     #[inline]
-    pub fn affine(&self) -> Affine3A {
+    pub fn affine(&mut self) -> Affine3A {
+        self.calculate_local_to_world_matrix();
         self.local_to_world_matrix
     }
 
@@ -324,21 +354,21 @@ impl ComponentBase for Transform {
         }
     }
 
-    fn update(&mut self) {
-        println!("Transform update");
+    fn get_node_id(&self) -> u32 {
+        self.node_id
     }
 
     fn start(&mut self) {
-        println!("Transform start");
+        println!("node {} Transform start", self.node_id);
+    }
+
+    fn update(&mut self) {
+        println!("node {} Transform update", self.node_id);
     }
 
     fn destroy(&mut self) {
-        println!("Transform destroy");
+        println!("node {} Transform destroy", self.node_id);
     }
-}
-
-impl Transform {
-    fn update(&mut self) {}
 }
 
 impl Default for Transform {
