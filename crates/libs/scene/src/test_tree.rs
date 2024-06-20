@@ -14,7 +14,9 @@ pub struct Node {
 
 pub trait Component: Any {
     fn id(&self) -> u32;
+    fn name(&self) -> &str;
     fn start(&mut self);
+    fn as_any(&self) -> &dyn Any;
 }
 
 pub struct Transform {
@@ -26,8 +28,22 @@ impl Component for Transform {
         self.id
     }
 
+    fn name(&self) -> &str {
+        "Transform"
+    }
+
     fn start(&mut self) {
         println!("Transform start");
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
+
+impl Transform {
+    pub fn set_id(&mut self, id: u32) {
+        self.id = id;
     }
 }
 
@@ -40,22 +56,16 @@ impl Component for MeshRenderer {
         self.id
     }
 
+    fn name(&self) -> &str {
+        "MeshRenderer"
+    }
+
     fn start(&mut self) {
         println!("MeshRenderer start");
     }
-}
 
-pub fn print_any<T: Any>(value: &T) {
-    let value_any = value as &dyn Any;
-
-    if let Some(string) = value_any.downcast_ref::<String>() {
-        println!("String ({}): {}", string.len(), string);
-    } else if let Some(Transform { id: 0 }) = value_any.downcast_ref::<Transform>() {
-        println!("Transform")
-    } else if let Some(MeshRenderer { id: 0 }) = value_any.downcast_ref::<MeshRenderer>() {
-        println!("MeshRenderer")
-    } else {
-        println!("{:?}", 1)
+    fn as_any(&self) -> &dyn Any {
+        self
     }
 }
 
@@ -99,12 +109,27 @@ impl Node {
         self.components.borrow_mut().push(component);
     }
 
-    /*pub fn get_component<T: Component>(&self) -> Option<Rc<T>> {
+    pub fn has_component<T: Component>(&self) -> bool {
         for component in self.components.borrow().iter() {
-            if let Some(component) = component.as_ref().downcast_ref::<T>() {
-                return Some(Rc::clone(component));
+            if let Some(_) = component.as_any().downcast_ref::<T>() {
+                return true;
             }
         }
-        None
-    }*/
+        false
+    }
+
+    pub fn get_component<T: Component>(&self) -> Option<Rc<dyn Component>> {
+        let mut index: i32 = -1;
+        for (idx, component) in self.components.borrow().iter().enumerate() {
+            if let Some(_) = component.as_any().downcast_ref::<T>() {
+                index = idx as i32;
+                break;
+            }
+        }
+        if index >= 0 {
+            Some(Rc::clone(&self.components.borrow_mut()[index as usize]))
+        } else {
+            None
+        }
+    }
 }

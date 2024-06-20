@@ -32,7 +32,7 @@ fn main() {
 }
 */
 
-use scene::test_tree::{print_any, MeshRenderer, Node, Transform};
+use scene::test_tree::{MeshRenderer, Node, Transform};
 use std::rc::Rc;
 
 fn main() {
@@ -41,6 +41,11 @@ fn main() {
     Node::add_child(&nodeA, &nodeB);
     nodeA.add_component(Rc::new(Transform { id: 0 }));
     nodeA.add_component(Rc::new(MeshRenderer { id: 0 }));
-    print_any(&nodeA.components.borrow()[0]);
-    print_any(&nodeA.components.borrow()[1]);
+    nodeA.get_component::<MeshRenderer>();
+    if nodeA.has_component::<Transform>() {
+        println!("nodeA has Transform component");
+    }
+    if nodeA.has_component::<MeshRenderer>() {
+        println!("nodeA has MeshRenderer component");
+    }
 }
