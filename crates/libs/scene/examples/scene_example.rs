@@ -1,4 +1,4 @@
-use glam::Vec3;
+/*use glam::Vec3;
 use scene::{
     component::{Component, ComponentBase, MeshRenderer},
     scene_tree::SceneTree, transform::{self, Transform},
@@ -18,7 +18,7 @@ fn main() {
     );
     scene_tree.print_tree();
     let mut node = scene_tree.get_node(0);
-    
+
     match &node.components()[0] {
         Component::Transform(mut transform) => {
             transform = transform.with_translation(Vec3::new(1.0, 2.0, 3.0));
@@ -29,4 +29,18 @@ fn main() {
     scene_tree.update();
     println!("*****************");
     scene_tree.print_tree();
+}
+*/
+
+use scene::test_tree::{print_any, MeshRenderer, Node, Transform};
+use std::rc::Rc;
+
+fn main() {
+    let nodeA = Node::new();
+    let nodeB = Node::new();
+    Node::add_child(&nodeA, &nodeB);
+    nodeA.add_component(Rc::new(Transform { id: 0 }));
+    nodeA.add_component(Rc::new(MeshRenderer { id: 0 }));
+    print_any(&nodeA.components.borrow()[0]);
+    print_any(&nodeA.components.borrow()[1]);
 }
