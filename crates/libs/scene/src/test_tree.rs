@@ -136,10 +136,12 @@ impl Node {
         }
     }
 
-    pub fn with_component_mut<T: Component, F: FnOnce(&mut T)>(&self, f: F) {
-        for component in self.components.borrow().iter() {
-            if let Some(comp) = component.as_any().downcast_ref::<RefCell<T>>() {
-                f(&mut *comp.borrow_mut());
+    pub fn with_component_mut<T: Component, F: FnOnce(&mut T)>(& self, f: F) {
+        for component in self.components.borrow_mut().iter_mut() {
+            if let Some(comp) =
+                Rc::get_mut(component).and_then(|c| c.as_any_mut().downcast_mut::<T>())
+            {
+                f(comp);
                 return;
             }
         }
