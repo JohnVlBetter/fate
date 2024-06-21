@@ -17,6 +17,7 @@ pub trait Component: Any {
     fn name(&self) -> &str;
     fn start(&mut self);
     fn as_any(&self) -> &dyn Any;
+    fn as_any_mut(&mut self) -> &mut dyn Any;
 }
 
 pub struct Transform {
@@ -37,6 +38,10 @@ impl Component for Transform {
     }
 
     fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn Any {
         self
     }
 }
@@ -65,6 +70,10 @@ impl Component for MeshRenderer {
     }
 
     fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn Any {
         self
     }
 }
@@ -118,18 +127,21 @@ impl Node {
         false
     }
 
-    pub fn get_component<T: Component>(&self) -> Option<Rc<dyn Component>> {
-        let mut index: i32 = -1;
-        for (idx, component) in self.components.borrow().iter().enumerate() {
-            if let Some(_) = component.as_any().downcast_ref::<T>() {
-                index = idx as i32;
-                break;
+    pub fn with_component<T: Component, F: FnOnce(&T)>(&self, f: F) {
+        for component in self.components.borrow().iter() {
+            if let Some(comp) = component.as_any().downcast_ref::<T>() {
+                f(comp);
+                return;
             }
         }
-        if index >= 0 {
-            Some(Rc::clone(&self.components.borrow_mut()[index as usize]))
-        } else {
-            None
+    }
+
+    pub fn with_component_mut<T: Component, F: FnOnce(&mut T)>(&self, f: F) {
+        for component in self.components.borrow().iter() {
+            if let Some(comp) = component.as_any().downcast_ref::<RefCell<T>>() {
+                f(&mut *comp.borrow_mut());
+                return;
+            }
         }
     }
 }

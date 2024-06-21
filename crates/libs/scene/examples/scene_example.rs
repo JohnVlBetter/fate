@@ -41,11 +41,16 @@ fn main() {
     Node::add_child(&nodeA, &nodeB);
     nodeA.add_component(Rc::new(Transform { id: 0 }));
     nodeA.add_component(Rc::new(MeshRenderer { id: 0 }));
-    nodeA.get_component::<MeshRenderer>();
     if nodeA.has_component::<Transform>() {
         println!("nodeA has Transform component");
     }
     if nodeA.has_component::<MeshRenderer>() {
         println!("nodeA has MeshRenderer component");
     }
+    nodeA.with_component_mut::<Transform, _>(|transform| {
+        transform.set_id(19999);
+    });
+    nodeA.with_component::<Transform, _>(|transform| {
+        println!("nodeA transform id: {}", transform.id);
+    });
 }
