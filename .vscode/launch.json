@@ -44,6 +44,193 @@
         {
             "type": "lldb",
             "request": "launch",
+            "name": "Debug unit tests in library 'application'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--lib",
+                    "--package=application"
+                ],
+                "filter": {
+                    "name": "application",
+                    "kind": "lib"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug example 'application_example'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--example=application_example",
+                    "--package=application"
+                ],
+                "filter": {
+                    "name": "application_example",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in example 'application_example'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--example=application_example",
+                    "--package=application"
+                ],
+                "filter": {
+                    "name": "application_example",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in library 'scene'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--lib",
+                    "--package=scene"
+                ],
+                "filter": {
+                    "name": "scene",
+                    "kind": "lib"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug example 'scene_example'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--example=scene_example",
+                    "--package=scene"
+                ],
+                "filter": {
+                    "name": "scene_example",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in example 'scene_example'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--example=scene_example",
+                    "--package=scene"
+                ],
+                "filter": {
+                    "name": "scene_example",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in library 'asset'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--lib",
+                    "--package=asset"
+                ],
+                "filter": {
+                    "name": "asset",
+                    "kind": "lib"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in library 'audio'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--lib",
+                    "--package=audio"
+                ],
+                "filter": {
+                    "name": "audio",
+                    "kind": "lib"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug example 'audio_example'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--example=audio_example",
+                    "--package=audio"
+                ],
+                "filter": {
+                    "name": "audio_example",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in example 'audio_example'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--example=audio_example",
+                    "--package=audio"
+                ],
+                "filter": {
+                    "name": "audio_example",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
             "name": "Debug unit tests in library 'rendering'",
             "cargo": {
                 "args": [
@@ -92,6 +279,25 @@
                 ],
                 "filter": {
                     "name": "fate_rt",
+                    "kind": "lib"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in library 'gltf_loader'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--lib",
+                    "--package=gltf_loader"
+                ],
+                "filter": {
+                    "name": "gltf_loader",
                     "kind": "lib"
                 }
             },
