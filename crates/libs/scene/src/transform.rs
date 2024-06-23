@@ -1,16 +1,15 @@
-use std::ops::Mul;
-
 use glam::{Affine3A, Mat3, Mat4, Quat, Vec3};
+use std::{any::Any, ops::Mul};
 
-use crate::component::{Component, ComponentBase};
+use crate::component::Component;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Transform {
-    pub(crate) id: u32,
-    pub(crate) node_id: u32,
-    pub translation: Vec3,
-    pub rotation: Quat,
-    pub scale: Vec3,
+    pub id: u32,
+    pub node_id: u32,
+    pub(crate) translation: Vec3,
+    pub(crate) rotation: Quat,
+    pub(crate) scale: Vec3,
     pub(crate) local_matrix: Affine3A,
     pub(crate) local_to_world_matrix: Affine3A,
     pub(crate) dirty: bool,
@@ -25,6 +24,28 @@ impl PartialOrd for Transform {
 impl PartialEq for Transform {
     fn eq(&self, other: &Self) -> bool {
         self.id == other.id
+    }
+}
+
+impl Component for Transform {
+    fn id(&self) -> u32 {
+        self.id
+    }
+
+    fn name(&self) -> &str {
+        "Transform"
+    }
+
+    fn start(&mut self) {}
+
+    fn update(&mut self) {}
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
     }
 }
 
@@ -87,7 +108,7 @@ impl Transform {
     }
 
     #[inline]
-    pub fn calculate_local_matrix(&mut self) {
+    pub fn local_matrix(&mut self) -> Affine3A {
         if self.dirty {
             self.local_matrix = Affine3A::from_scale_rotation_translation(
                 self.scale,
@@ -96,16 +117,11 @@ impl Transform {
             );
             self.dirty = false;
         }
-    }
-
-    #[inline]
-    pub fn local_matrix(&mut self) -> Affine3A {
-        self.calculate_local_matrix();
         self.local_matrix
     }
 
     #[inline]
-    pub fn local_to_world_matrix(&mut self) -> Affine3A {
+    pub fn local_to_world_matrix(&self) -> Affine3A {
         self.local_to_world_matrix
     }
 
@@ -161,6 +177,39 @@ impl Transform {
         self.scale = scale;
         self.dirty = true;
         self
+    }
+
+    #[inline]
+    pub fn set_translation(&mut self, translation: Vec3) {
+        self.translation = translation;
+        self.dirty = true;
+    }
+
+    #[inline]
+    pub fn set_rotation(&mut self, rotation: Quat) {
+        self.rotation = rotation;
+        self.dirty = true;
+    }
+
+    #[inline]
+    pub fn set_scale(&mut self, scale: Vec3) {
+        self.scale = scale;
+        self.dirty = true;
+    }
+
+    #[inline]
+    pub fn translation(&self) -> Vec3 {
+        self.translation
+    }
+
+    #[inline]
+    pub fn rotation(&self) -> Quat {
+        self.rotation
+    }
+
+    #[inline]
+    pub fn scale(&self) -> Vec3 {
+        self.scale
     }
 
     #[inline]
@@ -304,42 +353,6 @@ impl Mul<Vec3> for Transform {
 
     fn mul(self, value: Vec3) -> Self::Output {
         self.transform_point(value)
-    }
-}
-
-impl ComponentBase for Transform {
-    fn id(&self) -> u32 {
-        self.id
-    }
-
-    fn set_id(&mut self, id: u32) {
-        self.id = id;
-    }
-
-    fn get_pred() -> impl Fn(&&Component) -> bool {
-        move |comp| {
-            if let Component::Transform(_) = comp {
-                true
-            } else {
-                false
-            }
-        }
-    }
-
-    fn get_node_id(&self) -> u32 {
-        self.node_id
-    }
-
-    fn start(&mut self) {
-        println!("node {} Transform start", self.node_id);
-    }
-
-    fn update(&mut self) {
-        println!("node {} Transform update", self.node_id);
-    }
-
-    fn destroy(&mut self) {
-        println!("node {} Transform destroy", self.node_id);
     }
 }
 

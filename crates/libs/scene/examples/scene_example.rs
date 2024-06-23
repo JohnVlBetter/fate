@@ -1,42 +1,5 @@
-/*use glam::Vec3;
-use scene::{
-    component::{Component, ComponentBase, MeshRenderer},
-    scene_tree::SceneTree, transform::{self, Transform},
-};
-
-fn main() {
-    let mut scene_tree = SceneTree::default();
-    let node_id = scene_tree.create_node("node_a", None);
-    let component = MeshRenderer {
-        id: 999,
-        node_id,
-        mesh: "cube mesh".to_string(),
-    };
-    scene_tree.add_component(
-        node_id,
-        scene::component::Component::MeshRenderer(component),
-    );
-    scene_tree.print_tree();
-    let mut node = scene_tree.get_node(0);
-
-    match &node.components()[0] {
-        Component::Transform(mut transform) => {
-            transform = transform.with_translation(Vec3::new(1.0, 2.0, 3.0));
-            println!("node 0 transform {:?}", transform.local_matrix());
-        }
-        _ => panic!("Expected Transform component"),
-    };
-    scene_tree.update();
-    println!("*****************");
-    scene_tree.print_tree();
-}
-*/
-
-use glam::Vec3;
-use scene::{
-    test_tree::SceneTree,
-    test_tree::{MeshRenderer, Transform},
-};
+use glam::{EulerRot, Quat, Vec3};
+use scene::{mesh_renderer::MeshRenderer, scene_tree::SceneTree, transform::Transform};
 use std::rc::Rc;
 
 fn main() {
@@ -64,13 +27,17 @@ fn main() {
         .with_component_mut::<Transform, _>(|transform| {
             transform.id = 123456;
             transform.set_translation(Vec3::new(1.0, 2.0, 3.0));
+            transform.set_scale(Vec3::new(0.5, 0.5, 0.5));
+            transform.set_rotation(Quat::from_euler(EulerRot::XYZ, 50.0, 0.0, 0.0));
         });
     node_a.with_component_mut::<Transform, _>(|transform| {
         transform.id = 19999;
     });
     node_b.with_component_mut::<Transform, _>(|transform| {
         transform.id = 19999;
-        transform.set_translation(Vec3::new(1.0, 2.0, 3.0));
+        transform.set_translation(Vec3::new(-1.0, -2.0, -3.0));
+        transform.set_scale(Vec3::new(2.0, 2.0, 2.0));
+        transform.set_rotation(Quat::from_euler(EulerRot::XYZ, -50.0, 0.0, 0.0));
     });
     node_c.with_component_mut::<Transform, _>(|transform| {
         transform.id = 19999;
@@ -106,4 +73,15 @@ fn main() {
     println!("children count: {}", node_a.children_count());
     println!("children count: {}", node_b.children_count());
     println!("children count: {}", node_c.children_count());
+    node_b.with_component::<Transform, _>(|transform| {
+        let (s, r, t) = transform
+            .local_to_world_matrix()
+            .to_scale_rotation_translation();
+        println!(
+            "node_b transform scale: {:?}, rotation: {:?}, translation: {:?}",
+            s,
+            r.to_euler(EulerRot::XYZ),
+            t
+        );
+    });
 }

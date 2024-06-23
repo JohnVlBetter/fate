@@ -1,28 +1,31 @@
-use std::collections::HashMap;
-
-use crate::{
-    component::{Component, ComponentBase},
-    transform::{self, Transform},
+use glam::Affine3A;
+use std::{
+    borrow::BorrowMut,
+    cell::RefCell,
+    rc::{Rc, Weak},
 };
 
-#[derive(Debug)]
+use crate::{component::Component, transform::Transform};
+
 pub struct Node {
-    pub(crate) id: u32,
-    pub(crate) name: String,
-    pub(crate) parent: Option<u32>,
-    pub(crate) children: Vec<u32>,
-    pub(crate) components: Vec<Component>,
+    id: u32,
+    name: String,
+    pub components: RefCell<Vec<Rc<dyn Component>>>,
+    parent: RefCell<Weak<Node>>,
+    children: RefCell<Vec<Rc<Node>>>,
 }
 
 impl Node {
-    pub(crate) fn new(id: u32, name: String) -> Self {
-        Node {
-            id,
+    pub fn new(name: String) -> Rc<Node> {
+        let mut comps: Vec<Rc<dyn Component>> = vec![];
+        comps.push(Rc::new(Transform::default()));
+        Rc::new(Node {
+            id: 0,
             name,
-            parent: None,
-            children: Vec::new(),
-            components: Vec::new(),
-        }
+            components: RefCell::new(comps),
+            parent: RefCell::new(Weak::new()),
+            children: RefCell::new(vec![]),
+        })
     }
 
     pub fn id(&self) -> u32 {
@@ -33,205 +36,128 @@ impl Node {
         &self.name
     }
 
-    pub fn parent_id(&self) -> Option<u32> {
-        self.parent
+    pub fn add_child(parent: &Rc<Self>, child: &Rc<Self>) {
+        child.parent.borrow_mut().upgrade().map(|old_parent| {
+            old_parent
+                .children
+                .borrow_mut()
+                .retain(|p| !Rc::ptr_eq(p, child));
+        });
+
+        *child.parent.borrow_mut() = Rc::downgrade(parent);
+
+        parent.children.borrow_mut().push(Rc::clone(child));
     }
 
-    pub fn get_child(&self, index: usize) -> u32 {
-        self.children[index]
+    pub fn remove_child(&self, index: usize) {
+        self.children.borrow_mut().remove(index);
     }
 
-    pub fn children(&self) -> &[u32] {
-        &self.children
+    pub fn get_parent(&self) -> Option<Rc<Node>> {
+        self.parent.borrow().upgrade()
     }
 
-    pub fn components(&self) -> &[Component] {
-        &self.components
+    pub fn get_child(&self, index: usize) -> Rc<Node> {
+        Rc::clone(&self.children.borrow()[index])
+    }
+
+    pub fn children_count(&self) -> u32 {
+        self.children.borrow().len() as u32
+    }
+
+    pub fn add_component(&self, component: Rc<dyn Component>) {
+        self.components.borrow_mut().push(component);
+    }
+
+    pub fn remove_component<T: Component>(&self) {
+        let mut remove_idx: i32 = -1;
+        for (idx, component) in self.components.borrow().iter().enumerate() {
+            if let Some(_) = component.as_any().downcast_ref::<T>() {
+                remove_idx = idx as i32;
+            }
+        }
+        if remove_idx >= 0 {
+            self.components.borrow_mut().remove(remove_idx as usize);
+        }
+    }
+
+    pub fn has_component<T: Component>(&self) -> bool {
+        for component in self.components.borrow().iter() {
+            if let Some(_) = component.as_any().downcast_ref::<T>() {
+                return true;
+            }
+        }
+        false
+    }
+
+    pub fn with_component<T: Component, F: FnOnce(&T)>(&self, f: F) {
+        for component in self.components.borrow().iter() {
+            if let Some(comp) = component.as_any().downcast_ref::<T>() {
+                f(comp);
+                return;
+            }
+        }
+    }
+
+    pub fn with_component_mut<T: Component, F: FnOnce(&mut T)>(&self, f: F) {
+        for component in self.components.borrow_mut().iter_mut() {
+            if let Some(comp) =
+                Rc::get_mut(component).and_then(|c| c.as_any_mut().downcast_mut::<T>())
+            {
+                f(comp);
+                return;
+            }
+        }
     }
 }
 
 pub struct SceneTree {
-    pub(crate) nodes: HashMap<u32, Node>,
-    pub(crate) root: u32,
-    id_allocator: u32,
+    root: Rc<Node>,
 }
 
 impl SceneTree {
     pub fn new() -> Self {
-        let mut nodes: HashMap<u32, Node> = HashMap::new();
-        let mut root = Node::new(0, "Scene Root".to_string());
-        root.components
-            .push(Component::Transform(transform::Transform::default()));
-        nodes.insert(0, root);
-        SceneTree {
-            nodes,
-            root: 0,
-            id_allocator: 1,
-        }
+        let root = Node::new("Scene Root".to_string());
+        SceneTree { root }
     }
 
-    pub fn get_root_node() -> u32 {
-        0
+    pub fn get_root_node(&self) -> Rc<Node> {
+        Rc::clone(&self.root)
     }
 
-    pub fn create_node(&mut self, name: &str, parent_id: Option<u32>) -> u32 {
-        let id = self.id_allocator;
-        self.id_allocator += 1;
-        let mut node = Node::new(id, name.to_string());
-        match parent_id {
-            Some(parent_id) => {
-                let parent = self
-                    .nodes
-                    .get_mut(&parent_id)
-                    .unwrap_or_else(|| panic!("没有找到id为 {} 的节点!", parent_id));
-                parent.children.push(id);
-                node.parent = Some(parent_id);
-            }
-            None => {
-                let root = self.nodes.get_mut(&0).unwrap();
-                root.children.push(id);
-                node.parent = Some(self.root);
-            }
-        }
-        let mut transform = transform::Transform::default();
-        transform.start();
-        let transform = Component::Transform(transform);
-        node.components.push(transform);
-        self.nodes.insert(id, node);
-        id
-    }
-
-    pub fn destory_node(&mut self, id: u32) {
-        let mut node = self
-            .nodes
-            .remove(&id)
-            .unwrap_or_else(|| panic!("没有找到id为 {} 的节点!", id));
-        node.components.iter_mut().for_each(|comp| {
-            if let Component::Transform(transform) = comp {
-                transform.destroy();
-            } else if let Component::Camera(camera) = comp {
-                camera.destroy();
-            } else if let Component::Light(light) = comp {
-                light.destroy();
-            } else if let Component::MeshRenderer(mesh_renderer) = comp {
-                mesh_renderer.destroy();
-            }
-        });
-        //移除父节点的子节点
-        if let Some(parent_id) = node.parent {
-            let parent = self
-                .nodes
-                .get_mut(&parent_id)
-                .unwrap_or_else(|| panic!("没有找到id为 {} 的节点!", parent_id));
-            parent.children.remove(
-                parent
-                    .children
-                    .iter()
-                    .position(|child_id| *child_id == id)
-                    .expect("没找到要删除的子节点!"),
-            );
-        }
-    }
-
-    pub fn get_node(&self, id: u32) -> &Node {
-        self.nodes
-            .get(&id)
-            .unwrap_or_else(|| panic!("没有找到id为 {} 的节点!", id))
-    }
-
-    pub fn update(&mut self) {
-        let mut satck: Vec<(Transform, u32)> = Vec::new();
-        satck.push((Transform::default(), 0));
-        while !satck.is_empty() {
-            let (mut parent_transform, node_id) = satck.pop().unwrap();
-            let node = self
-                .nodes
-                .get_mut(&node_id)
-                .unwrap_or_else(|| panic!("没有找到id为 {} 的节点!", node_id));
-
-            let mut transform = match node.components[0] {
-                Component::Transform(transform) => transform,
-                _ => panic!("Expected Transform component"),
-            };
-            transform.local_to_world_matrix =
-                parent_transform.local_to_world_matrix() * transform.local_matrix();
-
-            node.components.iter_mut().for_each(|comp| {
-                if let Component::Camera(camera) = comp {
-                    camera.update();
-                } else if let Component::Light(light) = comp {
-                    light.update();
-                } else if let Component::MeshRenderer(mesh_renderer) = comp {
-                    mesh_renderer.update();
-                }
-            });
-            for child_id in node.children() {
-                satck.push((transform, *child_id));
-            }
-        }
-    }
-
-    pub fn has_component(&mut self, node_id: u32, component: Component) -> bool {
-        let node = self
-            .nodes
-            .get_mut(&node_id)
-            .unwrap_or_else(|| panic!("没有找到id为 {} 的节点!", node_id));
-        node.components
-            .iter()
-            .find(|&comp| comp == &component)
-            .is_some()
-    }
-
-    pub fn add_component(&mut self, node_id: u32, component: Component) {
-        let node = self
-            .nodes
-            .get_mut(&node_id)
-            .unwrap_or_else(|| panic!("没有找到id为 {} 的节点!", node_id));
-        if node
-            .components
-            .iter()
-            .find(|&comp| comp == &component)
-            .is_none()
-        {
-            node.components.push(component);
+    pub fn create_node(&self, name: String, parent: Option<Rc<Node>>) -> Rc<Node> {
+        let node = Node::new(name);
+        if let Some(parent) = parent {
+            Node::add_child(&parent, &node);
         } else {
-            panic!("节点 {} 已经存在组件 {:?}", node_id, component);
+            Node::add_child(&self.root, &node);
         }
+        node
     }
 
-    pub fn get_component(
-        &mut self,
-        node_id: u32,
-        pred: impl Fn(&&Component) -> bool,
-    ) -> Option<&Component> {
-        let node = self
-            .nodes
-            .get_mut(&node_id)
-            .unwrap_or_else(|| panic!("没有找到id为 {} 的节点!", node_id));
-        node.components.iter().find(pred)
-    }
-
-    pub fn print_tree(&mut self) {
-        let mut stack: Vec<(u32, u32)> = Vec::new();
-        stack.push((0, 0));
-        while !stack.is_empty() {
-            let (node_id, level) = stack.pop().unwrap();
-            let node = self
-                .nodes
-                .get_mut(&node_id)
-                .unwrap_or_else(|| panic!("没有找到id为 {} 的节点!", node_id));
-            println!("{}{}", "  ".repeat(level as usize), node.name);
-            node.components.iter().for_each(|comp| {
-                if let Component::Transform(mut transform) = comp {
-                    println!(
-                        "{}{}",
-                        "  ".repeat((level + 1) as usize),
-                        transform.local_matrix()
-                    );
+    pub fn update(&self) {
+        let mut stack: Vec<(Affine3A, Rc<Node>)> = vec![];
+        stack.push((Affine3A::IDENTITY, self.root.clone()));
+        while let Some((parent_affine, node)) = stack.pop() {
+            let mut cur_node_affine = Affine3A::IDENTITY;
+            for (idx, component) in node.components.borrow_mut().iter_mut().enumerate() {
+                let comp = Rc::get_mut(component);
+                //更新transform
+                if idx == 0 {
+                    if let Some(transform) =
+                        comp.and_then(|c| c.as_any_mut().downcast_mut::<Transform>())
+                    {
+                        transform.local_to_world_matrix = parent_affine * transform.local_matrix();
+                        cur_node_affine = transform.local_to_world_matrix;
+                    }
                 }
-            });
-            for child_id in node.children() {
-                stack.push((*child_id, level + 1));
+                //更新其他组件
+                else {
+                    comp.unwrap().update();
+                }
+            }
+            for child in node.children.borrow().iter() {
+                stack.push((cur_node_affine, Rc::clone(child)));
             }
         }
     }
@@ -239,21 +165,6 @@ impl SceneTree {
 
 impl Default for SceneTree {
     fn default() -> Self {
-        let mut tree = Self::new();
-        let main_camera_node = tree.create_node("MainCamera", None);
-        let main_light_node = tree.create_node("MainLight", None);
-        let main_camera = Component::Camera(crate::component::Camera {
-            id: 0,
-            node_id: main_camera_node,
-            view: "View".to_string(),
-        });
-        tree.add_component(main_camera_node, main_camera);
-        let main_light = Component::Light(crate::component::Light {
-            id: 0,
-            node_id: main_light_node,
-            color: "Color".to_string(),
-        });
-        tree.add_component(main_light_node, main_light);
-        tree
+        SceneTree::new()
     }
 }
