@@ -7,9 +7,9 @@ fn main() {
     let node_a = scene_tree.create_node("Node A".to_string(), None);
     let node_b = scene_tree.create_node("Node B".to_string(), None);
     let node_c = scene_tree.create_node("Node C".to_string(), Some(node_b.clone()));
-    node_a.add_component(Rc::new(MeshRenderer { id: 0 }));
+    node_a.add_component(Rc::new(MeshRenderer::default()));
     node_a.remove_component::<MeshRenderer>();
-    node_a.add_component(Rc::new(MeshRenderer { id: 0 }));
+    node_a.add_component(Rc::new(MeshRenderer::default()));
     if node_a.has_component::<Transform>() {
         println!("node_a has Transform component");
     }
