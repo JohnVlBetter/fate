@@ -1,4 +1,4 @@
-use glam::Vec3;
+use glam::{Vec3, Vec4};
 
 use crate::component::Component;
 use std::any::Any;
@@ -75,9 +75,11 @@ impl BoundingBox {
         self.max = self.max.max(other.max);
     }
 
+    //https://iquilezles.org/articles/frustumcorrect/
+    //cgmath_culling
     pub fn check_intersect_with_camera_frustum(&self) -> bool {
-        //TODO 根据相机视锥体判断包围盒是否相交
-        true
+        // check box outside/inside of frustum
+        return true;
     }
 
     fn check(&self) {
