@@ -42,6 +42,7 @@ fn main() {
     node_c.with_component_mut::<Transform, _>(|transform| {
         transform.id = 19999;
     });
+    println!("update!!!!!!!!!!!!!!!");
     scene_tree.update();
     scene_tree
         .get_root_node()

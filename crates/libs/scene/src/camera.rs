@@ -1,6 +1,6 @@
 use glam::{Mat4, Vec3};
 
-use crate::component::Component;
+use crate::{component::Component, frustum::Frustum};
 use std::any::Any;
 
 #[derive(Clone, Copy, Debug)]
@@ -53,6 +53,14 @@ impl Camera {
         }
     }
 
+    pub fn set_node_id(&mut self, node_id: u32) {
+        self.node_id = node_id;
+    }
+
+    pub fn node_id(&self) -> u32 {
+        self.node_id
+    }
+
     pub fn set_fov(&mut self, fov: f32) {
         self.fov = fov;
     }
@@ -96,6 +104,10 @@ impl Camera {
     pub fn get_view_matrix(&self) -> Mat4 {
         Mat4::look_at_rh(self.position, self.target, Vec3::Y)
     }
+
+    pub fn get_frustum(&self) -> Frustum {
+        Frustum::compute(self.get_projection_matrix(), self.get_view_matrix())
+    }
 }
 
 impl Default for Camera {
@@ -107,7 +119,7 @@ impl Default for Camera {
             near: 0.1,
             far: 100.0,
             aspect: 1.0,
-            target: Vec3::ZERO,
+            target: Vec3::ONE,
             position: Vec3::ZERO,
             is_projection: true,
         }

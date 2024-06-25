@@ -1,11 +1,13 @@
 use glam::Affine3A;
 use std::{
-    borrow::BorrowMut,
     cell::RefCell,
     rc::{Rc, Weak},
 };
 
-use crate::{component::Component, transform::Transform};
+use crate::{
+    camera::Camera, component::Component, frustum::Frustum, mesh_renderer::MeshRenderer,
+    transform::Transform,
+};
 
 pub struct Node {
     id: u32,
@@ -113,16 +115,24 @@ impl Node {
 
 pub struct SceneTree {
     root: Rc<Node>,
+    main_camera: Rc<Node>,
 }
 
 impl SceneTree {
     pub fn new() -> Self {
         let root = Node::new("Scene Root".to_string());
-        SceneTree { root }
+        let main_camera = Node::new("Main Camera".to_string());
+        main_camera.add_component(Rc::new(Camera::default()));
+        Node::add_child(&root, &main_camera);
+        SceneTree { root, main_camera }
     }
 
     pub fn get_root_node(&self) -> Rc<Node> {
         Rc::clone(&self.root)
+    }
+
+    pub fn get_main_camera(&self) -> Rc<Node> {
+        Rc::clone(&self.main_camera)
     }
 
     pub fn create_node(&self, name: String, parent: Option<Rc<Node>>) -> Rc<Node> {
@@ -136,6 +146,11 @@ impl SceneTree {
     }
 
     pub fn update(&self) {
+        let mut frustum = Frustum::default();
+        self.main_camera.with_component_mut::<Camera, _>(|cam| {
+            frustum = cam.get_frustum();
+        });
+
         let mut stack: Vec<(Affine3A, Rc<Node>)> = vec![];
         stack.push((Affine3A::IDENTITY, self.root.clone()));
         while let Some((parent_affine, node)) = stack.pop() {
@@ -153,7 +168,16 @@ impl SceneTree {
                 }
                 //更新其他组件
                 else {
-                    comp.unwrap().update();
+                    //mesh 视锥体裁剪
+                    if let Some(mesh_renderer) =
+                        comp.and_then(|c| c.as_any_mut().downcast_mut::<MeshRenderer>())
+                    {
+                        let bounding_box = mesh_renderer.bounding_box();
+                        let visible =
+                            frustum.is_bounding_box_visible(bounding_box.min(), bounding_box.max());
+                        mesh_renderer.set_visible(visible);
+                        println!("Node: {} visible: {}", node.name(), visible);
+                    }
                 }
             }
             for child in node.children.borrow().iter() {

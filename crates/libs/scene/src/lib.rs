@@ -4,4 +4,4 @@ pub mod scene;
 pub mod scene_tree;
 pub mod transform;
 pub mod camera;
-pub mod culling;
+pub mod frustum;
