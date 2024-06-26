@@ -1,12 +1,11 @@
 use glam::Affine3A;
 use std::{
-    cell::RefCell,
-    rc::{Rc, Weak},
+    borrow::BorrowMut, cell::RefCell, rc::{Rc, Weak}
 };
 
 use crate::{
     camera::Camera, component::Component, frustum::Frustum, mesh_renderer::MeshRenderer,
-    transform::Transform,
+    transform::{self, Transform},
 };
 
 pub struct Node {
@@ -15,18 +14,18 @@ pub struct Node {
     pub components: RefCell<Vec<Rc<dyn Component>>>,
     parent: RefCell<Weak<Node>>,
     children: RefCell<Vec<Rc<Node>>>,
+    transform: Rc<Transform>,
 }
 
 impl Node {
     pub fn new(name: String) -> Rc<Node> {
-        let mut comps: Vec<Rc<dyn Component>> = vec![];
-        comps.push(Rc::new(Transform::default()));
         Rc::new(Node {
             id: 0,
             name,
-            components: RefCell::new(comps),
+            components: RefCell::new(vec![]),
             parent: RefCell::new(Weak::new()),
             children: RefCell::new(vec![]),
+            transform: Rc::new(Transform::default()),
         })
     }
 
@@ -36,6 +35,18 @@ impl Node {
 
     pub fn name(&self) -> &str {
         &self.name
+    }
+
+    pub fn set_name(&mut self, name: String) {
+        self.name = name;
+    }
+
+    pub fn transform(&mut self) -> &mut Rc<Transform> {
+        self.transform.borrow_mut()
+    }
+
+    pub fn set_transform(&mut self, transform: Rc<Transform>) {
+        self.transform = transform;
     }
 
     pub fn add_child(parent: &Rc<Self>, child: &Rc<Self>) {
@@ -155,29 +166,22 @@ impl SceneTree {
         stack.push((Affine3A::IDENTITY, self.root.clone()));
         while let Some((parent_affine, node)) = stack.pop() {
             let mut cur_node_affine = Affine3A::IDENTITY;
+
+            //更新transform
+            let transform = node.transform();
+            transform.set_local_to_world_matrix(parent_affine * transform.local_matrix());
+            cur_node_affine = transform.local_to_world_matrix;
+
             for (idx, component) in node.components.borrow_mut().iter_mut().enumerate() {
-                let comp = Rc::get_mut(component);
-                //更新transform
-                if idx == 0 {
-                    if let Some(transform) =
-                        comp.and_then(|c| c.as_any_mut().downcast_mut::<Transform>())
-                    {
-                        transform.local_to_world_matrix = parent_affine * transform.local_matrix();
-                        cur_node_affine = transform.local_to_world_matrix;
-                    }
-                }
-                //更新其他组件
-                else {
-                    //mesh 视锥体裁剪
-                    if let Some(mesh_renderer) =
-                        comp.and_then(|c| c.as_any_mut().downcast_mut::<MeshRenderer>())
-                    {
-                        let bounding_box = mesh_renderer.bounding_box();
-                        let visible =
-                            frustum.is_bounding_box_visible(bounding_box.min(), bounding_box.max());
-                        mesh_renderer.set_visible(visible);
-                        println!("Mesh Renderer: {} visible: {}", node.name(), visible);
-                    }
+                //mesh 视锥体裁剪
+                if let Some(mesh_renderer) = Rc::get_mut(component)
+                    .and_then(|c| c.as_any_mut().downcast_mut::<MeshRenderer>())
+                {
+                    let bounding_box = mesh_renderer.bounding_box();
+                    let visible =
+                        frustum.is_bounding_box_visible(bounding_box.min(), bounding_box.max());
+                    mesh_renderer.set_visible(visible);
+                    println!("Mesh Renderer: {} visible: {}", node.name(), visible);
                 }
             }
             for child in node.children.borrow().iter() {

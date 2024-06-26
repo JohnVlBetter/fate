@@ -1,52 +1,15 @@
 use glam::{Affine3A, Mat3, Mat4, Quat, Vec3};
-use std::{any::Any, ops::Mul};
+use std::ops::Mul;
 
-use crate::component::Component;
-
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone)]
 pub struct Transform {
     pub id: u32,
-    pub node_id: u32,
     pub(crate) translation: Vec3,
     pub(crate) rotation: Quat,
     pub(crate) scale: Vec3,
     pub(crate) local_matrix: Affine3A,
     pub(crate) local_to_world_matrix: Affine3A,
     pub(crate) dirty: bool,
-}
-
-impl PartialOrd for Transform {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.id.partial_cmp(&other.id)
-    }
-}
-
-impl PartialEq for Transform {
-    fn eq(&self, other: &Self) -> bool {
-        self.id == other.id
-    }
-}
-
-impl Component for Transform {
-    fn id(&self) -> u32 {
-        self.id
-    }
-
-    fn name(&self) -> &str {
-        "Transform"
-    }
-
-    fn start(&mut self) {}
-
-    fn update(&mut self) {}
-
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
-    fn as_any_mut(&mut self) -> &mut dyn Any {
-        self
-    }
 }
 
 impl Transform {
@@ -69,7 +32,6 @@ impl Transform {
     pub fn from_translation(translation: Vec3) -> Self {
         Transform {
             id: 0,
-            node_id: 0,
             translation,
             rotation: Quat::IDENTITY,
             scale: Vec3::ONE,
@@ -83,7 +45,6 @@ impl Transform {
     pub fn from_rotation(rotation: Quat) -> Self {
         Transform {
             id: 0,
-            node_id: 0,
             translation: Vec3::ZERO,
             rotation: rotation,
             scale: Vec3::ONE,
@@ -97,7 +58,6 @@ impl Transform {
     pub fn from_scale(scale: Vec3) -> Self {
         Transform {
             id: 0,
-            node_id: 0,
             translation: Vec3::ZERO,
             rotation: Quat::IDENTITY,
             scale: scale,
@@ -126,12 +86,16 @@ impl Transform {
     }
 
     #[inline]
+    pub fn set_local_to_world_matrix(&mut self, matrix: Affine3A) {
+        self.local_to_world_matrix = matrix;
+    }
+
+    #[inline]
     pub fn from_matrix(matrix: Mat4) -> Self {
         let (scale, rotation, translation) = matrix.to_scale_rotation_translation();
 
         Transform {
             id: 0,
-            node_id: 0,
             translation,
             rotation,
             scale,
@@ -360,7 +324,6 @@ impl Default for Transform {
     fn default() -> Self {
         Transform {
             id: 0,
-            node_id: 0,
             translation: Vec3::ZERO,
             rotation: Quat::IDENTITY,
             scale: Vec3::ONE,
