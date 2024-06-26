@@ -1,10 +1,10 @@
 use super::{JointsBuffer, ModelData};
 use crate::renderer::attachments::GBUFFER_NORMALS_FORMAT;
 use crate::renderer::{create_renderer_pipeline, RendererPipelineParameters};
+use gltf_loader::mesh::Primitive;
+use gltf_loader::model::Model;
 use rendering::cgmath::Matrix4;
 use rendering::material::Material;
-use rendering::mesh::Primitive;
-use rendering::model::Model;
 use rendering::texture::Texture;
 use rendering::util::any_as_u8_slice;
 use rendering::vertex::ModelVertex;

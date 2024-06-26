@@ -5,9 +5,10 @@ pub mod shadowcasterpass;
 mod uniform;
 
 use gbufferpass::GBufferPass;
+use gltf_loader::model::Model;
 use lightpass::LightPass;
 use rendering::cgmath::Matrix4;
-use rendering::{model::Model, skin::MAX_JOINTS_PER_MESH};
+use rendering::skin::MAX_JOINTS_PER_MESH;
 use std::cell::RefCell;
 use std::rc::Weak;
 use std::sync::Arc;

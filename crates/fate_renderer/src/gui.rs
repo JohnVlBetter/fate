@@ -4,9 +4,9 @@ use crate::renderer::{
 };
 use egui::{ClippedPrimitive, Context, Label, Sense, TexturesDelta, Ui, ViewportId, Widget};
 use egui_winit::State as EguiWinit;
+use gltf_loader::model::Model;
 use rendering::animation::PlaybackState;
 use rendering::metadata::{Metadata, Node, NodeKind};
-use rendering::model::Model;
 use std::cell::RefCell;
 use std::rc::{Rc, Weak};
 use vulkan::winit::event::WindowEvent;
@@ -365,7 +365,7 @@ fn build_inspector_window(
     ui: &mut Ui,
     state: &mut State,
     model_nodes: &[rendering::node::Node],
-    model_meshes: &[rendering::mesh::Mesh],
+    model_meshes: &[gltf_loader::mesh::Mesh],
 ) {
     if let Some(node) = &state.select_node {
         ui.label(format!(

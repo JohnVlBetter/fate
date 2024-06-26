@@ -4,8 +4,8 @@ use crate::renderer::{create_renderer_pipeline, RendererPipelineParameters, Rend
 use rendering::cgmath::Matrix4;
 use rendering::environment::{Environment, PRE_FILTERED_MAP_SIZE};
 use rendering::material::PBRWorkflow;
-use rendering::mesh::Primitive;
-use rendering::model::Model;
+use gltf_loader::mesh::Primitive;
+use gltf_loader::model::Model;
 use rendering::texture::Texture;
 use rendering::util::*;
 use rendering::vertex::ModelVertex;

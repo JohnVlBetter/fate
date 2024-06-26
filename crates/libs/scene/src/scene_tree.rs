@@ -176,7 +176,7 @@ impl SceneTree {
                         let visible =
                             frustum.is_bounding_box_visible(bounding_box.min(), bounding_box.max());
                         mesh_renderer.set_visible(visible);
-                        println!("Node: {} visible: {}", node.name(), visible);
+                        println!("Mesh Renderer: {} visible: {}", node.name(), visible);
                     }
                 }
             }

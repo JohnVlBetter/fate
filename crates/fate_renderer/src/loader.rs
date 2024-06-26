@@ -1,4 +1,4 @@
-use rendering::model::{Model, ModelStagingResources};
+use gltf_loader::model::{Model, ModelStagingResources};
 use std::error::Error;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc;

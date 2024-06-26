@@ -6,10 +6,11 @@ mod loader;
 mod renderer;
 
 use crate::{camera::*, config::Config, gui::Gui, inputsystem::*, loader::*, renderer::*};
+use gltf_loader::model::Model;
 use log::LevelFilter;
 use rendering::cgmath::Vector3;
 use rendering::environment::Environment;
-use rendering::{animation::PlaybackMode, model::Model};
+use rendering::{animation::PlaybackMode};
 use std::{cell::RefCell, error::Error, path::PathBuf, rc::Rc, sync::Arc, time::Instant};
 use vulkan::*;
 use winit::{

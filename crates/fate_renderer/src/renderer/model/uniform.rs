@@ -1,9 +1,9 @@
 use super::JointsBuffer;
+use gltf_loader::model::Model;
 use rendering::cgmath::{InnerSpace, Matrix4, SquareMatrix, Vector4};
 use rendering::{
     light::{Light, LightType},
     material::{Material, PBRWorkflow},
-    model::Model,
     skin::MAX_JOINTS_PER_MESH,
 };
 use std::{mem::size_of, sync::Arc};

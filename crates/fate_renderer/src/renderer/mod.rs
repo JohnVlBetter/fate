@@ -22,9 +22,10 @@ use super::gui::Gui;
 use ash::{vk, Device};
 use egui::{ClippedPrimitive, TextureId};
 use egui_ash_renderer::{DynamicRendering, Options, Renderer as GuiRenderer};
+use gltf_loader::model::Model;
 use rendering::cgmath::{Deg, InnerSpace, Matrix4, Point3, SquareMatrix, Vector3};
 use rendering::environment::Environment;
-use rendering::model::Model;
+use scene::scene_tree::SceneTree;
 use std::cell::RefCell;
 use std::f32::consts::LN_2;
 use std::ffi::CString;
@@ -92,6 +93,7 @@ impl Default for RendererSettings {
 }
 
 pub struct Renderer {
+    scene: SceneTree,
     settings: RendererSettings,
     depth_format: vk::Format,
     msaa_samples: vk::SampleCountFlags,
@@ -216,6 +218,7 @@ impl Renderer {
         .expect("创建ui渲染器失败！");
 
         Self {
+            scene: SceneTree::default(),
             context,
             settings,
             depth_format,

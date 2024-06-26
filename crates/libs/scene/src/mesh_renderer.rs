@@ -75,13 +75,6 @@ impl BoundingBox {
         self.max = self.max.max(other.max);
     }
 
-    //https://iquilezles.org/articles/frustumcorrect/
-    //cgmath_culling
-    pub fn check_intersect_with_camera_frustum(&self) -> bool {
-        // check box outside/inside of frustum
-        return true;
-    }
-
     fn check(&self) {
         if self.min.x > self.max.x || self.min.y > self.max.y || self.min.z > self.max.z {
             panic!("Invalid bounding box");
@@ -199,13 +192,6 @@ impl MeshRenderer {
 
     pub fn id(&self) -> u32 {
         self.id
-    }
-
-    pub fn check_visibility_with_camera_frustum(&mut self) -> bool {
-        //TODO 根据相机视锥体判断包围盒是否可见
-        let res = self.bounding_box.check_intersect_with_camera_frustum();
-        self.visible = res;
-        res
     }
 }
 
