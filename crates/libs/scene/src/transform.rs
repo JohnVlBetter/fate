@@ -3,7 +3,7 @@ use std::ops::Mul;
 
 #[derive(Clone)]
 pub struct Transform {
-    pub id: u32,
+    pub(crate) id: u32,
     pub(crate) translation: Vec3,
     pub(crate) rotation: Quat,
     pub(crate) scale: Vec3,
@@ -13,6 +13,16 @@ pub struct Transform {
 }
 
 impl Transform {
+    #[inline]
+    pub fn id(&self) -> u32 {
+        self.id
+    }
+
+    #[inline]
+    pub fn set_id(&mut self, id: u32) {
+        self.id = id;
+    }
+
     #[inline]
     pub fn set_dirty(&mut self, dirty: bool) {
         self.dirty = dirty;

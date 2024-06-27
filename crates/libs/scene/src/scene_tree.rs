@@ -1,20 +1,21 @@
 use glam::Affine3A;
 use std::{
-    borrow::BorrowMut, cell::RefCell, rc::{Rc, Weak}
+    cell::RefCell,
+    rc::{Rc, Weak},
 };
 
 use crate::{
     camera::Camera, component::Component, frustum::Frustum, mesh_renderer::MeshRenderer,
-    transform::{self, Transform},
+    transform::Transform,
 };
 
 pub struct Node {
     id: u32,
     name: String,
-    pub components: RefCell<Vec<Rc<dyn Component>>>,
+    components: RefCell<Vec<Rc<dyn Component>>>,
     parent: RefCell<Weak<Node>>,
     children: RefCell<Vec<Rc<Node>>>,
-    transform: Rc<Transform>,
+    transform: RefCell<Rc<Transform>>,
 }
 
 impl Node {
@@ -25,7 +26,7 @@ impl Node {
             components: RefCell::new(vec![]),
             parent: RefCell::new(Weak::new()),
             children: RefCell::new(vec![]),
-            transform: Rc::new(Transform::default()),
+            transform: RefCell::new(Rc::new(Transform::default())),
         })
     }
 
@@ -39,14 +40,6 @@ impl Node {
 
     pub fn set_name(&mut self, name: String) {
         self.name = name;
-    }
-
-    pub fn transform(&mut self) -> &mut Rc<Transform> {
-        self.transform.borrow_mut()
-    }
-
-    pub fn set_transform(&mut self, transform: Rc<Transform>) {
-        self.transform = transform;
     }
 
     pub fn add_child(parent: &Rc<Self>, child: &Rc<Self>) {
@@ -122,6 +115,12 @@ impl Node {
             }
         }
     }
+
+    pub fn with_transform_mut<F: FnOnce(&mut Transform)>(&self, f: F) {
+        let mut binding = self.transform.borrow_mut();
+        let transform = Rc::get_mut(&mut binding).unwrap();
+        f(transform);
+    }
 }
 
 pub struct SceneTree {
@@ -168,11 +167,12 @@ impl SceneTree {
             let mut cur_node_affine = Affine3A::IDENTITY;
 
             //更新transform
-            let transform = node.transform();
-            transform.set_local_to_world_matrix(parent_affine * transform.local_matrix());
-            cur_node_affine = transform.local_to_world_matrix;
+            node.with_transform_mut(|transform| {
+                transform.local_to_world_matrix = parent_affine * transform.local_matrix();
+                cur_node_affine = transform.local_to_world_matrix();
+            });
 
-            for (idx, component) in node.components.borrow_mut().iter_mut().enumerate() {
+            for component in node.components.borrow_mut().iter_mut() {
                 //mesh 视锥体裁剪
                 if let Some(mesh_renderer) = Rc::get_mut(component)
                     .and_then(|c| c.as_any_mut().downcast_mut::<MeshRenderer>())
