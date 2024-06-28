@@ -1,18 +1,19 @@
 use crate::mesh::{create_meshes_from_gltf, Mesh, Meshes};
 use cgmath::{Vector3, Zero};
 use gltf::image::Source;
+use gltf::{iter::Nodes as GltfNodes, Scene};
 use rendering::{
     animation::{load_animations, Animations, PlaybackMode, PlaybackState},
     error::ModelLoadingError,
     light::{create_lights_from_gltf, Light},
     metadata::Metadata,
-    node::Nodes,
     skin::{create_skins_from_gltf, Skin},
     texture::{self, Texture, Textures},
-    transform::Transform,
     Aabb,
 };
-use std::{error::Error, path::Path, result::Result, sync::Arc};
+use scene::scene_tree::Node;
+use scene::transform::Transform;
+use std::{error::Error, path::Path, rc::Rc, result::Result, sync::Arc};
 use vulkan::{ash::vk, Buffer, Context, PreLoadedResource};
 
 pub struct ModelStagingResources {
@@ -24,7 +25,7 @@ pub struct ModelStagingResources {
 pub struct Model {
     metadata: Metadata,
     meshes: Vec<Mesh>,
-    nodes: Nodes,
+    node: Rc<Node>,
     animations: Option<Animations>,
     skins: Vec<Skin>,
     textures: Textures,
@@ -79,18 +80,17 @@ impl Model {
 
         let mut skins = create_skins_from_gltf(document.skins(), &buffers);
 
-        let mut nodes = Nodes::from_gltf_nodes(document.nodes(), &scene);
+        let mut node = from_gltf_nodes(document.nodes(), &scene);
 
         let transform = {
-            let aabb = compute_aabb(&nodes, &meshes);
+            let aabb = compute_aabb(&node, &meshes);
             let mut transform = compute_unit_cube_at_origin_transform(aabb);
-            nodes.transform(Some(transform.local_to_world_matrix()));
-            nodes
-                .get_skins_transform()
+            node.transform(Some(transform.local_to_world_matrix()));
+            node.get_skins_transform()
                 .iter()
                 .for_each(|(index, transform)| {
                     let skin = &mut skins[*index];
-                    skin.compute_joints_matrices(*transform, nodes.nodes());
+                    skin.compute_joints_matrices(*transform, node.nodes());
                 });
             transform
         };
@@ -109,7 +109,7 @@ impl Model {
         let model = Model {
             metadata,
             meshes,
-            nodes,
+            node,
             transform,
             animations,
             skins,
@@ -195,7 +195,7 @@ impl Model {
     }
 
     pub fn update_transform(&mut self) {
-        self.nodes
+        self.node
             .transform(Some(self.transform.local_to_world_matrix()));
     }
 }
@@ -222,8 +222,8 @@ impl Model {
         &self.skins
     }
 
-    pub fn nodes(&self) -> &Nodes {
-        &self.nodes
+    pub fn nodes(&self) -> Rc<Node> {
+        self.node.clone()
     }
 
     pub fn textures(&self) -> &[Texture] {
@@ -255,7 +255,7 @@ impl Model {
     }
 }
 
-fn compute_aabb(nodes: &Nodes, meshes: &[Mesh]) -> Aabb<f32> {
+fn compute_aabb(nodes: Rc<Node>, meshes: &[Mesh]) -> Aabb<f32> {
     let aabbs = nodes
         .nodes()
         .iter()
@@ -284,4 +284,48 @@ fn compute_unit_cube_at_origin_transform(aabb: Aabb<f32>) -> Transform {
     );
     //translation * scale
     transform
+}
+
+pub fn from_gltf_nodes(gltf_nodes: GltfNodes, scene: &Scene) -> Rc<Node> {
+    let roots_indices = scene.nodes().map(|n| n.index()).collect::<Vec<_>>();
+    let node_count = gltf_nodes.len();
+    let mut nodes = Vec::with_capacity(node_count);
+    for node in gltf_nodes {
+        let node_index = node.index();
+        let local_transform = node.transform();
+        let global_transform_matrix = compute_transform_matrix(&local_transform);
+        let mesh_index = node.mesh().map(|m| m.index());
+        let skin_index = node.skin().map(|s| s.index());
+        let light_index = node.light().map(|l| l.index());
+        let children_indices = node.children().map(|c| c.index()).collect::<Vec<_>>();
+        let node = Node {
+            local_transform,
+            global_transform_matrix,
+            mesh_index,
+            skin_index,
+            light_index,
+            children_indices,
+        };
+        nodes.insert(node_index, node);
+    }
+
+    let mut nodes = Nodes::new(nodes, roots_indices);
+    nodes.transform(None);
+    nodes
+}
+
+fn compute_transform_matrix(transform: &Transform) -> Matrix4<f32> {
+    match transform {
+        Transform::Matrix { matrix } => Matrix4::from(*matrix),
+        Transform::Decomposed {
+            translation,
+            rotation: [xr, yr, zr, wr],
+            scale: [xs, ys, zs],
+        } => {
+            let translation = Matrix4::from_translation(Vector3::from(*translation));
+            let rotation = Matrix4::from(Quaternion::new(*wr, *xr, *yr, *zr));
+            let scale = Matrix4::from_nonuniform_scale(*xs, *ys, *zs);
+            translation * rotation * scale
+        }
+    }
 }

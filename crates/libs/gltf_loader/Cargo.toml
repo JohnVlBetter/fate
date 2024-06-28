@@ -6,6 +6,7 @@ edition.workspace = true
 [dependencies]
 mikktspace.workspace = true
 rendering.workspace = true
+scene.workspace = true
 log.workspace = true
 cgmath.workspace = true
 vulkan.workspace = true
